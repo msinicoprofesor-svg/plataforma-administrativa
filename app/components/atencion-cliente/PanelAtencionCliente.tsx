@@ -9,6 +9,7 @@ import { MdSupportAgent, MdAddCircleOutline, MdListAlt, MdMap, MdPeopleAlt } fro
 import RegistroReporte from './views/RegistroReporte';
 import DirectorioClientes from './views/DirectorioClientes';
 import ListaReportes from './views/ListaReportes';
+import GestionRutas from './views/GestionRutas';
 
 export default function PanelAtencionCliente() {
     const [vistaActual, setVistaActual] = useState('REGISTRO'); 
@@ -64,15 +65,11 @@ export default function PanelAtencionCliente() {
                 
                 {vistaActual === 'REGISTRO' && <RegistroReporte />}
                 {vistaActual === 'CLIENTES' && <DirectorioClientes />}
-                
-                {/* AQUI CONECTAMOS LA NUEVA VISTA */}
                 {vistaActual === 'REPORTES' && <ListaReportes />}
-
-                {vistaActual === 'RUTAS' && (
-                    <div className="h-full border-2 border-dashed border-gray-200 rounded-3xl flex items-center justify-center text-gray-400 font-bold bg-white/50">
-                        [Aquí irá el Tablero de Técnicos y Drag & Drop]
-                    </div>
-                )}
+                
+                {/* AQUI CONECTAMOS AL JEFE FINAL */}
+                {vistaActual === 'RUTAS' && <GestionRutas />}
+                
             </div>
         </div>
     );
