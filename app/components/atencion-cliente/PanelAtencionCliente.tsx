@@ -3,10 +3,11 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react';
-import { MdSupportAgent, MdAddCircleOutline, MdListAlt, MdMap } from "react-icons/md";
+import { MdSupportAgent, MdAddCircleOutline, MdListAlt, MdMap, MdPeopleAlt } from "react-icons/md";
 
-// Importamos la nueva vista que acabamos de crear
+// Importamos las vistas
 import RegistroReporte from './views/RegistroReporte';
+import DirectorioClientes from './views/DirectorioClientes';
 
 export default function PanelAtencionCliente() {
     const [vistaActual, setVistaActual] = useState('REGISTRO'); 
@@ -45,6 +46,16 @@ export default function PanelAtencionCliente() {
                     >
                         <MdMap className="text-base" /> Gestión de Rutas
                     </button>
+                    
+                    {/* NUEVA PESTAÑA: DIRECTORIO DE CLIENTES */}
+                    <div className="w-px h-6 bg-gray-300 mx-1 hidden md:block"></div>
+                    
+                    <button 
+                        onClick={() => setVistaActual('CLIENTES')}
+                        className={`flex items-center whitespace-nowrap gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${vistaActual === 'CLIENTES' ? 'bg-white text-blue-600 shadow-sm border border-blue-200' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'}`}
+                    >
+                        <MdPeopleAlt className="text-base" /> Directorio Clientes
+                    </button>
                 </div>
             </div>
 
@@ -52,6 +63,7 @@ export default function PanelAtencionCliente() {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                 
                 {vistaActual === 'REGISTRO' && <RegistroReporte />}
+                {vistaActual === 'CLIENTES' && <DirectorioClientes />}
 
                 {vistaActual === 'REPORTES' && (
                     <div className="h-full border-2 border-dashed border-gray-200 rounded-3xl flex items-center justify-center text-gray-400 font-bold bg-white/50">
