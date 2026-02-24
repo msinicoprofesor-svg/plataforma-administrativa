@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/page.tsx (LOGIN CONECTADO CORRECTAMENTE A SUPABASE)           */
+/* ARCHIVO: app/page.tsx (CONECTADO A ATENCIÓN AL CLIENTE)                    */
 /* -------------------------------------------------------------------------- */
 'use client';
 
@@ -29,6 +29,9 @@ import PanelMarketing from './components/marketing/PanelMarketing';
 import PanelSolicitudes from './components/marketing/PanelSolicitudes';
 import PanelEstudios from './components/marketing/estudios/PanelEstudios'; 
 import PanelSocial from './components/marketing/social/PanelSocial';
+
+// --- COMPONENTES NUEVOS (JAVAK) ---
+import PanelAtencionCliente from './components/atencion-cliente/PanelAtencionCliente';
 
 // --- COMPONENTES RRHH ---
 import Directorio from './components/rrhh/Directorio';
@@ -94,6 +97,9 @@ export default function Home() {
   const verMesa = tienePermiso(u, 'marketing_mesa');
   const verLogistica = tienePermiso(u, 'almacen_operativo');
   
+  // Permiso temporal para JAVAK (mientras se agrega al archivo de permisos)
+  const verAtencionCliente = true; 
+
   const verSolicitudesDiseno = tienePermiso(u, 'marketing_solicitudes');
   const verPromociones = tienePermiso(u, 'marketing_promociones');
   const verColaboradores = tienePermiso(u, 'marketing_colaboradores');
@@ -125,7 +131,7 @@ export default function Home() {
       e.preventDefault();
       setErrorLogin(''); 
       
-      const exito = await auth.login(emailInput, passInput); // Usamos auth.login()
+      const exito = await auth.login(emailInput, passInput); 
       
       if (exito) {
           setPassInput('');
@@ -224,7 +230,7 @@ export default function Home() {
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
-         {!isLikeStore && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace(/_/g, ' ')} />}
+         {!isLikeStore && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace(/_/g, ' ')} />}
          
          <main className={mainContainerClasses}>
             {activeModule === 'marketing_dashboard' && (
@@ -232,6 +238,13 @@ export default function Home() {
                    <div className="w-40 h-40 md:w-64 md:h-64 bg-white rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(0,0,0,0.05)] mb-8 animate-pulse"><MdDashboard className="text-6xl md:text-8xl text-gray-200" /></div>
                    <h2 className="text-2xl md:text-4xl font-extrabold text-gray-300">Hola, {u.nombre.split(' ')[0]}</h2>
                    <p className="text-sm md:text-base text-gray-400 mt-2">Panel {u.puesto || u.rol}</p>
+                </div>
+            )}
+
+            {/* --- MÓDULOS JAVAK (NUEVOS) --- */}
+            {activeModule === 'atencion_cliente' && verAtencionCliente && (
+                <div className="animate-slide-up h-full pb-10">
+                    <PanelAtencionCliente />
                 </div>
             )}
 

@@ -1,12 +1,12 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/layout/Sidebar.tsx (LIMPIO Y CONECTADO)            */
+/* ARCHIVO: app/components/layout/Sidebar.tsx (ACTUALIZADO CON JAVAK)         */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { 
   MdDashboard, MdPeople, MdOutlineCloudUpload, MdMap, MdAttachMoney, 
   MdFactCheck, MdInventory2, MdCardGiftcard, MdBusiness, MdEngineering, 
   MdWork, MdLocalOffer, MdClose, MdFormatPaint, MdPoll, MdShare, 
-  MdEventNote, MdGroups, MdReceiptLong 
+  MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent 
 } from "react-icons/md";
 import { FaStoreAlt, FaUserCircle } from "react-icons/fa";
 
@@ -16,7 +16,9 @@ import { tienePermiso } from '../../config/permisos';
 export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModule, usuario, onLogout }) {
   
   // --- 1. CONSULTA DE PERMISOS (ATOMICA) ---
-  // El Sidebar no decide, solo pregunta a permisos.js
+  
+  // ATENCIÓN AL CLIENTE (NUEVO MÓDULO JAVAK)
+  const verAtencionCliente = true; // TODO: Cambiar a tienePermiso(usuario, 'atencion_cliente') cuando lo agregues a permisos.js
 
   // OPERACIONES
   const verDashboard = tienePermiso(usuario, 'marketing_dashboard');
@@ -37,7 +39,7 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
   const verLikeStore = tienePermiso(usuario, 'likestore');
 
   // RRHH
-  const verHubRRHH = tienePermiso(usuario, 'rrhh_hub'); // Acceso general
+  const verHubRRHH = tienePermiso(usuario, 'rrhh_hub'); 
   const verMural = tienePermiso(usuario, 'rrhh_mural');
   const verIncidencias = tienePermiso(usuario, 'rrhh_incidencias');
   const verNomina = tienePermiso(usuario, 'rrhh_nomina');
@@ -46,7 +48,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
   const verSoporte = tienePermiso(usuario, 'soporte_tickets');
 
   // --- 2. LÓGICA DE VISIBILIDAD DE SECCIONES ---
-  // Solo mostramos el título de "Marketing" si el usuario puede ver al menos un módulo de ese grupo
   const verSeccionMarketing = verCentroDiseno || verEstudios || verSocial || verPromociones || verColaboradores || verImportar || verLikeStore;
   const verSeccionRRHH = verMural || verIncidencias || verNomina || verHubRRHH;
 
@@ -65,7 +66,7 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             <div className="w-12 h-12 bg-[#DA291C] rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20 shrink-0">
                 <FaStoreAlt className="text-white text-xl" />
             </div>
-            <span className={`font-extrabold text-2xl text-gray-800 tracking-tight ${!isOpen && 'md:hidden'}`}>LikeStore</span>
+            <span className={`font-extrabold text-2xl text-gray-800 tracking-tight ${!isOpen && 'md:hidden'}`}>JAVAK</span>
           </div>
           <button onClick={() => setIsOpen(false)} className="md:hidden text-gray-400 p-2">
             <MdClose className="text-2xl"/>
@@ -75,7 +76,16 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
         {/* MENU SCROLLABLE */}
         <nav className="flex-1 overflow-y-auto px-4 space-y-1 custom-scrollbar pb-6">
           
+          {/* SECCIÓN: ATENCIÓN AL CLIENTE (NUEVA) */}
+          {verAtencionCliente && (
+            <>
+                <SectionTitle label="Atención al Cliente" isOpen={isOpen} />
+                <MenuButton icon={<MdSupportAgent />} label="Reportes y Rutas" active={activeModule === 'atencion_cliente'} onClick={() => setActiveModule('atencion_cliente')} isOpen={isOpen} />
+            </>
+          )}
+
           {/* SECCIÓN: OPERACIONES */}
+          <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
           <SectionTitle label="Operaciones" isOpen={isOpen} />
           
           {verDashboard && <MenuButton icon={<MdDashboard />} label="Dashboard" active={activeModule === 'marketing_dashboard'} onClick={() => setActiveModule('marketing_dashboard')} isOpen={isOpen} />}
@@ -112,13 +122,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
                 <SectionTitle label="Recursos Humanos" isOpen={isOpen} />
-                
-                {/* NOTA: Aquí usamos las claves del activeModule que definimos en permisos.js.
-                   'rrhh_mural', 'rrhh_incidencias', etc.
-                   Si queremos que vayan al Hub general primero, podríamos usar 'rrhh_hub',
-                   pero como ya desglosamos el menú, pueden ir directo.
-                */}
-                
                 {verMural && <MenuButton icon={<MdGroups />} label="Mural & Avisos" active={activeModule === 'rrhh_mural'} onClick={() => setActiveModule('rrhh_mural')} isOpen={isOpen} />}
                 {verIncidencias && <MenuButton icon={<MdEventNote />} label="Incidencias" active={activeModule === 'rrhh_incidencias'} onClick={() => setActiveModule('rrhh_incidencias')} isOpen={isOpen} />}
                 {verNomina && <MenuButton icon={<MdReceiptLong />} label="Nómina" active={activeModule === 'rrhh_nomina'} onClick={() => setActiveModule('rrhh_nomina')} isOpen={isOpen} />}
