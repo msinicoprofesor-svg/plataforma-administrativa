@@ -5,31 +5,50 @@
 import { useState } from 'react';
 import { 
     MdSearch, MdPersonAdd, MdFilterList, MdEdit, MdDelete, 
-    MdLocationOn, MdDomain, MdWifi, MdFiberManualRecord 
+    MdLocationOn, MdDomain, MdWifi, MdFiberManualRecord, MdClose, MdSave
 } from "react-icons/md";
 
-// DATOS DUMMY PARA VISUALIZACIÓN (LUEGO CONECTAREMOS A SUPABASE)
-const CLIENTES_MOCK = [
-    { id: '1', nombre: 'Roberto Gómez Bolaños', contrato: '10045-DMG', marca: 'DMG', region: 'San Diego de la Unión', estado: 'ACTIVO', telefono: '442-555-0199' },
-    { id: '2', nombre: 'Florinda Meza', contrato: '20012-JAV', marca: 'JAVAK', region: 'Centro', estado: 'SUSPENDIDO', telefono: '442-555-0144' },
-    { id: '3', nombre: 'Carlos Villagrán', contrato: '30056-FIB', marca: 'Fibrox MX', region: 'Xichú', estado: 'ACTIVO', telefono: '442-555-0122' },
-    { id: '4', nombre: 'Rubén Aguirre', contrato: '40088-RK', marca: 'RK', region: 'Michoacán', estado: 'CANCELADO', telefono: '442-555-0111' },
-    { id: '5', nombre: 'María Antonieta de las Nieves', contrato: '50021-WIF', marca: 'WifiCel', region: 'Amealco', estado: 'ACTIVO', telefono: '442-555-0188' },
-];
+// Importamos el hook que acabamos de crear
+import { useClientes } from '../../../hooks/useClientes';
 
 export default function DirectorioClientes() {
+    // ESTADOS DE UI
     const [busqueda, setBusqueda] = useState('');
     const [filtroMarca, setFiltroMarca] = useState('TODAS');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    // DATOS REALES DE SUPABASE
+    const { clientes, marcas, regiones, loading, agregarCliente } = useClientes();
 
-    // Lógica de filtrado
-    const clientesFiltrados = CLIENTES_MOCK.filter(c => {
+    // ESTADO DEL FORMULARIO
+    const [formData, setFormData] = useState({
+        nombre_completo: '',
+        numero_contrato: '',
+        telefono: '',
+        direccion: '',
+        marca_id: '',
+        region_id: '',
+        estado_servicio: 'ACTIVO'
+    });
+
+    // LÓGICA DE FILTRADO
+    const clientesFiltrados = clientes.filter(c => {
         const matchTexto = c.nombre.toLowerCase().includes(busqueda.toLowerCase()) || c.contrato.toLowerCase().includes(busqueda.toLowerCase());
         const matchMarca = filtroMarca === 'TODAS' || c.marca === filtroMarca;
         return matchTexto && matchMarca;
     });
 
+    // MANEJO DEL FORMULARIO
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        await agregarCliente(formData);
+        setIsModalOpen(false);
+        // Limpiar formulario
+        setFormData({ nombre_completo: '', numero_contrato: '', telefono: '', direccion: '', marca_id: '', region_id: '', estado_servicio: 'ACTIVO' });
+    };
+
     return (
-        <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10 h-full flex flex-col">
+        <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10 h-full flex flex-col relative">
             
             {/* BARRA DE HERRAMIENTAS SUPERIOR */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-200 shrink-0">
@@ -56,15 +75,16 @@ export default function DirectorioClientes() {
                             className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer"
                         >
                             <option value="TODAS">Todas las Marcas</option>
-                            <option value="JAVAK">JAVAK</option>
-                            <option value="DMG">DMG</option>
-                            <option value="Fibrox MX">Fibrox MX</option>
-                            <option value="WifiCel">WifiCel</option>
-                            <option value="RK">RK</option>
+                            {marcas.map(m => (
+                                <option key={m.id} value={m.nombre}>{m.nombre}</option>
+                            ))}
                         </select>
                     </div>
 
-                    <button className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95">
+                    <button 
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                    >
                         <MdPersonAdd className="text-base"/> Nuevo Cliente
                     </button>
                 </div>
@@ -72,8 +92,16 @@ export default function DirectorioClientes() {
 
             {/* TABLA DE CLIENTES */}
             <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                <div className="overflow-x-auto custom-scrollbar flex-1">
-                    <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto custom-scrollbar flex-1 relative">
+                    
+                    {loading && (
+                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                            <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                            <p className="text-xs font-bold text-gray-500 mt-3 animate-pulse">Cargando base de datos...</p>
+                        </div>
+                    )}
+
+                    <table className="w-full text-left border-collapse min-w-[600px]">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-100">
                                 <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente / Contrato</th>
@@ -118,9 +146,6 @@ export default function DirectorioClientes() {
                                             <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors" title="Editar">
                                                 <MdEdit/>
                                             </button>
-                                            <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors" title="Eliminar / Dar de baja">
-                                                <MdDelete/>
-                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -128,14 +153,114 @@ export default function DirectorioClientes() {
                         </tbody>
                     </table>
                     
-                    {clientesFiltrados.length === 0 && (
+                    {!loading && clientesFiltrados.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
                             <MdWifi className="text-4xl mb-2 opacity-20"/>
                             <p className="text-xs font-bold">No se encontraron clientes</p>
+                            {busqueda === '' && <p className="text-[10px] mt-1">Haz clic en "Nuevo Cliente" para empezar a llenar tu base de datos.</p>}
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* MODAL NUEVO CLIENTE */}
+            {isModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-slide-up">
+                        <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
+                            <h3 className="text-lg font-black text-gray-800 flex items-center gap-2">
+                                <MdPersonAdd className="text-blue-600"/> Registrar Nuevo Cliente
+                            </h3>
+                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors bg-white p-2 rounded-full shadow-sm">
+                                <MdClose className="text-xl"/>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* NOMBRE */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nombre Completo</label>
+                                    <input 
+                                        type="text" required
+                                        value={formData.nombre_completo}
+                                        onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})}
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all"
+                                        placeholder="Ej. Juan Pérez López"
+                                    />
+                                </div>
+
+                                {/* CONTRATO Y TELEFONO */}
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">No. de Contrato</label>
+                                    <input 
+                                        type="text" required
+                                        value={formData.numero_contrato}
+                                        onChange={(e) => setFormData({...formData, numero_contrato: e.target.value})}
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all"
+                                        placeholder="Ej. 10045-DMG"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Teléfono</label>
+                                    <input 
+                                        type="text" required
+                                        value={formData.telefono}
+                                        onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all"
+                                        placeholder="10 dígitos"
+                                    />
+                                </div>
+
+                                {/* MARCA Y REGION */}
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Marca</label>
+                                    <select 
+                                        required value={formData.marca_id}
+                                        onChange={(e) => setFormData({...formData, marca_id: e.target.value})}
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 cursor-pointer"
+                                    >
+                                        <option value="">Selecciona marca...</option>
+                                        {marcas.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Región / Zona</label>
+                                    <select 
+                                        required value={formData.region_id}
+                                        onChange={(e) => setFormData({...formData, region_id: e.target.value})}
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 cursor-pointer"
+                                    >
+                                        <option value="">Selecciona región...</option>
+                                        {regiones.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                                    </select>
+                                </div>
+
+                                {/* DIRECCION */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Dirección de Instalación</label>
+                                    <textarea 
+                                        required value={formData.direccion}
+                                        onChange={(e) => setFormData({...formData, direccion: e.target.value})}
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all resize-none h-20 custom-scrollbar"
+                                        placeholder="Calle, número, colonia, referencias..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors">
+                                    Cancelar
+                                </button>
+                                <button type="submit" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95">
+                                    <MdSave className="text-base"/> Guardar Cliente
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }
