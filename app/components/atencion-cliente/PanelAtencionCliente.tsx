@@ -8,6 +8,7 @@ import { MdSupportAgent, MdAddCircleOutline, MdListAlt, MdMap, MdPeopleAlt } fro
 // Importamos las vistas
 import RegistroReporte from './views/RegistroReporte';
 import DirectorioClientes from './views/DirectorioClientes';
+import ListaReportes from './views/ListaReportes';
 
 export default function PanelAtencionCliente() {
     const [vistaActual, setVistaActual] = useState('REGISTRO'); 
@@ -47,7 +48,6 @@ export default function PanelAtencionCliente() {
                         <MdMap className="text-base" /> Gestión de Rutas
                     </button>
                     
-                    {/* NUEVA PESTAÑA: DIRECTORIO DE CLIENTES */}
                     <div className="w-px h-6 bg-gray-300 mx-1 hidden md:block"></div>
                     
                     <button 
@@ -64,12 +64,10 @@ export default function PanelAtencionCliente() {
                 
                 {vistaActual === 'REGISTRO' && <RegistroReporte />}
                 {vistaActual === 'CLIENTES' && <DirectorioClientes />}
+                
+                {/* AQUI CONECTAMOS LA NUEVA VISTA */}
+                {vistaActual === 'REPORTES' && <ListaReportes />}
 
-                {vistaActual === 'REPORTES' && (
-                    <div className="h-full border-2 border-dashed border-gray-200 rounded-3xl flex items-center justify-center text-gray-400 font-bold bg-white/50">
-                        [Aquí irán las Tarjetas de los reportes más actuales]
-                    </div>
-                )}
                 {vistaActual === 'RUTAS' && (
                     <div className="h-full border-2 border-dashed border-gray-200 rounded-3xl flex items-center justify-center text-gray-400 font-bold bg-white/50">
                         [Aquí irá el Tablero de Técnicos y Drag & Drop]
