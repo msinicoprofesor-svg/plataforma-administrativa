@@ -2,13 +2,14 @@
 /* ARCHIVO: app/components/atencion-cliente/views/DirectorioClientes.tsx      */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
     MdSearch, MdPersonAdd, MdFilterList, MdEdit, MdDelete, 
-    MdLocationOn, MdDomain, MdWifi, MdFiberManualRecord, MdClose, MdSave
+    MdLocationOn, MdDomain, MdWifi, MdFiberManualRecord, MdClose, MdSave,
+    MdPerson, MdMap, MdSettingsEthernet
 } from "react-icons/md";
 
-// Importamos el hook que acabamos de crear
+// Importamos el hook
 import { useClientes } from '../../../hooks/useClientes';
 
 export default function DirectorioClientes() {
@@ -17,34 +18,60 @@ export default function DirectorioClientes() {
     const [filtroMarca, setFiltroMarca] = useState('TODAS');
     const [isModalOpen, setIsModalOpen] = useState(false);
     
-    // DATOS REALES DE SUPABASE
+    // DATOS DE SUPABASE
     const { clientes, marcas, regiones, loading, agregarCliente } = useClientes();
 
-    // ESTADO DEL FORMULARIO
-    const [formData, setFormData] = useState({
-        nombre_completo: '',
-        numero_contrato: '',
-        telefono: '',
-        direccion: '',
-        marca_id: '',
-        region_id: '',
+    // ESTADO DEL FORMULARIO COMPLETO
+    const estadoInicial = {
+        nombre_completo: '', numero_contrato: '', telefono: '', telefono_adicional: '',
+        cp: '', estado: '', municipio: '', comunidad: '', direccion: '', coordenadas: '',
+        marca_id: '', region_id: '', paquete: '', costo: '', tipo_conexion: '', fecha_instalacion: '', ip: '',
         estado_servicio: 'ACTIVO'
-    });
+    };
+    const [formData, setFormData] = useState(estadoInicial);
+    const [buscandoCP, setBuscandoCP] = useState(false);
 
     // LÓGICA DE FILTRADO
     const clientesFiltrados = clientes.filter(c => {
-        const matchTexto = c.nombre.toLowerCase().includes(busqueda.toLowerCase()) || c.contrato.toLowerCase().includes(busqueda.toLowerCase());
+        const matchTexto = c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) || c.contrato?.toLowerCase().includes(busqueda.toLowerCase());
         const matchMarca = filtroMarca === 'TODAS' || c.marca === filtroMarca;
         return matchTexto && matchMarca;
     });
 
-    // MANEJO DEL FORMULARIO
+    // LÓGICA DE AUTO-COMPLETADO DE CP
+    const handleCPChange = async (e) => {
+        const cp = e.target.value;
+        setFormData({ ...formData, cp });
+
+        if (cp.length === 5) {
+            setBuscandoCP(true);
+            try {
+                const res = await fetch(`https://api.zippopotam.us/mx/${cp}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setFormData(prev => ({
+                        ...prev,
+                        estado: data.places[0].state,
+                        municipio: data.places[0]['place name']
+                    }));
+                }
+            } catch (error) {
+                console.error("No se encontró el CP");
+            }
+            setBuscandoCP(false);
+        }
+    };
+
+    // LÓGICA CONDICIONAL: ¿Es marca de internet?
+    const marcaSeleccionada = marcas.find(m => m.id.toString() === formData.marca_id.toString())?.nombre || '';
+    const esMarcaInternet = ['JAVAK', 'Fibrox MX', 'DMG', 'WifiCel'].includes(marcaSeleccionada);
+
+    // GUARDAR CLIENTE
     const handleSubmit = async (e) => {
         e.preventDefault();
         await agregarCliente(formData);
         setIsModalOpen(false);
-        // Limpiar formulario
-        setFormData({ nombre_completo: '', numero_contrato: '', telefono: '', direccion: '', marca_id: '', region_id: '', estado_servicio: 'ACTIVO' });
+        setFormData(estadoInicial);
     };
 
     return (
@@ -52,39 +79,25 @@ export default function DirectorioClientes() {
             
             {/* BARRA DE HERRAMIENTAS SUPERIOR */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-200 shrink-0">
-                
-                {/* BUSCADOR */}
                 <div className="relative w-full md:w-96">
                     <MdSearch className="absolute left-3 top-3 text-gray-400 text-lg"/>
                     <input 
-                        type="text" 
-                        placeholder="Buscar cliente por nombre o contrato..." 
-                        value={busqueda}
-                        onChange={(e) => setBusqueda(e.target.value)}
+                        type="text" placeholder="Buscar cliente por nombre o contrato..." 
+                        value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all"
                     />
                 </div>
 
-                {/* FILTROS Y ACCIONES */}
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                     <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
                         <MdFilterList className="text-gray-400"/>
-                        <select 
-                            value={filtroMarca}
-                            onChange={(e) => setFiltroMarca(e.target.value)}
-                            className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer"
-                        >
+                        <select value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer">
                             <option value="TODAS">Todas las Marcas</option>
-                            {marcas.map(m => (
-                                <option key={m.id} value={m.nombre}>{m.nombre}</option>
-                            ))}
+                            {marcas.map(m => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
                         </select>
                     </div>
 
-                    <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
-                    >
+                    <button onClick={() => setIsModalOpen(true)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95">
                         <MdPersonAdd className="text-base"/> Nuevo Cliente
                     </button>
                 </div>
@@ -93,18 +106,16 @@ export default function DirectorioClientes() {
             {/* TABLA DE CLIENTES */}
             <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <div className="overflow-x-auto custom-scrollbar flex-1 relative">
-                    
                     {loading && (
                         <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
                             <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                            <p className="text-xs font-bold text-gray-500 mt-3 animate-pulse">Cargando base de datos...</p>
                         </div>
                     )}
-
-                    <table className="w-full text-left border-collapse min-w-[600px]">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-100">
                                 <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente / Contrato</th>
+                                <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Servicio</th>
                                 <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Marca & Región</th>
                                 <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Estado</th>
                                 <th className="py-4 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Acciones</th>
@@ -116,147 +127,181 @@ export default function DirectorioClientes() {
                                     <td className="py-4 px-6">
                                         <p className="text-sm font-bold text-gray-800">{cliente.nombre}</p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
-                                                {cliente.contrato}
-                                            </span>
+                                            <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">{cliente.contrato}</span>
                                             <span className="text-[10px] text-gray-400">{cliente.telefono}</span>
                                         </div>
                                     </td>
                                     <td className="py-4 px-6">
+                                        {cliente.ip && <p className="text-xs font-bold text-gray-600">IP: {cliente.ip}</p>}
+                                        <p className="text-[10px] text-gray-400">{cliente.paquete ? `${cliente.paquete} - $${cliente.costo || 0}` : 'Sin paquete'}</p>
+                                    </td>
+                                    <td className="py-4 px-6">
                                         <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-                                                <MdDomain className="text-blue-400"/> {cliente.marca}
-                                            </div>
-                                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400">
-                                                <MdLocationOn/> {cliente.region}
-                                            </div>
+                                            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700"><MdDomain className="text-blue-400"/> {cliente.marca}</div>
+                                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400"><MdLocationOn/> {cliente.region}</div>
                                         </div>
                                     </td>
                                     <td className="py-4 px-6 text-center">
-                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
-                                            cliente.estado === 'ACTIVO' ? 'bg-green-50 text-green-600 border-green-100' :
-                                            cliente.estado === 'SUSPENDIDO' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                            'bg-red-50 text-red-600 border-red-100'
-                                        }`}>
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${cliente.estado === 'ACTIVO' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                                             <MdFiberManualRecord className="text-[8px]"/> {cliente.estado}
                                         </span>
                                     </td>
                                     <td className="py-4 px-6 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors" title="Editar">
-                                                <MdEdit/>
-                                            </button>
+                                            <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors" title="Editar"><MdEdit/></button>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    
-                    {!loading && clientesFiltrados.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                            <MdWifi className="text-4xl mb-2 opacity-20"/>
-                            <p className="text-xs font-bold">No se encontraron clientes</p>
-                            {busqueda === '' && <p className="text-[10px] mt-1">Haz clic en "Nuevo Cliente" para empezar a llenar tu base de datos.</p>}
-                        </div>
-                    )}
                 </div>
             </div>
 
-            {/* MODAL NUEVO CLIENTE */}
+            {/* MODAL EXPEDIENTE CLIENTE */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-slide-up">
-                        <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
-                            <h3 className="text-lg font-black text-gray-800 flex items-center gap-2">
-                                <MdPersonAdd className="text-blue-600"/> Registrar Nuevo Cliente
-                            </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors bg-white p-2 rounded-full shadow-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col animate-slide-up overflow-hidden border border-gray-200">
+                        
+                        {/* HEADER MODAL */}
+                        <div className="flex justify-between items-center px-8 py-5 border-b border-gray-100 bg-white shrink-0">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center"><MdPersonAdd /></div>
+                                    Expediente de Nuevo Cliente
+                                </h3>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 ml-13">Alta en base de datos central</p>
+                            </div>
+                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors bg-gray-50 hover:bg-red-50 p-2.5 rounded-full">
                                 <MdClose className="text-xl"/>
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* NOMBRE */}
-                                <div className="md:col-span-2">
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Nombre Completo</label>
-                                    <input 
-                                        type="text" required
-                                        value={formData.nombre_completo}
-                                        onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all"
-                                        placeholder="Ej. Juan Pérez López"
-                                    />
+                        {/* BODY MODAL SCROLLABLE */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gray-50/50">
+                            <form id="formCliente" onSubmit={handleSubmit} className="space-y-8">
+                                
+                                {/* SECCIÓN 1: DATOS PERSONALES */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdPerson className="text-blue-500"/> 1. Datos Generales</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Nombre Completo</label>
+                                            <input type="text" required value={formData.nombre_completo} onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">ID / Contrato / Folio</label>
+                                            <input type="text" required value={formData.numero_contrato} onChange={(e) => setFormData({...formData, numero_contrato: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Marca Principal</label>
+                                            <select required value={formData.marca_id} onChange={(e) => setFormData({...formData, marca_id: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 cursor-pointer">
+                                                <option value="">Selecciona marca...</option>
+                                                {marcas.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Teléfono Principal</label>
+                                            <input type="text" required value={formData.telefono} onChange={(e) => setFormData({...formData, telefono: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Teléfono Adicional (Opcional)</label>
+                                            <input type="text" value={formData.telefono_adicional} onChange={(e) => setFormData({...formData, telefono_adicional: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* CONTRATO Y TELEFONO */}
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">No. de Contrato</label>
-                                    <input 
-                                        type="text" required
-                                        value={formData.numero_contrato}
-                                        onChange={(e) => setFormData({...formData, numero_contrato: e.target.value})}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all"
-                                        placeholder="Ej. 10045-DMG"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Teléfono</label>
-                                    <input 
-                                        type="text" required
-                                        value={formData.telefono}
-                                        onChange={(e) => setFormData({...formData, telefono: e.target.value})}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all"
-                                        placeholder="10 dígitos"
-                                    />
+                                {/* SECCIÓN 2: DIRECCIÓN */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdMap className="text-green-500"/> 2. Ubicación de Instalación</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex justify-between">
+                                                Código Postal {buscandoCP && <span className="text-blue-500 animate-pulse">Buscando...</span>}
+                                            </label>
+                                            <input type="text" maxLength={5} value={formData.cp} onChange={handleCPChange} placeholder="Ej. 76000" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Estado</label>
+                                            <input type="text" value={formData.estado} onChange={(e) => setFormData({...formData, estado: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Municipio</label>
+                                            <input type="text" value={formData.municipio} onChange={(e) => setFormData({...formData, municipio: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Región / Zona Operativa</label>
+                                            <select required value={formData.region_id} onChange={(e) => setFormData({...formData, region_id: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 cursor-pointer">
+                                                <option value="">Selecciona región...</option>
+                                                {regiones.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Comunidad / Colonia</label>
+                                            <input type="text" value={formData.comunidad} onChange={(e) => setFormData({...formData, comunidad: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+
+                                        <div className="md:col-span-2">
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Calle y Número</label>
+                                            <input type="text" required value={formData.direccion} onChange={(e) => setFormData({...formData, direccion: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Enlace Maps (Coordenadas)</label>
+                                            <input type="text" value={formData.coordenadas} onChange={(e) => setFormData({...formData, coordenadas: e.target.value})} placeholder="https://maps.app.goo.gl/..." className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-blue-600 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* MARCA Y REGION */}
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Marca</label>
-                                    <select 
-                                        required value={formData.marca_id}
-                                        onChange={(e) => setFormData({...formData, marca_id: e.target.value})}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 cursor-pointer"
-                                    >
-                                        <option value="">Selecciona marca...</option>
-                                        {marcas.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Región / Zona</label>
-                                    <select 
-                                        required value={formData.region_id}
-                                        onChange={(e) => setFormData({...formData, region_id: e.target.value})}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 cursor-pointer"
-                                    >
-                                        <option value="">Selecciona región...</option>
-                                        {regiones.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                                    </select>
+                                {/* SECCIÓN 3: TÉCNICA Y CONTRATACIÓN */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdSettingsEthernet className="text-orange-500"/> 3. Información Técnica</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Paquete de Velocidad</label>
+                                            <input type="text" value={formData.paquete} onChange={(e) => setFormData({...formData, paquete: e.target.value})} placeholder="Ej. 50 Megas" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Costo Mensual ($)</label>
+                                            <input type="number" value={formData.costo} onChange={(e) => setFormData({...formData, costo: e.target.value})} placeholder="0.00" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Fecha de Instalación</label>
+                                            <input type="date" value={formData.fecha_instalacion} onChange={(e) => setFormData({...formData, fecha_instalacion: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all cursor-pointer"/>
+                                        </div>
+                                        
+                                        {/* CONDICIONAL: TIPO DE CONEXIÓN */}
+                                        {esMarcaInternet && (
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-orange-500 uppercase mb-1.5">Tipo de Conexión</label>
+                                                <select value={formData.tipo_conexion} onChange={(e) => setFormData({...formData, tipo_conexion: e.target.value})} className="w-full px-4 py-2.5 bg-orange-50 border border-orange-200 rounded-xl text-sm font-bold text-orange-800 outline-none focus:bg-white focus:border-orange-400 cursor-pointer">
+                                                    <option value="">Seleccionar...</option>
+                                                    <option value="Antena">Inalámbrico (Antena)</option>
+                                                    <option value="FO">Fibra Óptica (FO)</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                        
+                                        <div className={esMarcaInternet ? "md:col-span-2" : "md:col-span-3"}>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Dirección IP Asignada</label>
+                                            <input type="text" value={formData.ip} onChange={(e) => setFormData({...formData, ip: e.target.value})} placeholder="Ej. 192.168.1.100" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all font-mono"/>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* DIRECCION */}
-                                <div className="md:col-span-2">
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Dirección de Instalación</label>
-                                    <textarea 
-                                        required value={formData.direccion}
-                                        onChange={(e) => setFormData({...formData, direccion: e.target.value})}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all resize-none h-20 custom-scrollbar"
-                                        placeholder="Calle, número, colonia, referencias..."
-                                    />
-                                </div>
-                            </div>
+                            </form>
+                        </div>
 
-                            <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors">
-                                    Cancelar
-                                </button>
-                                <button type="submit" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95">
-                                    <MdSave className="text-base"/> Guardar Cliente
-                                </button>
-                            </div>
-                        </form>
+                        {/* FOOTER MODAL */}
+                        <div className="p-5 border-t border-gray-100 bg-white shrink-0 flex justify-end gap-3">
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors">
+                                Cancelar
+                            </button>
+                            <button form="formCliente" type="submit" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 active:scale-95">
+                                <MdSave className="text-base"/> Guardar Expediente
+                            </button>
+                        </div>
+
                     </div>
                 </div>
             )}
