@@ -32,6 +32,7 @@ import PanelSocial from './components/marketing/social/PanelSocial';
 
 // --- COMPONENTES NUEVOS (JAVAK) ---
 import PanelAtencionCliente from './components/atencion-cliente/PanelAtencionCliente';
+import DirectorioClientes from './components/atencion-cliente/views/DirectorioClientes'; // Importación Agregada
 
 // --- COMPONENTES RRHH ---
 import Directorio from './components/rrhh/Directorio';
@@ -230,7 +231,7 @@ export default function Home() {
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
-         {!isLikeStore && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace(/_/g, ' ')} />}
+         {!isLikeStore && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
          
          <main className={mainContainerClasses}>
             {activeModule === 'marketing_dashboard' && (
@@ -245,6 +246,12 @@ export default function Home() {
             {activeModule === 'atencion_cliente' && verAtencionCliente && (
                 <div className="animate-slide-up h-full pb-10">
                     <PanelAtencionCliente />
+                </div>
+            )}
+            {/* NUEVA VISTA PARA DIRECTORIO INDEPENDIENTE */}
+            {activeModule === 'atencion_directorio' && verAtencionCliente && (
+                <div className="animate-slide-up h-full pb-10 pt-4 md:pt-6">
+                    <DirectorioClientes />
                 </div>
             )}
 

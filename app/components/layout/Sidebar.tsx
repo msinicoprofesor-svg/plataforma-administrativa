@@ -1,12 +1,12 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/layout/Sidebar.tsx (ACTUALIZADO CON JAVAK)         */
+/* ARCHIVO: app/components/layout/Sidebar.tsx (ACTUALIZADO CON DIRECTORIO)    */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { 
   MdDashboard, MdPeople, MdOutlineCloudUpload, MdMap, MdAttachMoney, 
   MdFactCheck, MdInventory2, MdCardGiftcard, MdBusiness, MdEngineering, 
   MdWork, MdLocalOffer, MdClose, MdFormatPaint, MdPoll, MdShare, 
-  MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent 
+  MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent, MdPeopleAlt 
 } from "react-icons/md";
 import { FaStoreAlt, FaUserCircle } from "react-icons/fa";
 
@@ -81,6 +81,8 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             <>
                 <SectionTitle label="Atención al Cliente" isOpen={isOpen} />
                 <MenuButton icon={<MdSupportAgent />} label="Reportes y Rutas" active={activeModule === 'atencion_cliente'} onClick={() => setActiveModule('atencion_cliente')} isOpen={isOpen} />
+                {/* NUEVO BOTÓN DIRECTORIO */}
+                <MenuButton icon={<MdPeopleAlt />} label="Directorio Clientes" active={activeModule === 'atencion_directorio'} onClick={() => setActiveModule('atencion_directorio')} isOpen={isOpen} />
             </>
           )}
 
