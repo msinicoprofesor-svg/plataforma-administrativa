@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { 
     MdDragIndicator, MdPerson, MdLocationOn, MdAccessTime, 
-    MdAutoAwesome, MdEngineering, MdAssignment 
+    MdAutoAwesome, MdEngineering, MdAssignment, MdMap 
 } from "react-icons/md";
 
 // DATOS MOCK
@@ -27,16 +27,10 @@ export default function GestionRutas() {
     // --- LÓGICA DRAG & DROP NATIVA ---
     const handleDragStart = (e, ticketId) => {
         e.dataTransfer.setData('ticketId', ticketId);
-        // Efecto visual al arrastrar
-        setTimeout(() => { e.target.style.opacity = '0.5'; }, 0);
-    };
-
-    const handleDragEnd = (e) => {
-        e.target.style.opacity = '1';
     };
 
     const handleDragOver = (e) => {
-        e.preventDefault(); // Necesario para permitir el "Drop"
+        e.preventDefault(); 
     };
 
     const handleDrop = (e, columnaDestino) => {
@@ -79,7 +73,7 @@ export default function GestionRutas() {
             <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-200 shrink-0">
                 <div>
                     <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                        <MdMap className="text-blue-500 text-lg hidden"/> Panel de Asignación
+                        <MdMap className="text-blue-500 text-lg"/> Panel de Asignación
                     </h3>
                     <p className="text-[10px] text-gray-400 font-bold mt-0.5">Arrastra los tickets a la ruta del técnico correspondiente.</p>
                 </div>
@@ -96,7 +90,7 @@ export default function GestionRutas() {
                 
                 {/* COLUMNA 1: PENDIENTES */}
                 <div 
-                    className="w-80 min-w-[20rem] flex flex-col bg-gray-100/50 rounded-3xl border-2 border-dashed border-gray-200 p-4"
+                    className="w-80 min-w-[20rem] flex flex-col bg-gray-100/50 rounded-3xl border-2 border-dashed border-gray-200 p-4 transition-colors hover:bg-gray-100"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, 'pendientes')}
                 >
@@ -113,7 +107,7 @@ export default function GestionRutas() {
                         {tickets.filter(t => t.asignadoA === 'pendientes').map(ticket => (
                             <TicketCard 
                                 key={ticket.id} ticket={ticket} 
-                                onDragStart={handleDragStart} onDragEnd={handleDragEnd} getColores={getColoresPrioridad}
+                                onDragStart={handleDragStart} getColores={getColoresPrioridad}
                             />
                         ))}
                     </div>
@@ -123,7 +117,7 @@ export default function GestionRutas() {
                 {TECNICOS.map(tecnico => (
                     <div 
                         key={tecnico.id}
-                        className="w-80 min-w-[20rem] flex flex-col bg-white rounded-3xl border border-gray-200 p-4 shadow-sm"
+                        className="w-80 min-w-[20rem] flex flex-col bg-white rounded-3xl border border-gray-200 p-4 shadow-sm transition-colors hover:border-blue-300"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, tecnico.id)}
                     >
@@ -141,7 +135,7 @@ export default function GestionRutas() {
                             {tickets.filter(t => t.asignadoA === tecnico.id).map(ticket => (
                                 <TicketCard 
                                     key={ticket.id} ticket={ticket} 
-                                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} getColores={getColoresPrioridad}
+                                    onDragStart={handleDragStart} getColores={getColoresPrioridad}
                                 />
                             ))}
                             {tickets.filter(t => t.asignadoA === tecnico.id).length === 0 && (
@@ -159,13 +153,12 @@ export default function GestionRutas() {
 }
 
 // Subcomponente de Tarjeta Draggable
-function TicketCard({ ticket, onDragStart, onDragEnd, getColores }) {
+function TicketCard({ ticket, onDragStart, getColores }) {
     return (
         <div 
             draggable
             onDragStart={(e) => onDragStart(e, ticket.id)}
-            onDragEnd={onDragEnd}
-            className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-300 transition-colors group relative"
+            className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group relative select-none"
         >
             <div className="flex justify-between items-start mb-2">
                 <span className="text-[10px] font-black text-gray-400 tracking-widest">{ticket.id}</span>
@@ -179,7 +172,7 @@ function TicketCard({ ticket, onDragStart, onDragEnd, getColores }) {
             <div className="flex items-center gap-1 text-[10px] font-medium text-gray-500">
                 <MdLocationOn className="text-blue-500"/> {ticket.zona}
             </div>
-            <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 <MdDragIndicator className="text-gray-300 text-xl"/>
             </div>
         </div>
