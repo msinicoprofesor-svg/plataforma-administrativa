@@ -66,10 +66,25 @@ export default function DirectorioClientes() {
     const marcaSeleccionada = marcas.find(m => m.id.toString() === formData.marca_id.toString())?.nombre || '';
     const esMarcaInternet = ['JAVAK', 'Fibrox MX', 'DMG', 'WifiCel'].includes(marcaSeleccionada);
 
-    // GUARDAR CLIENTE
+    // ========================================================================
+    // GUARDAR CLIENTE (CORREGIDO PARA EVITAR ERROR 400 EN SUPABASE)
+    // ========================================================================
     const handleSubmit = async (e) => {
         e.preventDefault();
-        await agregarCliente(formData);
+        
+        // Creamos una copia exacta de los datos del formulario
+        const datosLimpios = { ...formData };
+
+        // LIMPIEZA: Si están vacíos, los convertimos a "null" para que Supabase no marque error de formato
+        if (datosLimpios.costo === '') datosLimpios.costo = null;
+        if (datosLimpios.fecha_instalacion === '') datosLimpios.fecha_instalacion = null;
+        if (datosLimpios.marca_id === '') datosLimpios.marca_id = null;
+        if (datosLimpios.region_id === '') datosLimpios.region_id = null;
+        
+        // Si no es internet, borramos la selección de antena/fibra por limpieza
+        if (!esMarcaInternet) datosLimpios.tipo_conexion = null;
+
+        await agregarCliente(datosLimpios);
         setIsModalOpen(false);
         setFormData(estadoInicial);
     };
