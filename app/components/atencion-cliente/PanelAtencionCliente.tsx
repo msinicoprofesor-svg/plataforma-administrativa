@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { MdSupportAgent, MdAddCircleOutline, MdListAlt, MdMap, MdPeopleAlt } from "react-icons/md";
 
-// Importamos las vistas
+// Importamos todas las vistas
 import RegistroReporte from './views/RegistroReporte';
 import DirectorioClientes from './views/DirectorioClientes';
 import ListaReportes from './views/ListaReportes';
@@ -16,7 +16,7 @@ export default function PanelAtencionCliente() {
 
     return (
         <div className="h-full flex flex-col bg-[#F5F7FA] animate-fade-in">
-            {/* TOP BAR TIPO LIKESTORE */}
+            {/* TOP BAR */}
             <div className="bg-white px-6 py-5 border-b border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-blue-600/20">
@@ -28,7 +28,7 @@ export default function PanelAtencionCliente() {
                     </div>
                 </div>
 
-                {/* TABS DE NAVEGACIÓN CENTRALES */}
+                {/* TABS DE NAVEGACIÓN */}
                 <div className="flex bg-gray-50/80 p-1.5 rounded-xl border border-gray-200 shadow-inner overflow-x-auto w-full md:w-auto custom-scrollbar">
                     <button 
                         onClick={() => setVistaActual('REGISTRO')}
@@ -62,14 +62,10 @@ export default function PanelAtencionCliente() {
 
             {/* CONTENEDOR DE LA VISTA ACTIVA */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                
                 {vistaActual === 'REGISTRO' && <RegistroReporte />}
                 {vistaActual === 'CLIENTES' && <DirectorioClientes />}
                 {vistaActual === 'REPORTES' && <ListaReportes />}
-                
-                {/* AQUI CONECTAMOS AL JEFE FINAL */}
                 {vistaActual === 'RUTAS' && <GestionRutas />}
-                
             </div>
         </div>
     );
