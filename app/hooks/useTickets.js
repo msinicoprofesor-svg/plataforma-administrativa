@@ -2,7 +2,7 @@
 /* ARCHIVO: app/hooks/useTickets.js                                           */
 /* -------------------------------------------------------------------------- */
 import { useState, useEffect } from 'react';
-import { supabase } from '../config/supabase';
+import { supabase } from '../lib/supabase'; // <-- AQUÍ ESTÁ LA CORRECCIÓN
 
 export function useTickets() {
     const [tickets, setTickets] = useState([]);
@@ -48,7 +48,6 @@ export function useTickets() {
         return { error };
     };
 
-    // Esta función es la que usará el Drag & Drop para asignar a un técnico real
     const moverTicket = async (ticketId, tecnicoId) => {
         const asignado_id = tecnicoId === 'pendientes' ? null : tecnicoId;
         const estado_nuevo = tecnicoId === 'pendientes' ? 'PENDIENTE' : 'EN_RUTA';

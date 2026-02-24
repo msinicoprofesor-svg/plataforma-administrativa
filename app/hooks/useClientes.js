@@ -2,7 +2,7 @@
 /* ARCHIVO: app/hooks/useClientes.js                                          */
 /* -------------------------------------------------------------------------- */
 import { useState, useEffect } from 'react';
-import { supabase } from '../config/supabase';
+import { supabase } from '../lib/supabase'; // <-- AQUÍ ESTÁ LA CORRECCIÓN
 
 export function useClientes() {
     const [clientes, setClientes] = useState([]);
