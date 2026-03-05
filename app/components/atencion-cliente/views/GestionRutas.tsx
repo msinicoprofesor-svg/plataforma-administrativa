@@ -16,20 +16,22 @@ export default function GestionRutas() {
     const { tickets, moverTicket, loading: loadingTickets } = useTickets();
     const { colaboradoresReales, loading: loadingColabs } = useColaboradores();
 
-    // 2. FILTRAMOS DATOS
-    // Filtramos solo los tickets que no estén resueltos
-    const ticketsActivos = tickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO');
+    // 2. FILTRAMOS DATOS (CON PROTECCIÓN ANTI-CRASH)
+    const ticketsSeguros = tickets || [];
+    const colabsSeguros = colaboradoresReales || [];
 
-    // Filtramos colaboradores para mostrar solo a los técnicos/instaladores
-    let tecnicos = colaboradoresReales.filter(c => 
-        c.rol === 'TECNICO' || c.rol === 'INSTALADOR' || 
-        c.puesto?.toLowerCase().includes('técnico') || 
-        c.puesto?.toLowerCase().includes('instalador')
-    );
+    const ticketsActivos = ticketsSeguros.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO');
 
-    // Fallback: Si no has asignado el rol de TÉCNICO a nadie aún, mostramos los primeros 3 usuarios como prueba
-    if (tecnicos.length === 0 && colaboradoresReales.length > 0) {
-        tecnicos = colaboradoresReales.slice(0, 3);
+    // Filtramos colaboradores protegiendo contra nulos
+    let tecnicos = colabsSeguros.filter(c => {
+        const rol = c?.rol || '';
+        const puesto = (c?.puesto || '').toLowerCase();
+        return rol === 'TECNICO' || rol === 'INSTALADOR' || puesto.includes('técnico') || puesto.includes('instalador');
+    });
+
+    // Fallback: Si no has asignado el rol a nadie aún, mostramos los primeros 3 usuarios como prueba
+    if (tecnicos.length === 0 && colabsSeguros.length > 0) {
+        tecnicos = colabsSeguros.slice(0, 3);
     }
 
     // --- LÓGICA DRAG & DROP NATIVA ---
@@ -44,12 +46,9 @@ export default function GestionRutas() {
     const handleDrop = async (e, columnaDestino) => {
         e.preventDefault();
         const ticketId = e.dataTransfer.getData('ticketId');
-        
-        // Llamamos a la función de tu hook que actualiza Supabase en tiempo real
         await moverTicket(ticketId, columnaDestino);
     };
 
-    // Función de "Inteligencia Artificial" (Demo visual)
     const asignarConIA = () => {
         alert("¡La IA de JAVAK está analizando las rutas! (En el futuro, esto se conectará a la API de Google Maps para optimizar distancias).");
     };
@@ -105,18 +104,18 @@ export default function GestionRutas() {
                             <MdAssignment className="text-gray-400"/> Sin Asignar
                         </h4>
                         <span className="bg-white text-gray-800 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-sm border border-gray-100">
-                            {ticketsActivos.filter(t => t.asignadoA === 'pendientes').length}
+                            {ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').length}
                         </span>
                     </div>
                     
                     <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-                        {ticketsActivos.filter(t => t.asignadoA === 'pendientes').map(ticket => (
+                        {ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').map(ticket => (
                             <TicketCard 
                                 key={ticket.id} ticket={ticket} 
                                 onDragStart={handleDragStart} getColores={getColoresPrioridad}
                             />
                         ))}
-                        {ticketsActivos.filter(t => t.asignadoA === 'pendientes').length === 0 && (
+                        {ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').length === 0 && (
                             <div className="h-32 flex flex-col items-center justify-center text-[10px] font-bold text-gray-400 border-2 border-dashed border-gray-200/50 rounded-2xl bg-white/50">
                                 <MdCheckCircle className="text-3xl mb-2 text-green-400 opacity-50"/>
                                 No hay tickets pendientes
@@ -126,52 +125,58 @@ export default function GestionRutas() {
                 </div>
 
                 {/* COLUMNAS TÉCNICOS (Desde BD) */}
-                {tecnicos.map(tecnico => (
-                    <div 
-                        key={tecnico.id}
-                        className="w-80 min-w-[20rem] flex flex-col bg-white rounded-[2rem] border border-gray-100 p-5 shadow-sm transition-colors hover:border-blue-300"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, tecnico.id)}
-                    >
-                        {/* CABECERA DEL TÉCNICO */}
-                        <div className="flex items-start gap-4 mb-5 p-4 bg-blue-50/50 rounded-[1.5rem] border border-blue-100/50">
-                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-blue-100 overflow-hidden">
-                                {tecnico.foto ? (
-                                    <img src={tecnico.foto} alt="foto" className="w-full h-full object-cover" />
-                                ) : (
-                                    <MdEngineering className="text-2xl"/>
+                {tecnicos.map(tecnico => {
+                    // Protección adicional para el nombre
+                    const nombreTecnico = tecnico?.nombre || 'Técnico';
+                    const partesNombre = nombreTecnico.split(' ');
+
+                    return (
+                        <div 
+                            key={tecnico.id}
+                            className="w-80 min-w-[20rem] flex flex-col bg-white rounded-[2rem] border border-gray-100 p-5 shadow-sm transition-colors hover:border-blue-300"
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, tecnico.id)}
+                        >
+                            {/* CABECERA DEL TÉCNICO */}
+                            <div className="flex items-start gap-4 mb-5 p-4 bg-blue-50/50 rounded-[1.5rem] border border-blue-100/50">
+                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-blue-100 overflow-hidden">
+                                    {tecnico.foto ? (
+                                        <img src={tecnico.foto} alt="foto" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <MdEngineering className="text-2xl"/>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm font-black text-blue-950 leading-tight truncate" title={nombreTecnico}>
+                                        {partesNombre[0]} {partesNombre[1] || ''}
+                                    </h4>
+                                    <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-wider mt-1 truncate">
+                                        {tecnico?.puesto || 'Técnico'}
+                                    </p>
+                                </div>
+                                <span className="bg-white text-blue-800 text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">
+                                    {ticketsActivos.filter(t => t.asignadoA === tecnico.id).length}
+                                </span>
+                            </div>
+
+                            {/* ZONA DE SOLTADO */}
+                            <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 bg-gray-50/30 rounded-3xl p-3 border border-gray-50">
+                                {ticketsActivos.filter(t => t.asignadoA === tecnico.id).map(ticket => (
+                                    <TicketCard 
+                                        key={ticket.id} ticket={ticket} 
+                                        onDragStart={handleDragStart} getColores={getColoresPrioridad}
+                                    />
+                                ))}
+                                {ticketsActivos.filter(t => t.asignadoA === tecnico.id).length === 0 && (
+                                    <div className="h-full min-h-[150px] flex flex-col items-center justify-center text-[10px] font-bold text-gray-400 border-2 border-dashed border-gray-200/60 rounded-2xl">
+                                        <MdAssignment className="text-2xl mb-2 opacity-30"/>
+                                        Arrastra tickets aquí
+                                    </div>
                                 )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-black text-blue-950 leading-tight truncate" title={tecnico.nombre}>
-                                    {tecnico.nombre.split(' ')[0]} {tecnico.nombre.split(' ')[1] || ''}
-                                </h4>
-                                <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-wider mt-1 truncate">
-                                    {tecnico.puesto || 'Técnico'}
-                                </p>
-                            </div>
-                            <span className="bg-white text-blue-800 text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">
-                                {ticketsActivos.filter(t => t.asignadoA === tecnico.id).length}
-                            </span>
                         </div>
-
-                        {/* ZONA DE SOLTADO */}
-                        <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 bg-gray-50/30 rounded-3xl p-3 border border-gray-50">
-                            {ticketsActivos.filter(t => t.asignadoA === tecnico.id).map(ticket => (
-                                <TicketCard 
-                                    key={ticket.id} ticket={ticket} 
-                                    onDragStart={handleDragStart} getColores={getColoresPrioridad}
-                                />
-                            ))}
-                            {ticketsActivos.filter(t => t.asignadoA === tecnico.id).length === 0 && (
-                                <div className="h-full min-h-[150px] flex flex-col items-center justify-center text-[10px] font-bold text-gray-400 border-2 border-dashed border-gray-200/60 rounded-2xl">
-                                    <MdAssignment className="text-2xl mb-2 opacity-30"/>
-                                    Arrastra tickets aquí
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
 
             </div>
         </div>
@@ -188,20 +193,20 @@ function TicketCard({ ticket, onDragStart, getColores }) {
         >
             <div className="flex justify-between items-start mb-3">
                 <span className="text-[10px] font-black text-gray-400 tracking-widest bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
-                    {ticket.folio_corto}
+                    {ticket?.folio_corto || 'TKT-000'}
                 </span>
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm ${getColores(ticket.prioridad)}`}>
-                    {ticket.prioridad}
+                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm ${getColores(ticket?.prioridad)}`}>
+                    {ticket?.prioridad || 'Baja'}
                 </span>
             </div>
             
             <h5 className="text-xs font-black text-gray-800 mb-1.5 flex items-center gap-2">
-                <MdPerson className="text-blue-500"/> {ticket.cliente}
+                <MdPerson className="text-blue-500"/> {ticket?.cliente || 'Sin Cliente'}
             </h5>
             
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 bg-gray-50 p-1.5 rounded-lg border border-gray-50">
-                <MdLocationOn className="text-green-500 text-sm"/> 
-                <span className="truncate">{ticket.zona}</span>
+                <MdLocationOn className="text-green-500 text-sm shrink-0"/> 
+                <span className="truncate">{ticket?.zona || 'Sin Zona'}</span>
             </div>
             
             <div className="absolute top-1/2 -right-3 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white rounded-full p-1 shadow-sm border border-gray-100">
