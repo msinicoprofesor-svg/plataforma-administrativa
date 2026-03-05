@@ -2,6 +2,7 @@
 /* ARCHIVO: app/components/atencion-cliente/views/GestionRutas.tsx            */
 /* -------------------------------------------------------------------------- */
 'use client';
+import { useState, useEffect } from 'react'; // IMPORTANTE: Agregamos useState y useEffect
 import { 
     MdDragIndicator, MdPerson, MdLocationOn, 
     MdAutoAwesome, MdEngineering, MdAssignment, MdMap, MdCheckCircle 
@@ -16,11 +17,19 @@ export default function GestionRutas() {
     const { tickets, moverTicket, loading: loadingTickets } = useTickets();
     const { colaboradoresReales, loading: loadingColabs } = useColaboradores();
 
-    // 2. FILTRAMOS DATOS (CON PROTECCIÓN ANTI-CRASH)
-    const ticketsSeguros = tickets || [];
-    const colabsSeguros = colaboradoresReales || [];
+    // 2. ESTADO LOCAL "OPTIMISTA" (Para que el arrastre sea instantáneo)
+    const [localTickets, setLocalTickets] = useState([]);
 
-    const ticketsActivos = ticketsSeguros.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO');
+    // Sincronizamos con Supabase, pero permitimos cambios locales rápidos
+    useEffect(() => {
+        if (tickets) {
+            setLocalTickets(tickets);
+        }
+    }, [tickets]);
+
+    // 3. FILTRAMOS DATOS
+    const colabsSeguros = colaboradoresReales || [];
+    const ticketsActivos = localTickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO');
 
     // Filtramos colaboradores protegiendo contra nulos
     let tecnicos = colabsSeguros.filter(c => {
@@ -34,14 +43,15 @@ export default function GestionRutas() {
         tecnicos = colabsSeguros.slice(0, 3);
     }
 
-    // --- LÓGICA DRAG & DROP REFORZADA PARA REACT ---
+    // --- LÓGICA DRAG & DROP NATIVA BLINDADA ---
     const handleDragStart = (e, ticketId) => {
-        e.dataTransfer.effectAllowed = "move"; // Permitimos mover
-        e.dataTransfer.setData('ticketId', String(ticketId)); // Aseguramos que sea texto
+        e.dataTransfer.effectAllowed = "move";
+        // CORRECCIÓN 1: Usar el estándar universal 'text/plain'
+        e.dataTransfer.setData('text/plain', String(ticketId)); 
     };
 
     const handleDragOver = (e) => {
-        e.preventDefault(); // Necesario para permitir soltar
+        e.preventDefault(); 
         e.stopPropagation();
         e.dataTransfer.dropEffect = "move";
     };
@@ -54,9 +64,18 @@ export default function GestionRutas() {
     const handleDrop = async (e, columnaDestino) => {
         e.preventDefault();
         e.stopPropagation();
-        const ticketId = e.dataTransfer.getData('ticketId');
+        // CORRECCIÓN 2: Leer el estándar 'text/plain'
+        const ticketId = e.dataTransfer.getData('text/plain'); 
         
         if (ticketId) {
+            // CORRECCIÓN 3: Actualización visual instantánea (Magia UI)
+            setLocalTickets(prev => prev.map(t => 
+                String(t.id) === ticketId 
+                    ? { ...t, asignadoA: columnaDestino, estado: columnaDestino === 'pendientes' ? 'PENDIENTE' : 'EN_RUTA' } 
+                    : t
+            ));
+
+            // Guardado en Supabase en segundo plano
             await moverTicket(ticketId, columnaDestino);
         }
     };
@@ -121,7 +140,6 @@ export default function GestionRutas() {
                         </span>
                     </div>
                     
-                    {/* CORRECCIÓN: overflow-x-hidden elimina la barra horizontal fea */}
                     <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-2">
                         {ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').map(ticket => (
                             <TicketCard 
@@ -173,7 +191,7 @@ export default function GestionRutas() {
                                 </span>
                             </div>
 
-                            {/* ZONA DE SOLTADO (También con overflow-x-hidden por seguridad) */}
+                            {/* ZONA DE SOLTADO */}
                             <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-2 bg-gray-50/30 rounded-3xl p-3 border border-gray-50">
                                 {ticketsActivos.filter(t => t.asignadoA === tecnico.id).map(ticket => (
                                     <TicketCard 
@@ -201,7 +219,7 @@ export default function GestionRutas() {
 function TicketCard({ ticket, onDragStart, getColores }) {
     return (
         <div 
-            draggable={true} // CORRECCIÓN: Explicitamente True para React
+            draggable={true} 
             onDragStart={(e) => onDragStart(e, ticket.id)}
             className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm shadow-gray-200/50 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group relative select-none w-full max-w-full"
         >
@@ -214,7 +232,6 @@ function TicketCard({ ticket, onDragStart, getColores }) {
                 </span>
             </div>
             
-            {/* Truco 'min-w-0' y 'truncate' para que nombres largos no rompan la tarjeta */}
             <h5 className="text-xs font-black text-gray-800 mb-1.5 flex items-center gap-2 min-w-0">
                 <MdPerson className="text-blue-500 shrink-0"/> 
                 <span className="truncate">{ticket?.cliente || 'Sin Cliente'}</span>
