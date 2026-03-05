@@ -34,19 +34,31 @@ export default function GestionRutas() {
         tecnicos = colabsSeguros.slice(0, 3);
     }
 
-    // --- LÓGICA DRAG & DROP NATIVA ---
+    // --- LÓGICA DRAG & DROP REFORZADA PARA REACT ---
     const handleDragStart = (e, ticketId) => {
-        e.dataTransfer.setData('ticketId', ticketId);
+        e.dataTransfer.effectAllowed = "move"; // Permitimos mover
+        e.dataTransfer.setData('ticketId', String(ticketId)); // Aseguramos que sea texto
     };
 
     const handleDragOver = (e) => {
-        e.preventDefault(); 
+        e.preventDefault(); // Necesario para permitir soltar
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+    };
+
+    const handleDragEnter = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
     };
 
     const handleDrop = async (e, columnaDestino) => {
         e.preventDefault();
+        e.stopPropagation();
         const ticketId = e.dataTransfer.getData('ticketId');
-        await moverTicket(ticketId, columnaDestino);
+        
+        if (ticketId) {
+            await moverTicket(ticketId, columnaDestino);
+        }
     };
 
     const asignarConIA = () => {
@@ -97,6 +109,7 @@ export default function GestionRutas() {
                 <div 
                     className="w-80 min-w-[20rem] flex flex-col bg-gray-100/60 rounded-[2rem] border-2 border-dashed border-gray-200 p-5 transition-colors hover:bg-gray-100"
                     onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
                     onDrop={(e) => handleDrop(e, 'pendientes')}
                 >
                     <div className="flex items-center justify-between mb-5 px-2">
@@ -108,7 +121,8 @@ export default function GestionRutas() {
                         </span>
                     </div>
                     
-                    <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
+                    {/* CORRECCIÓN: overflow-x-hidden elimina la barra horizontal fea */}
+                    <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-2">
                         {ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').map(ticket => (
                             <TicketCard 
                                 key={ticket.id} ticket={ticket} 
@@ -126,7 +140,6 @@ export default function GestionRutas() {
 
                 {/* COLUMNAS TÉCNICOS (Desde BD) */}
                 {tecnicos.map(tecnico => {
-                    // Protección adicional para el nombre
                     const nombreTecnico = tecnico?.nombre || 'Técnico';
                     const partesNombre = nombreTecnico.split(' ');
 
@@ -135,6 +148,7 @@ export default function GestionRutas() {
                             key={tecnico.id}
                             className="w-80 min-w-[20rem] flex flex-col bg-white rounded-[2rem] border border-gray-100 p-5 shadow-sm transition-colors hover:border-blue-300"
                             onDragOver={handleDragOver}
+                            onDragEnter={handleDragEnter}
                             onDrop={(e) => handleDrop(e, tecnico.id)}
                         >
                             {/* CABECERA DEL TÉCNICO */}
@@ -159,8 +173,8 @@ export default function GestionRutas() {
                                 </span>
                             </div>
 
-                            {/* ZONA DE SOLTADO */}
-                            <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 bg-gray-50/30 rounded-3xl p-3 border border-gray-50">
+                            {/* ZONA DE SOLTADO (También con overflow-x-hidden por seguridad) */}
+                            <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-2 bg-gray-50/30 rounded-3xl p-3 border border-gray-50">
                                 {ticketsActivos.filter(t => t.asignadoA === tecnico.id).map(ticket => (
                                     <TicketCard 
                                         key={ticket.id} ticket={ticket} 
@@ -187,24 +201,26 @@ export default function GestionRutas() {
 function TicketCard({ ticket, onDragStart, getColores }) {
     return (
         <div 
-            draggable
+            draggable={true} // CORRECCIÓN: Explicitamente True para React
             onDragStart={(e) => onDragStart(e, ticket.id)}
-            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm shadow-gray-200/50 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group relative select-none"
+            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm shadow-gray-200/50 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group relative select-none w-full max-w-full"
         >
             <div className="flex justify-between items-start mb-3">
-                <span className="text-[10px] font-black text-gray-400 tracking-widest bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                <span className="text-[10px] font-black text-gray-400 tracking-widest bg-gray-50 px-2 py-0.5 rounded border border-gray-100 truncate">
                     {ticket?.folio_corto || 'TKT-000'}
                 </span>
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm ${getColores(ticket?.prioridad)}`}>
+                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm shrink-0 ml-2 ${getColores(ticket?.prioridad)}`}>
                     {ticket?.prioridad || 'Baja'}
                 </span>
             </div>
             
-            <h5 className="text-xs font-black text-gray-800 mb-1.5 flex items-center gap-2">
-                <MdPerson className="text-blue-500"/> {ticket?.cliente || 'Sin Cliente'}
+            {/* Truco 'min-w-0' y 'truncate' para que nombres largos no rompan la tarjeta */}
+            <h5 className="text-xs font-black text-gray-800 mb-1.5 flex items-center gap-2 min-w-0">
+                <MdPerson className="text-blue-500 shrink-0"/> 
+                <span className="truncate">{ticket?.cliente || 'Sin Cliente'}</span>
             </h5>
             
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 bg-gray-50 p-1.5 rounded-lg border border-gray-50">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 bg-gray-50 p-1.5 rounded-lg border border-gray-50 min-w-0">
                 <MdLocationOn className="text-green-500 text-sm shrink-0"/> 
                 <span className="truncate">{ticket?.zona || 'Sin Zona'}</span>
             </div>
