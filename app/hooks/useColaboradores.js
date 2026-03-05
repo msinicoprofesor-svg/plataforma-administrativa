@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/hooks/useColaboradores.js (CORRECCIÓN UUID)                   */
+/* ARCHIVO: app/hooks/useColaboradores.js (CORRECCIÓN DE CAMPOS FALTANTES)    */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useEffect } from 'react';
@@ -25,6 +25,7 @@ export function useColaboradores() {
     id: db.id, nombre: db.nombre, puesto: db.puesto, departamento: db.departamento,
     email: db.email, region: db.region, marca: db.marca, puntos: db.puntos || 0,
     foto: db.foto, fechaIngreso: db.fecha_ingreso, horario: db.horario || DEFAULT_HORARIO,
+    // CAMPOS DE CONTACTO RECUPERADOS:
     telefono: db.telefono || '',
     facebook: db.facebook || '',
     cumpleanos: db.cumpleanos || '',
@@ -32,6 +33,7 @@ export function useColaboradores() {
     sueldoBase: db.sueldo_base || 0, premioPuntualidad: db.premio_puntualidad || 0,
     premioAsistencia: db.premio_asistencia || 0, bonoEspecial: db.bono_especial || 0,
     cajaAhorro: db.caja_ahorro || 0, creditoInfonavit: db.credito_infonavit || 0,
+    // AMBOS PRÉSTAMOS AHORA SON JSON:
     prestamoAlianza: db.prestamo_alianza || { saldo: 0, descuento: 0 },
     prestamoEmpresa: db.prestamo_empresa || { saldo: 0, descuento: 0 }
   });
@@ -40,6 +42,7 @@ export function useColaboradores() {
     id: c.id, nombre: c.nombre, puesto: c.puesto, departamento: c.departamento || 'General',
     email: c.email || null, region: c.region, marca: c.marca, puntos: c.puntos || 0,
     foto: c.foto, fecha_ingreso: c.fechaIngreso || null, horario: c.horario,
+    // CAMPOS DE CONTACTO ENVIADOS:
     telefono: c.telefono || null,
     facebook: c.facebook || null,
     cumpleanos: c.cumpleanos || null,
@@ -47,6 +50,7 @@ export function useColaboradores() {
     sueldo_base: c.sueldoBase, premio_puntualidad: c.premioPuntualidad,
     premio_asistencia: c.premioAsistencia, bono_especial: c.bonoEspecial,
     caja_ahorro: c.cajaAhorro, credito_infonavit: c.creditoInfonavit,
+    // AMBOS PRÉSTAMOS COMO JSON:
     prestamo_alianza: c.prestamoAlianza, 
     prestamo_empresa: c.prestamoEmpresa
   });
@@ -97,9 +101,7 @@ export function useColaboradores() {
 
   // --- ACCIONES CRUD ---
   const agregarColaborador = async (nuevo) => {
-    // CORRECCIÓN MAGISTRAL: Generamos un UUID real compatible con Supabase
-    const id = nuevo.id || crypto.randomUUID(); 
-    
+    const id = nuevo.id || `EMP-${Date.now()}`;
     const colaborador = { 
         ...nuevo, 
         id, 
@@ -169,7 +171,7 @@ export function useColaboradores() {
         : `${evento.tipo} (${evento.cantidad} ops)`;
 
     const registroHistorial = {
-        id: evento.id || crypto.randomUUID(), // <-- También UUID aquí por seguridad
+        id: evento.id || `EVT-${Date.now()}`,
         fecha: evento.fecha || new Date().toISOString(),
         tipo: evento.tipo, 
         detalle: descripcion,
@@ -200,9 +202,7 @@ export function useColaboradores() {
       const filtrados = nuevos.filter(n => !actualesIds.has(n.id));
       
       const nuevosNormalizados = filtrados.map(n => ({
-          ...n, 
-          id: n.id || crypto.randomUUID(), // UUID al importar
-          puntos: 0, horario: DEFAULT_HORARIO, sueldoBase: 0, 
+          ...n, puntos: 0, horario: DEFAULT_HORARIO, sueldoBase: 0, 
           prestamoEmpresa: { saldo: 0, descuento: 0 },
           prestamoAlianza: { saldo: 0, descuento: 0 }
       }));

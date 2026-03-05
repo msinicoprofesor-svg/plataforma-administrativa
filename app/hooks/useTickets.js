@@ -32,6 +32,8 @@ export function useTickets() {
                 prioridad: t.prioridad,
                 estado: t.estado,
                 fecha: new Date(t.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
+                // NUEVO: MEMORIA DE CALENDARIO
+                fecha_agendada: t.fecha_agendada || new Date().toISOString().split('T')[0], 
                 visita: t.requiere_visita,
                 asignadoA: t.tecnico_asignado_id || 'pendientes',
                 descripcion: t.descripcion
@@ -47,36 +49,49 @@ export function useTickets() {
         return { error };
     };
 
-    // LÓGICA PROFESIONAL DE GUARDADO CON AUDITORÍA DE ERRORES
+    // LÓGICA DE GUARDADO DE RUTAS
     const moverTicket = async (ticketId, tecnicoId) => {
         const asignado_id = tecnicoId === 'pendientes' ? null : tecnicoId;
         const estado_nuevo = tecnicoId === 'pendientes' ? 'PENDIENTE' : 'EN_RUTA';
 
-        // Intentamos actualizar y obligamos a Supabase a devolver la fila modificada (.select())
         const { data, error } = await supabase
             .from('tickets')
             .update({ tecnico_asignado_id: asignado_id, estado: estado_nuevo })
             .eq('id', ticketId)
             .select(); 
             
-        // 1. Si hay error de conexión o sintaxis
         if (error) {
             console.error("[Backend Error] Falla al actualizar Supabase:", error);
             alert(`Error de Base de Datos: ${error.message}`);
             return { error };
         }
 
-        // 2. Si Supabase responde "Éxito" pero no modificó ninguna fila (Clásico error de RLS)
         if (!data || data.length === 0) {
-            console.warn("[Seguridad] Supabase bloqueó la actualización (0 filas modificadas). Revisa tus políticas RLS.");
+            console.warn("[Seguridad] Supabase bloqueó la actualización (0 filas). Revisa políticas RLS.");
             alert("No se guardó el cambio. Revisa que la tabla 'tickets' tenga habilitada la política RLS para 'UPDATE'.");
             return { error: 'RLS_BLOCKED' };
         }
         
-        // 3. Éxito Real
         await fetchTickets();
         return { success: true };
     };
 
-    return { tickets, loading, crearTicket, moverTicket, refetch: fetchTickets };
+    // NUEVA FUNCIÓN: REPROGRAMAR FECHA
+    const reprogramarTicket = async (ticketId, nuevaFecha) => {
+        const { error } = await supabase
+            .from('tickets')
+            .update({ fecha_agendada: nuevaFecha }) // Actualiza la fecha de forma persistente
+            .eq('id', ticketId);
+            
+        if (error) {
+            console.error("Error al posponer:", error);
+            alert("Hubo un error al posponer el ticket.");
+            return { error };
+        }
+        
+        await fetchTickets();
+        return { success: true };
+    };
+
+    return { tickets, loading, crearTicket, moverTicket, reprogramarTicket, refetch: fetchTickets };
 }
