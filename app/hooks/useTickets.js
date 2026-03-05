@@ -2,7 +2,7 @@
 /* ARCHIVO: app/hooks/useTickets.js                                           */
 /* -------------------------------------------------------------------------- */
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // <-- AQUÍ ESTÁ LA CORRECCIÓN
+import { supabase } from '../lib/supabase';
 
 export function useTickets() {
     const [tickets, setTickets] = useState([]);
@@ -23,7 +23,6 @@ export function useTickets() {
             .order('created_at', { ascending: false });
 
         if (!error && data) {
-            // Traducimos los datos de Supabase a lo que entienden tus tarjetas
             const ticketsFormateados = data.map(t => ({
                 id: t.id,
                 folio_corto: `TKT-${t.folio_visual}`,
@@ -34,7 +33,7 @@ export function useTickets() {
                 estado: t.estado,
                 fecha: new Date(t.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
                 visita: t.requiere_visita,
-                asignadoA: t.tecnico_asignado_id || 'pendientes', // Para el Drag & Drop
+                asignadoA: t.tecnico_asignado_id || 'pendientes',
                 descripcion: t.descripcion
             }));
             setTickets(ticketsFormateados);
@@ -48,16 +47,35 @@ export function useTickets() {
         return { error };
     };
 
+    // LÓGICA PROFESIONAL DE GUARDADO CON AUDITORÍA DE ERRORES
     const moverTicket = async (ticketId, tecnicoId) => {
         const asignado_id = tecnicoId === 'pendientes' ? null : tecnicoId;
         const estado_nuevo = tecnicoId === 'pendientes' ? 'PENDIENTE' : 'EN_RUTA';
 
-        const { error } = await supabase
+        // Intentamos actualizar y obligamos a Supabase a devolver la fila modificada (.select())
+        const { data, error } = await supabase
             .from('tickets')
             .update({ tecnico_asignado_id: asignado_id, estado: estado_nuevo })
-            .eq('id', ticketId);
+            .eq('id', ticketId)
+            .select(); 
             
-        if (!error) fetchTickets();
+        // 1. Si hay error de conexión o sintaxis
+        if (error) {
+            console.error("[Backend Error] Falla al actualizar Supabase:", error);
+            alert(`Error de Base de Datos: ${error.message}`);
+            return { error };
+        }
+
+        // 2. Si Supabase responde "Éxito" pero no modificó ninguna fila (Clásico error de RLS)
+        if (!data || data.length === 0) {
+            console.warn("[Seguridad] Supabase bloqueó la actualización (0 filas modificadas). Revisa tus políticas RLS.");
+            alert("No se guardó el cambio. Revisa que la tabla 'tickets' tenga habilitada la política RLS para 'UPDATE'.");
+            return { error: 'RLS_BLOCKED' };
+        }
+        
+        // 3. Éxito Real
+        await fetchTickets();
+        return { success: true };
     };
 
     return { tickets, loading, crearTicket, moverTicket, refetch: fetchTickets };
