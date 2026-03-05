@@ -4,23 +4,22 @@
 'use client';
 import { useState } from 'react';
 import { 
-    MdViewModule, MdViewList, MdFilterList, MdWarning, 
+    MdViewModule, MdViewList, MdFilterList, 
     MdSchedule, MdAssignment, MdLocationOn, MdCheckCircle 
 } from "react-icons/md";
 
-// MOCK DE DATOS (Simulación de reportes vivos)
-const REPORTES_MOCK = [
-    { id: 'TKT-1001', cliente: 'Roberto Gómez Bolaños', tipo: 'Falla de internet', prioridad: 'Crítica', estado: 'Pendiente', fecha: 'Hoy, 10:30 AM', visita: true },
-    { id: 'TKT-1002', cliente: 'Florinda Meza', tipo: 'Cambio de domicilio', prioridad: 'Media', estado: 'En Ruta', fecha: 'Hoy, 09:15 AM', visita: true },
-    { id: 'TKT-1003', cliente: 'Carlos Villagrán', tipo: 'Lentitud', prioridad: 'Baja', estado: 'Resuelto', fecha: 'Ayer, 16:45 PM', visita: false },
-    { id: 'TKT-1004', cliente: 'María Antonieta de las Nieves', tipo: 'Corte de servicio', prioridad: 'Alta', estado: 'Pendiente', fecha: 'Hoy, 11:00 AM', visita: true },
-];
+// Importamos el hook con la conexión real a Supabase
+import { useTickets } from '../../../hooks/useTickets';
 
 export default function ListaReportes() {
     const [formatoVista, setFormatoVista] = useState('TARJETAS'); // TARJETAS o LISTA
-    const [filtroPrioridad, setFiltroPrioridad] = useState('TODAS'); // TODAS, Baja, Media, Alta, Crítica
+    const [filtroPrioridad, setFiltroPrioridad] = useState('TODAS'); 
 
-    const reportesFiltrados = REPORTES_MOCK.filter(r => 
+    // Extraemos los datos reales del hook
+    const { tickets, loading } = useTickets();
+
+    // Filtramos los datos reales
+    const reportesFiltrados = tickets.filter(r => 
         filtroPrioridad === 'TODAS' || r.prioridad === filtroPrioridad
     );
 
@@ -35,7 +34,7 @@ export default function ListaReportes() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10 h-full flex flex-col">
+        <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10 h-full flex flex-col relative">
             
             {/* BARRA DE HERRAMIENTAS */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-200 shrink-0">
@@ -74,8 +73,16 @@ export default function ListaReportes() {
             </div>
 
             {/* CONTENEDOR DE REPORTES */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                 
+                {/* PANTALLA DE CARGA */}
+                {loading && (
+                    <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-2xl">
+                        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                        <p className="text-xs font-bold text-gray-500 mt-3 animate-pulse">Cargando reportes...</p>
+                    </div>
+                )}
+
                 {formatoVista === 'TARJETAS' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {reportesFiltrados.map(reporte => (
@@ -84,7 +91,7 @@ export default function ListaReportes() {
                                 <div className={`absolute top-0 left-0 w-full h-1.5 ${getColoresPrioridad(reporte.prioridad).split(' ')[0]}`}></div>
                                 
                                 <div className="flex justify-between items-start mb-4">
-                                    <span className="text-[10px] font-black text-gray-400 tracking-widest">{reporte.id}</span>
+                                    <span className="text-[10px] font-black text-gray-400 tracking-widest">{reporte.folio_corto}</span>
                                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getColoresPrioridad(reporte.prioridad)}`}>
                                         {reporte.prioridad}
                                     </span>
@@ -105,8 +112,8 @@ export default function ListaReportes() {
                                 </div>
 
                                 <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${reporte.estado === 'Resuelto' ? 'text-green-500' : 'text-orange-500'}`}>
-                                        • {reporte.estado}
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${reporte.estado === 'RESUELTO' ? 'text-green-500' : 'text-orange-500'}`}>
+                                        • {reporte.estado.replace('_', ' ')}
                                     </span>
                                     <button className="text-[10px] font-bold text-blue-600 hover:underline">Ver detalles</button>
                                 </div>
@@ -129,7 +136,7 @@ export default function ListaReportes() {
                                 {reportesFiltrados.map(reporte => (
                                     <tr key={reporte.id} className="hover:bg-gray-50/50 transition-colors">
                                         <td className="py-3 px-4">
-                                            <p className="text-xs font-bold text-gray-800">{reporte.id}</p>
+                                            <p className="text-xs font-bold text-gray-800">{reporte.folio_corto}</p>
                                             <p className="text-[10px] text-gray-400">{reporte.fecha}</p>
                                         </td>
                                         <td className="py-3 px-4 text-xs font-bold text-gray-600">{reporte.cliente}</td>
@@ -140,8 +147,8 @@ export default function ListaReportes() {
                                             </span>
                                         </td>
                                         <td className="py-3 px-4 text-right">
-                                            <span className={`text-[10px] font-black uppercase ${reporte.estado === 'Resuelto' ? 'text-green-500' : 'text-orange-500'}`}>
-                                                {reporte.estado}
+                                            <span className={`text-[10px] font-black uppercase ${reporte.estado === 'RESUELTO' ? 'text-green-500' : 'text-orange-500'}`}>
+                                                {reporte.estado.replace('_', ' ')}
                                             </span>
                                         </td>
                                     </tr>
@@ -151,7 +158,7 @@ export default function ListaReportes() {
                     </div>
                 )}
 
-                {reportesFiltrados.length === 0 && (
+                {!loading && reportesFiltrados.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-400">
                         <MdCheckCircle className="text-4xl mb-2 opacity-20 text-green-500"/>
                         <p className="text-xs font-bold">No hay reportes activos con esta prioridad</p>
