@@ -27,9 +27,15 @@ export default function GestionRutas() {
     // Vista (Kanban o Línea de Tiempo)
     const [vistaActiva, setVistaActiva] = useState('TABLERO'); 
 
-    // FILTROS
+    // FILTROS PROFESIONALES
     const colabsSeguros = colaboradoresReales || [];
-    const ticketsActivos = tickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO');
+    
+    // CORRECCIÓN 3: Filtramos solo los tickets activos QUE REQUIEREN VISITA FÍSICA
+    const ticketsActivos = tickets.filter(t => 
+        t.estado !== 'RESUELTO' && 
+        t.estado !== 'CANCELADO' && 
+        t.visita === true 
+    );
     
     // Filtrar los tickets que corresponden al día seleccionado
     const ticketsDelDia = ticketsActivos.filter(t => t.fecha_agendada === fechaFiltro);
@@ -98,7 +104,9 @@ export default function GestionRutas() {
                     <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
                         <MdMap className="text-blue-500 text-xl"/> Planificación de Rutas
                     </h3>
-                    <p className="text-[10px] text-gray-400 font-bold mt-1">Organiza a los técnicos por día y monitorea sus paradas.</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-1">
+                        Mostrando exclusivamente tickets que <span className="text-blue-500">requieren visita en sitio</span>.
+                    </p>
                 </div>
                 
                 <div className="flex items-center gap-3">
@@ -208,7 +216,7 @@ export default function GestionRutas() {
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-1 space-y-6">
                     {tecnicos.map(tecnico => {
                         const ticketsTecnico = ticketsDelDia.filter(t => t.asignadoA === tecnico.id);
-                        if (ticketsTecnico.length === 0) return null; // Solo mostramos técnicos con ruta
+                        if (ticketsTecnico.length === 0) return null;
 
                         return (
                             <div key={tecnico.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col">
@@ -225,35 +233,51 @@ export default function GestionRutas() {
                                     </span>
                                 </div>
 
-                                <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-4 items-center">
-                                    {ticketsTecnico.map((ticket, index) => (
-                                        <div key={ticket.id} className="flex items-center shrink-0 group">
-                                            <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-5 rounded-3xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all min-w-[240px] relative cursor-pointer" onClick={() => abrirDetalles(ticket)}>
-                                                <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-lg border-2 border-white">
-                                                    {index + 1}
+                                {/* CORRECCIÓN 1 Y 2: Espaciado final y etiqueta de hora */}
+                                <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 pt-2 items-center px-2">
+                                    {ticketsTecnico.map((ticket, index) => {
+                                        // Extraemos la hora del reporte (ej. "10/03/2026, 10:30" -> "10:30")
+                                        const horaReporte = ticket.fecha.split(',')[1] || ticket.fecha;
+
+                                        return (
+                                            <div key={ticket.id} className="flex items-center shrink-0 group">
+                                                <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-5 rounded-3xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all w-[260px] relative cursor-pointer" onClick={() => abrirDetalles(ticket)}>
+                                                    
+                                                    {/* Número de parada */}
+                                                    <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-lg border-2 border-white">
+                                                        {index + 1}
+                                                    </div>
+
+                                                    {/* HORA DESTACADA */}
+                                                    <div className="absolute -top-3 right-4 bg-gray-800 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-md flex items-center gap-1">
+                                                        <MdAccessTime className="text-xs"/> {horaReporte}
+                                                    </div>
+
+                                                    <div className="pl-2 pt-2">
+                                                        <p className="text-[10px] text-gray-400 font-black mb-1.5 flex justify-between items-center">
+                                                            {ticket.folio_corto}
+                                                            <span className={`px-2 py-0.5 rounded shadow-sm text-[8px] ${getColoresPrioridad(ticket.prioridad)}`}>{ticket.prioridad}</span>
+                                                        </p>
+                                                        <p className="text-sm font-black text-gray-800 mb-2 truncate">{ticket.cliente}</p>
+                                                        <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-100">
+                                                            <MdLocationOn className="text-green-500 text-sm shrink-0"/>
+                                                            <span className="truncate">{ticket.zona}</span>
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className="pl-2">
-                                                    <p className="text-[10px] text-gray-400 font-black mb-1.5 flex justify-between items-center">
-                                                        {ticket.folio_corto}
-                                                        <span className={`px-2 py-0.5 rounded shadow-sm text-[8px] ${getColoresPrioridad(ticket.prioridad)}`}>{ticket.prioridad}</span>
-                                                    </p>
-                                                    <p className="text-sm font-black text-gray-800 mb-2 truncate">{ticket.cliente}</p>
-                                                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-100">
-                                                        <MdLocationOn className="text-green-500 text-sm"/>{ticket.zona}
-                                                    </p>
-                                                </div>
+                                                {index < ticketsTecnico.length - 1 && (
+                                                    <MdArrowForward className="mx-4 text-gray-200 text-2xl shrink-0 group-hover:text-blue-400 transition-colors"/>
+                                                )}
                                             </div>
-                                            {index < ticketsTecnico.length - 1 && (
-                                                <MdArrowForward className="mx-4 text-gray-200 text-2xl shrink-0 group-hover:text-blue-400 transition-colors"/>
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
+                                    {/* ESPACIADOR INVISIBLE PARA EVITAR CORTE AL FINAL */}
+                                    <div className="w-4 shrink-0"></div>
                                 </div>
                             </div>
                         );
                     })}
 
-                    {/* Si ningún técnico tiene tickets hoy */}
                     {tecnicos.every(tecnico => ticketsDelDia.filter(t => t.asignadoA === tecnico.id).length === 0) && (
                         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2rem] border border-gray-100 shadow-sm">
                             <MdViewTimeline className="text-6xl text-gray-100 mb-4"/>
@@ -269,7 +293,7 @@ export default function GestionRutas() {
     );
 }
 
-// Subcomponente de Tarjeta Draggable Actualizado
+// Subcomponente de Tarjeta Draggable
 function TicketCard({ ticket, onDragStart, getColores, onVerDetalles, onReprogramar }) {
     return (
         <div 
@@ -299,7 +323,7 @@ function TicketCard({ ticket, onDragStart, getColores, onVerDetalles, onReprogra
             {/* BOTONES INFERIORES */}
             <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                 
-                {/* BOTÓN POSPONER CON INPUT NATIVO INVISIBLE */}
+                {/* BOTÓN POSPONER */}
                 <div className="relative overflow-hidden group/date cursor-pointer">
                     <input 
                         type="date" 
