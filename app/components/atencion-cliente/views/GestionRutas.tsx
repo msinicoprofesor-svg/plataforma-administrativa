@@ -4,7 +4,7 @@
 'use client';
 import { 
     MdDragIndicator, MdPerson, MdLocationOn, 
-    MdAutoAwesome, MdEngineering, MdAssignment, MdMap 
+    MdAutoAwesome, MdEngineering, MdAssignment, MdMap, MdCheckCircle 
 } from "react-icons/md";
 
 // Importamos los hooks para traer datos reales de Supabase
