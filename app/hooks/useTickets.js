@@ -33,7 +33,7 @@ export function useTickets() {
                 estado: t.estado,
                 fecha: new Date(t.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
                 fecha_agendada: t.fecha_agendada || new Date().toISOString().split('T')[0], 
-                horario_preferencia: t.horario_preferencia || 'Lo antes posible', // <-- NUEVO: HORA DEL CLIENTE
+                horario_preferencia: t.horario_preferencia || 'Lo antes posible',
                 visita: t.requiere_visita,
                 asignadoA: t.tecnico_asignado_id || 'pendientes',
                 descripcion: t.descripcion
@@ -49,13 +49,12 @@ export function useTickets() {
         return { error };
     };
 
-    // NUEVO: Ahora recibe la fecha de destino para agendar automáticamente al arrastrar
     const moverTicket = async (ticketId, tecnicoId, fechaDestino = null) => {
         const asignado_id = tecnicoId === 'pendientes' ? null : tecnicoId;
         const estado_nuevo = tecnicoId === 'pendientes' ? 'PENDIENTE' : 'EN_RUTA';
 
         const payload = { tecnico_asignado_id: asignado_id, estado: estado_nuevo };
-        if (fechaDestino) payload.fecha_agendada = fechaDestino; // Asignación de calendario
+        if (fechaDestino) payload.fecha_agendada = fechaDestino; 
 
         const { data, error } = await supabase
             .from('tickets')
@@ -95,5 +94,42 @@ export function useTickets() {
         return { success: true };
     };
 
-    return { tickets, loading, crearTicket, moverTicket, reprogramarTicket, refetch: fetchTickets };
+    // --- NUEVAS FUNCIONES PARA PANEL DE REPORTES ACTIVOS ---
+
+    const cambiarEstadoTicket = async (ticketId, nuevoEstado) => {
+        const { error } = await supabase
+            .from('tickets')
+            .update({ estado: nuevoEstado })
+            .eq('id', ticketId);
+            
+        if (error) {
+            console.error("Error al cambiar estado:", error);
+            alert("Hubo un error al actualizar el estado del reporte.");
+            return { error };
+        }
+        
+        await fetchTickets();
+        return { success: true };
+    };
+
+    const enviarAPapelera = async (ticketId) => {
+        const { error } = await supabase
+            .from('tickets')
+            .update({ estado: 'PAPELERA' })
+            .eq('id', ticketId);
+            
+        if (error) {
+            console.error("Error al eliminar (enviar a papelera):", error);
+            alert("Hubo un error al enviar el reporte a la papelera.");
+            return { error };
+        }
+        
+        await fetchTickets();
+        return { success: true };
+    };
+
+    return { 
+        tickets, loading, crearTicket, moverTicket, reprogramarTicket, 
+        cambiarEstadoTicket, enviarAPapelera, refetch: fetchTickets 
+    };
 }
