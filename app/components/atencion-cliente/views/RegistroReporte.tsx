@@ -8,7 +8,6 @@ import {
     MdSend, MdAssignment, MdLocationOn, MdDomain, MdOutlineBolt, MdCheckCircle
 } from "react-icons/md";
 
-// Importamos los hooks para datos reales
 import { useClientes } from '../../../hooks/useClientes';
 import { useTickets } from '../../../hooks/useTickets';
 
@@ -23,17 +22,14 @@ const SUGERENCIAS_TEXTO = {
 };
 
 export default function RegistroReporte() {
-    // CONEXIÓN A BASE DE DATOS
     const { clientes } = useClientes();
     const { crearTicket } = useTickets();
 
-    // ESTADOS DEL BUSCADOR
     const [busqueda, setBusqueda] = useState('');
     const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
     const [mostrarResultados, setMostrarResultados] = useState(false);
     const [ticketGenerado, setTicketGenerado] = useState(false);
 
-    // ESTADOS DEL FORMULARIO
     const [tipoReporte, setTipoReporte] = useState('');
     const [prioridad, setPrioridad] = useState('Media');
     const [descripcion, setDescripcion] = useState('');
@@ -42,13 +38,12 @@ export default function RegistroReporte() {
     const [requiereMaterial, setRequiereMaterial] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // BÚSQUEDA REAL EN CLIENTES
     const clientesFiltrados = busqueda.length > 2 
         ? clientes.filter(c => 
             c.nombre.toLowerCase().includes(busqueda.toLowerCase()) || 
             c.contrato.toLowerCase().includes(busqueda.toLowerCase()) ||
             c.telefono?.includes(busqueda)
-          ).slice(0, 5) // Mostramos máximo 5 resultados rápidos
+          ).slice(0, 5) 
         : [];
 
     const seleccionarCliente = (cliente) => {
@@ -61,7 +56,6 @@ export default function RegistroReporte() {
         setDescripcion(prev => prev ? `${prev} ${texto}` : texto);
     };
 
-    // GUARDAR TICKET EN SUPABASE
     const handleGenerarTicket = async () => {
         if (!clienteSeleccionado || !tipoReporte) return alert("Selecciona un cliente y el tipo de reporte.");
         setIsSubmitting(true);
@@ -76,9 +70,10 @@ export default function RegistroReporte() {
             marca_id: clienteSeleccionado.marca_id,
             region_id: clienteSeleccionado.region_id,
             estado: 'PENDIENTE',
-            // MAGIA AQUÍ: Copiamos las coordenadas exactas del expediente del cliente al reporte
             latitud: clienteSeleccionado.latitud,
-            longitud: clienteSeleccionado.longitud
+            longitud: clienteSeleccionado.longitud,
+            // NUEVO: Enviamos el checkbox de material a la base de datos
+            requiere_material: requiereMaterial 
         };
 
         const { error } = await crearTicket(nuevoTicket);
@@ -86,7 +81,6 @@ export default function RegistroReporte() {
         setIsSubmitting(false);
         if (!error) {
             setTicketGenerado(true);
-            // Limpiar todo después de 3 segundos
             setTimeout(() => {
                 setClienteSeleccionado(null);
                 setTipoReporte('');
@@ -117,7 +111,6 @@ export default function RegistroReporte() {
     return (
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
             
-            {/* 1. BUSCADOR DE CLIENTES REALES */}
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-200">
                 <h3 className="text-sm font-black text-gray-800 mb-4 flex items-center gap-2 uppercase tracking-wide">
                     <MdPerson className="text-blue-500 text-lg"/> 1. Identificación del Cliente
@@ -137,7 +130,6 @@ export default function RegistroReporte() {
                             className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold text-gray-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner"
                         />
                         
-                        {/* RESULTADOS DE BÚSQUEDA FLOTANTES */}
                         {mostrarResultados && busqueda.length > 2 && (
                             <div className="absolute w-full mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-20">
                                 {clientesFiltrados.length > 0 ? (
@@ -189,11 +181,9 @@ export default function RegistroReporte() {
                 )}
             </div>
 
-            {/* 2. DETALLES DEL REPORTE */}
             <div className={`transition-all duration-500 ${clienteSeleccionado ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                 <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row">
                     
-                    {/* COLUMNA IZQUIERDA: Clasificación */}
                     <div className="flex-1 p-6 md:p-8 border-b md:border-b-0 md:border-r border-gray-100 bg-white">
                         <h3 className="text-sm font-black text-gray-800 mb-6 flex items-center gap-2 uppercase tracking-wide">
                             <MdAssignment className="text-blue-500 text-lg"/> 2. Clasificación
@@ -257,7 +247,6 @@ export default function RegistroReporte() {
                         </div>
                     </div>
 
-                    {/* COLUMNA DERECHA: Logística */}
                     <div className="flex-1 p-6 md:p-8 bg-gray-50/50 flex flex-col">
                         <h3 className="text-sm font-black text-gray-800 mb-6 flex items-center gap-2 uppercase tracking-wide">
                             <MdSchedule className="text-blue-500 text-lg"/> 3. Logística y Visita
@@ -305,7 +294,6 @@ export default function RegistroReporte() {
                             )}
                         </div>
 
-                        {/* BOTÓN GENERAR */}
                         <div className="mt-8 pt-6 border-t border-gray-200">
                             <button 
                                 onClick={handleGenerarTicket}

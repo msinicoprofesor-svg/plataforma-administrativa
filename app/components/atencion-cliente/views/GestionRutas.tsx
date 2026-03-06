@@ -124,7 +124,7 @@ export default function GestionRutas() {
         return ordenados;
     };
 
-    // --- NUEVO MOTOR IA: AGRUPACIÓN FÍSICA Y REPARTO EQUITATIVO ---
+    // REEMPLAZAR SOLO ESTA FUNCIÓN EN GestionRutas.tsx
     const asignarConIA = async () => {
         const ticketsAOrganizar = [...pendientesGlobales, ...ticketsDelDia];
         
@@ -135,14 +135,13 @@ export default function GestionRutas() {
 
         setIsUpdating(true);
 
-        // 1. CLUSTERING GEOGRÁFICO (Unimos los que estén a menos de 3km)
         let clusters = [];
         ticketsAOrganizar.forEach(ticket => {
             let agregado = false;
             for (let cluster of clusters) {
                 if (ticket.latitud && ticket.longitud && cluster.latCentro && cluster.lngCentro) {
                     const dist = calcularDistanciaEnKm(ticket.latitud, ticket.longitud, cluster.latCentro, cluster.lngCentro);
-                    if (dist < 3) { // 3 KM DE TOLERANCIA
+                    if (dist < 3) { 
                         cluster.tickets.push(ticket);
                         cluster.latCentro = ((cluster.latCentro * (cluster.tickets.length - 1)) + ticket.latitud) / cluster.tickets.length;
                         cluster.lngCentro = ((cluster.lngCentro * (cluster.tickets.length - 1)) + ticket.longitud) / cluster.tickets.length;
@@ -150,7 +149,6 @@ export default function GestionRutas() {
                         break;
                     }
                 } else if (!ticket.latitud && !cluster.latCentro && ticket.zona === cluster.zonaTexto) {
-                    // Fallback por texto si no tienen coordenadas en BD
                     cluster.tickets.push(ticket);
                     agregado = true;
                     break;
@@ -163,8 +161,7 @@ export default function GestionRutas() {
             }
         });
 
-        // 2. REPARTO JUSTO Y EQUITATIVO
-        clusters.sort((a, b) => b.tickets.length - a.tickets.length); // Asignar bloques grandes primero
+        clusters.sort((a, b) => b.tickets.length - a.tickets.length); 
         let asignaciones = tecnicos.map(t => ({ id: t.id, tickets: [], latUltima: null, lngUltima: null }));
 
         clusters.forEach(cluster => {
@@ -172,14 +169,10 @@ export default function GestionRutas() {
             let mejorCalificacion = Infinity;
 
             asignaciones.forEach(tec => {
-                // PESO 1: EQUIDAD. (Multiplicamos sus tickets x 100 para que los que tienen menos tickets siempre ganen primero)
                 let calificacion = tec.tickets.length * 100;
-
-                // PESO 2: DISTANCIA. (Solo desempata o apoya si las cargas de trabajo son similares)
                 if (cluster.latCentro && tec.latUltima) {
                     calificacion += calcularDistanciaEnKm(cluster.latCentro, cluster.lngCentro, tec.latUltima, tec.lngUltima);
                 }
-
                 if (calificacion < mejorCalificacion) {
                     mejorCalificacion = calificacion;
                     mejorTecnico = tec;
@@ -193,12 +186,12 @@ export default function GestionRutas() {
             }
         });
 
-        // 3. GUARDAR RESULTADOS
+        // MAGIA AQUÍ: Guardamos EN LA BASE DE DATOS el orden exacto (i + 1) para que la App Móvil lo lea
         for (let tecnicoCarga of asignaciones) {
-            for (let ticket of tecnicoCarga.tickets) {
-                if (ticket.asignadoA !== tecnicoCarga.id) {
-                    await moverTicket(ticket.id, tecnicoCarga.id, fechaFiltro);
-                }
+            for (let i = 0; i < tecnicoCarga.tickets.length; i++) {
+                const ticket = tecnicoCarga.tickets[i];
+                // Siempre actualizamos para inyectar el orden numérico
+                await moverTicket(ticket.id, tecnicoCarga.id, fechaFiltro, i + 1);
             }
         }
         

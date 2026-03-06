@@ -38,9 +38,11 @@ export function useTickets() {
                 asignadoA: t.tecnico_asignado_id || 'pendientes',
                 descripcion: t.descripcion,
                 notas_resolucion: t.notas_resolucion || '',
-                // MAGIA AQUÍ: Extraemos las coordenadas para que el mapa las lea
                 latitud: t.latitud,
-                longitud: t.longitud
+                longitud: t.longitud,
+                // NUEVAS VARIABLES PARA EL TÉCNICO
+                requiere_material: t.requiere_material || false,
+                orden_ruta: t.orden_ruta || 0 
             }));
             setTickets(ticketsFormateados);
         }
@@ -53,12 +55,14 @@ export function useTickets() {
         return { error };
     };
 
-    const moverTicket = async (ticketId, tecnicoId, fechaDestino = null) => {
+    // ACTUALIZADO: Ahora recibe el "orden" y lo guarda en la base de datos
+    const moverTicket = async (ticketId, tecnicoId, fechaDestino = null, orden = null) => {
         const asignado_id = tecnicoId === 'pendientes' ? null : tecnicoId;
         const estado_nuevo = tecnicoId === 'pendientes' ? 'PENDIENTE' : 'EN_RUTA';
 
         const payload = { tecnico_asignado_id: asignado_id, estado: estado_nuevo };
         if (fechaDestino) payload.fecha_agendada = fechaDestino; 
+        if (orden !== null) payload.orden_ruta = orden; // Guardamos el número de ruta
 
         const { data, error } = await supabase
             .from('tickets')
