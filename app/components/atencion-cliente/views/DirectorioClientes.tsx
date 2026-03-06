@@ -6,22 +6,19 @@ import { useState, useEffect } from 'react';
 import { 
     MdSearch, MdPersonAdd, MdFilterList, MdEdit, MdDelete, 
     MdLocationOn, MdDomain, MdWifi, MdFiberManualRecord, MdClose, MdSave,
-    MdPerson, MdMap, MdSettingsEthernet, MdCheckCircle
+    MdPerson, MdMap, MdSettingsEthernet, MdCheckCircle, MdAutorenew
 } from "react-icons/md";
 
 // Importamos el hook
 import { useClientes } from '../../../hooks/useClientes';
 
 export default function DirectorioClientes() {
-    // ESTADOS DE UI
     const [busqueda, setBusqueda] = useState('');
     const [filtroMarca, setFiltroMarca] = useState('TODAS');
     const [isModalOpen, setIsModalOpen] = useState(false);
     
-    // DATOS DE SUPABASE
     const { clientes, marcas, regiones, loading, agregarCliente } = useClientes();
 
-    // ESTADO DEL FORMULARIO COMPLETO (Añadido latitud y longitud ocultas)
     const estadoInicial = {
         nombre_completo: '', numero_contrato: '', telefono: '', telefono_adicional: '',
         cp: '', estado: '', municipio: '', comunidad: '', direccion: '', coordenadas: '',
@@ -31,15 +28,16 @@ export default function DirectorioClientes() {
     };
     const [formData, setFormData] = useState(estadoInicial);
     const [buscandoCP, setBuscandoCP] = useState(false);
+    
+    // NUEVO ESTADO: Para mostrar que estamos "desenvolviendo" el enlace
+    const [resolviendoLink, setResolviendoLink] = useState(false);
 
-    // LÓGICA DE FILTRADO
     const clientesFiltrados = clientes.filter(c => {
         const matchTexto = c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) || c.contrato?.toLowerCase().includes(busqueda.toLowerCase());
         const matchMarca = filtroMarca === 'TODAS' || c.marca === filtroMarca;
         return matchTexto && matchMarca;
     });
 
-    // LÓGICA DE AUTO-COMPLETADO DE CP
     const handleCPChange = async (e) => {
         const cp = e.target.value;
         setFormData({ ...formData, cp });
@@ -63,38 +61,56 @@ export default function DirectorioClientes() {
         }
     };
 
-    // --- NUEVA LÓGICA: TRADUCTOR DE ENLACES A COORDENADAS ---
-    const handleLinkChange = (e) => {
+    // --- TRADUCTOR HÍBRIDO (ENLACES LARGOS Y CORTOS) ---
+    const handleLinkChange = async (e) => {
         const link = e.target.value;
-        
-        // Expresión regular para buscar patrones de latitud y longitud en links de Maps
-        // Busca patrones como @21.144,-100.31 o q=21.144,-100.31
-        const regexCoordenadas = /@?(-?\d+\.\d+),(-?\d+\.\d+)/;
+        setFormData(prev => ({ ...prev, coordenadas: link, latitud: null, longitud: null }));
+
+        if (!link) return;
+
+        // 1. Intentamos leerlo como Enlace Largo (Ej. @21.14,-100.31)
+        const regexCoordenadas = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
         const match = link.match(regexCoordenadas);
 
-        setFormData(prev => ({
-            ...prev,
-            coordenadas: link,
-            latitud: match ? parseFloat(match[1]) : null,
-            longitud: match ? parseFloat(match[2]) : null
-        }));
+        if (match) {
+            setFormData(prev => ({ ...prev, latitud: parseFloat(match[1]), longitud: parseFloat(match[2]) }));
+            return;
+        }
+
+        // 2. Si no trae coordenadas visibles, lo mandamos al Backend para desenvolverlo
+        if (link.includes('http')) {
+            setResolviendoLink(true);
+            try {
+                const res = await fetch('/api/resolve-maps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: link })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.latitud && data.longitud) {
+                        setFormData(prev => ({ ...prev, latitud: data.latitud, longitud: data.longitud }));
+                    }
+                }
+            } catch (error) {
+                console.error("No se pudo resolver el enlace de maps.");
+            }
+            setResolviendoLink(false);
+        }
     };
 
-    // LÓGICA CONDICIONAL: ¿Es marca de internet?
     const marcaSeleccionada = marcas.find(m => m.id.toString() === formData.marca_id.toString())?.nombre || '';
     const esMarcaInternet = ['JAVAK', 'Fibrox MX', 'DMG', 'WifiCel'].includes(marcaSeleccionada);
 
-    // GUARDAR CLIENTE 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
         const datosLimpios = { ...formData };
 
         if (datosLimpios.costo === '') datosLimpios.costo = null;
         if (datosLimpios.fecha_instalacion === '') datosLimpios.fecha_instalacion = null;
         if (datosLimpios.marca_id === '') datosLimpios.marca_id = null;
         if (datosLimpios.region_id === '') datosLimpios.region_id = null;
-        
         if (!esMarcaInternet) datosLimpios.tipo_conexion = null;
 
         await agregarCliente(datosLimpios);
@@ -105,7 +121,6 @@ export default function DirectorioClientes() {
     return (
         <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10 h-full flex flex-col relative">
             
-            {/* BARRA DE HERRAMIENTAS SUPERIOR */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-200 shrink-0">
                 <div className="relative w-full md:w-96">
                     <MdSearch className="absolute left-3 top-3 text-gray-400 text-lg"/>
@@ -131,7 +146,6 @@ export default function DirectorioClientes() {
                 </div>
             </div>
 
-            {/* TABLA DE CLIENTES */}
             <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <div className="overflow-x-auto custom-scrollbar flex-1 relative">
                     {loading && (
@@ -186,7 +200,6 @@ export default function DirectorioClientes() {
                 </div>
             </div>
 
-            {/* MODAL EXPEDIENTE CLIENTE */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col animate-slide-up overflow-hidden border border-gray-200">
@@ -207,7 +220,6 @@ export default function DirectorioClientes() {
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gray-50/50">
                             <form id="formCliente" onSubmit={handleSubmit} className="space-y-8">
                                 
-                                {/* SECCIÓN 1 */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                     <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdPerson className="text-blue-500"/> 1. Datos Generales</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -237,7 +249,6 @@ export default function DirectorioClientes() {
                                     </div>
                                 </div>
 
-                                {/* SECCIÓN 2: DIRECCIÓN Y MAPS */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                     <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdMap className="text-green-500"/> 2. Ubicación de Instalación</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -273,24 +284,25 @@ export default function DirectorioClientes() {
                                             <input type="text" required value={formData.direccion} onChange={(e) => setFormData({...formData, direccion: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
                                         </div>
                                         
-                                        {/* ENLACE MAPS CON LECTOR INTELIGENTE */}
+                                        {/* ENLACE MAPS CON LECTOR INTELIGENTE Y ESTADOS */}
                                         <div>
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex justify-between items-center">
                                                 Enlace Maps
-                                                {formData.latitud && <span className="text-[9px] text-green-500 font-black flex items-center gap-1"><MdCheckCircle/> ¡Coordenadas detectadas!</span>}
+                                                {resolviendoLink && <span className="text-[9px] text-blue-500 font-black flex items-center gap-1 animate-pulse"><MdAutorenew className="animate-spin"/> Leyendo ruta...</span>}
+                                                {!resolviendoLink && formData.latitud && <span className="text-[9px] text-green-500 font-black flex items-center gap-1"><MdCheckCircle/> ¡Coordenadas detectadas!</span>}
                                             </label>
                                             <input 
                                                 type="text" 
                                                 value={formData.coordenadas} 
                                                 onChange={handleLinkChange} 
-                                                placeholder="Pega el enlace web aquí..." 
-                                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-bold outline-none transition-all ${formData.latitud ? 'border-green-300 text-green-700 focus:border-green-500 focus:bg-white' : 'border-gray-200 text-blue-600 focus:bg-white focus:border-blue-400'}`}
+                                                placeholder="Pega el enlace corto o largo aquí..." 
+                                                disabled={resolviendoLink}
+                                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-bold outline-none transition-all ${resolviendoLink ? 'opacity-50 cursor-not-allowed' : formData.latitud ? 'border-green-300 text-green-700 focus:border-green-500 focus:bg-white' : 'border-gray-200 text-blue-600 focus:bg-white focus:border-blue-400'}`}
                                             />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* SECCIÓN 3 */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                     <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdSettingsEthernet className="text-orange-500"/> 3. Información Técnica</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -332,7 +344,7 @@ export default function DirectorioClientes() {
                             <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors">
                                 Cancelar
                             </button>
-                            <button form="formCliente" type="submit" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 active:scale-95">
+                            <button form="formCliente" type="submit" disabled={resolviendoLink} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 active:scale-95 disabled:opacity-50">
                                 <MdSave className="text-base"/> Guardar Expediente
                             </button>
                         </div>
