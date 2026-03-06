@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { 
     MdDragIndicator, MdPerson, MdLocationOn, 
     MdAutoAwesome, MdEngineering, MdAssignment, MdMap, MdCheckCircle, MdAccessTime,
-    MdEvent, MdViewColumn, MdViewTimeline, MdArrowForward
+    MdEvent, MdViewColumn, MdViewTimeline, MdArrowForward, MdPinDrop
 } from "react-icons/md";
 
 import { useTickets } from '../../../hooks/useTickets';
@@ -21,17 +21,14 @@ export default function GestionRutas() {
     const [modalAbierto, setModalAbierto] = useState(false);
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
     const [fechaFiltro, setFechaFiltro] = useState(() => new Date().toISOString().split('T')[0]);
+    
+    // AÑADIDA LA VISTA DE MAPA
     const [vistaActiva, setVistaActiva] = useState('TABLERO'); 
 
     const colabsSeguros = colaboradoresReales || [];
     
-    // TICKETS GLOBALES (Visita requerida)
-  const ticketsActivos = tickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO' && t.estado !== 'PAPELERA' && t.visita === true);
-    
-    // PENDIENTES UNIVERSALES (Siempre visibles sin importar la fecha)
+    const ticketsActivos = tickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO' && t.estado !== 'PAPELERA' && t.visita === true);
     const pendientesGlobales = ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes');
-    
-    // ASIGNADOS DEL DÍA
     const ticketsDelDia = ticketsActivos.filter(t => t.fecha_agendada === fechaFiltro && t.asignadoA !== 'pendientes');
 
     let tecnicos = colabsSeguros.filter(c => {
@@ -44,44 +41,86 @@ export default function GestionRutas() {
         tecnicos = colabsSeguros.slice(0, 3);
     }
 
-    // --- ALGORITMO IA ---
+    // --- ALGORITMO ORDENADOR (RECONSTRUIDO) ---
+    const ordenarRuta = (ticketsRuta) => {
+        const getPesoHorario = (h) => {
+            const text = (h || '').toLowerCase();
+            if (text.includes('mañana') || text.includes('9am')) return 1;
+            if (text.includes('tarde') || text.includes('2pm')) return 3;
+            return 2; 
+        };
+
+        const getPesoPrioridad = (p) => {
+            const text = (p || '').toLowerCase();
+            if (text === 'crítica' || text === 'critica') return 4;
+            if (text === 'alta') return 3;
+            if (text === 'media') return 2;
+            if (text === 'baja') return 1;
+            return 0;
+        };
+
+        return [...ticketsRuta].sort((a, b) => {
+            const hA = getPesoHorario(a.horario_preferencia);
+            const hB = getPesoHorario(b.horario_preferencia);
+            
+            // 1. Horario (Mañana primero)
+            if (hA !== hB) return hA - hB;
+            
+            // 2. Prioridad (Crítica primero)
+            const pA = getPesoPrioridad(a.prioridad);
+            const pB = getPesoPrioridad(b.prioridad);
+            if (pA !== pB) return pB - pA;
+            
+            // 3. Ubicación (Agrupar por zona si tienen el mismo horario y prioridad)
+            return (a.zona || '').localeCompare(b.zona || '');
+        });
+    };
+
+    // --- CEREBRO AUTO-ORGANIZAR (NUEVO MOTOR LOGÍSTICO COMPLETO) ---
     const asignarConIA = async () => {
-        if(pendientesGlobales.length === 0) {
-            alert("No hay tickets pendientes universales para organizar.");
+        // Ahora toma TODOS los tickets (pendientes y asignados de este día) para re-optimizar
+        const ticketsAOrganizar = [...pendientesGlobales, ...ticketsDelDia];
+        
+        if(ticketsAOrganizar.length === 0) {
+            alert("No hay tickets pendientes ni asignados en esta fecha para organizar.");
             return;
         }
 
         setIsUpdating(true);
-        const valoresPrioridad = { 'Crítica': 4, 'Alta': 3, 'Media': 2, 'Baja': 1 };
-        let ticketsOrdenados = [...pendientesGlobales].sort((a, b) => {
-            if(valoresPrioridad[b.prioridad] !== valoresPrioridad[a.prioridad]) {
-                return valoresPrioridad[b.prioridad] - valoresPrioridad[a.prioridad];
-            }
-            return new Date(a.fecha) - new Date(b.fecha);
+
+        // 1. Agrupar por zona (Logística geográfica)
+        const ticketsPorZona = {};
+        ticketsAOrganizar.forEach(t => {
+            const z = t.zona || 'Sin Zona';
+            if(!ticketsPorZona[z]) ticketsPorZona[z] = [];
+            ticketsPorZona[z].push(t);
         });
 
-        for (let ticket of ticketsOrdenados) {
-            let techDestino = null;
-            let mejorMatch = tecnicos.find(tec => {
-                const ticketsTec = ticketsDelDia.filter(t => t.asignadoA === tec.id);
-                return ticketsTec.some(t => t.zona === ticket.zona);
-            });
+        // Zonas más pesadas primero
+        const zonasOrdenadas = Object.keys(ticketsPorZona).sort((a,b) => ticketsPorZona[b].length - ticketsPorZona[a].length);
 
-            if (mejorMatch) techDestino = mejorMatch;
-            else {
-                techDestino = [...tecnicos].sort((a, b) => {
-                    const cargaA = ticketsDelDia.filter(t => t.asignadoA === a.id).length;
-                    const cargaB = ticketsDelDia.filter(t => t.asignadoA === b.id).length;
-                    return cargaA - cargaB;
-                })[0];
+        // Memoria temporal de asignaciones
+        let asignaciones = tecnicos.map(t => ({ id: t.id, tickets: [] }));
+
+        // 2. Repartir zonas completas a los técnicos
+        zonasOrdenadas.forEach(zona => {
+            // Buscamos al técnico con menos carga actual
+            asignaciones.sort((a, b) => a.tickets.length - b.tickets.length);
+            asignaciones[0].tickets.push(...ticketsPorZona[zona]);
+        });
+
+        // 3. Guardar en Base de Datos (solo los que cambiaron de dueño o estaban pendientes)
+        for (let tecnicoCarga of asignaciones) {
+            for (let ticket of tecnicoCarga.tickets) {
+                if (ticket.asignadoA !== tecnicoCarga.id) {
+                    await moverTicket(ticket.id, tecnicoCarga.id, fechaFiltro);
+                }
             }
-
-            if (techDestino) await moverTicket(ticket.id, techDestino.id, fechaFiltro);
         }
+        
         setIsUpdating(false);
     };
 
-    // --- DRAG & DROP ---
     const handleDragStart = (e, ticketId) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData('text/plain', String(ticketId)); 
@@ -124,12 +163,11 @@ export default function GestionRutas() {
                 <div className="absolute inset-0 bg-[#F5F7FA]/70 backdrop-blur-sm z-20 flex flex-col items-center justify-center rounded-3xl">
                     <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
                     <p className="text-xs font-bold text-gray-700 mt-3 animate-pulse">
-                        {isUpdating ? 'Actualizando y organizando base de datos...' : 'Sincronizando sistema...'}
+                        {isUpdating ? 'Optimizando ubicaciones y tiempos de ruta...' : 'Sincronizando sistema...'}
                     </p>
                 </div>
             )}
 
-            {/* BARRA SUPERIOR */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-3xl shadow-sm border border-gray-100 shrink-0 gap-4">
                 <div>
                     <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
@@ -141,7 +179,7 @@ export default function GestionRutas() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3">
-                    <button onClick={asignarConIA} disabled={isUpdating} className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 hover:from-purple-200 hover:to-fuchsia-200 text-purple-700 px-4 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 border border-purple-200 disabled:opacity-50">
+                    <button onClick={asignarConIA} disabled={isUpdating} className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 hover:from-purple-200 hover:to-fuchsia-200 text-purple-700 px-4 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 border border-purple-200 disabled:opacity-50" title="Repartir por zona y horario">
                         <MdAutoAwesome className="text-lg text-purple-600"/> Auto-Organizar
                     </button>
 
@@ -150,12 +188,16 @@ export default function GestionRutas() {
                         <input type="date" value={fechaFiltro} onChange={(e) => setFechaFiltro(e.target.value)} className="bg-transparent text-xs font-black text-blue-900 outline-none cursor-pointer" />
                     </div>
 
+                    {/* SELECTOR DE TRES VISTAS AHORA */}
                     <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 shadow-inner">
-                        <button onClick={() => setVistaActiva('TABLERO')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TABLERO' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                        <button onClick={() => setVistaActiva('TABLERO')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TABLERO' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`} title="Modo Tablero (Drag & Drop)">
                             <MdViewColumn className="text-lg"/>
                         </button>
-                        <button onClick={() => setVistaActiva('TIMELINE')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TIMELINE' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                        <button onClick={() => setVistaActiva('TIMELINE')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TIMELINE' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`} title="Modo Línea de Tiempo">
                             <MdViewTimeline className="text-lg"/>
+                        </button>
+                        <button onClick={() => setVistaActiva('MAPA')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'MAPA' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`} title="Modo Mapa Geográfico">
+                            <MdMap className="text-lg"/>
                         </button>
                     </div>
                 </div>
@@ -164,14 +206,13 @@ export default function GestionRutas() {
             {vistaActiva === 'TABLERO' ? (
                 /* --- VISTA 1: KANBAN --- */
                 <div className="flex-1 flex gap-5 overflow-x-auto custom-scrollbar pb-4 px-1">
-                    {/* COLUMNA PENDIENTES UNIVERSAL */}
                     <div className="w-80 min-w-[20rem] flex flex-col bg-gray-100/60 rounded-[2rem] border-2 border-dashed border-gray-200 p-5 transition-colors hover:bg-gray-100" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, 'pendientes')}>
                         <div className="flex items-center justify-between mb-5 px-2">
                             <h4 className="text-xs font-black text-gray-700 uppercase tracking-widest flex items-center gap-2"><MdAssignment className="text-gray-400"/> Sin Asignar</h4>
                             <span className="bg-white text-gray-800 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-sm border border-gray-100">{pendientesGlobales.length}</span>
                         </div>
                         <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-2">
-                            {pendientesGlobales.map(ticket => (
+                            {ordenarRuta(pendientesGlobales).map(ticket => (
                                 <TicketCard key={ticket.id} ticket={ticket} onDragStart={handleDragStart} getColores={getColoresPrioridad} onVerDetalles={abrirDetalles} onReprogramar={reprogramarTicket} />
                             ))}
                         </div>
@@ -179,7 +220,7 @@ export default function GestionRutas() {
 
                     {tecnicos.map(tecnico => {
                         const partesNombre = (tecnico?.nombre || 'Técnico').split(' ');
-                        const ticketsTecnico = ticketsDelDia.filter(t => t.asignadoA === tecnico.id);
+                        const ticketsTecnico = ordenarRuta(ticketsDelDia.filter(t => t.asignadoA === tecnico.id));
                         return (
                             <div key={tecnico.id} className="w-80 min-w-[20rem] flex flex-col bg-white rounded-[2rem] border border-gray-100 p-5 shadow-sm transition-colors hover:border-blue-300" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, tecnico.id)}>
                                 <div className="flex items-start gap-4 mb-5 p-4 bg-blue-50/50 rounded-[1.5rem] border border-blue-100/50">
@@ -206,8 +247,8 @@ export default function GestionRutas() {
                         );
                     })}
                 </div>
-            ) : (
-                /* --- VISTA 2: LÍNEA DE TIEMPO (CORTES SOLUCIONADOS NATIVAMENTE) --- */
+            ) : vistaActiva === 'TIMELINE' ? (
+                /* --- VISTA 2: LÍNEA DE TIEMPO --- */
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-1 space-y-6">
                     
                     {pendientesGlobales.length > 0 && (
@@ -222,7 +263,7 @@ export default function GestionRutas() {
                             </div>
                             
                             <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 pt-2 items-center px-2">
-                                {pendientesGlobales.map(ticket => (
+                                {ordenarRuta(pendientesGlobales).map(ticket => (
                                     <div key={ticket.id} className="min-w-[260px] shrink-0">
                                         <TicketCard ticket={ticket} onDragStart={handleDragStart} getColores={getColoresPrioridad} onVerDetalles={abrirDetalles} onReprogramar={reprogramarTicket} />
                                     </div>
@@ -233,7 +274,7 @@ export default function GestionRutas() {
                     )}
 
                     {tecnicos.map(tecnico => {
-                        const ticketsTecnico = ticketsDelDia.filter(t => t.asignadoA === tecnico.id);
+                        const ticketsTecnico = ordenarRuta(ticketsDelDia.filter(t => t.asignadoA === tecnico.id));
                         if (ticketsTecnico.length === 0) return null;
 
                         return (
@@ -251,14 +292,13 @@ export default function GestionRutas() {
                                     {ticketsTecnico.map((ticket, index) => (
                                         <div key={ticket.id} className="flex items-center shrink-0 group">
                                             
-                                            {/* TARJETA TIMELINE CON HORA Y NÚMERO INTEGRADOS (Evita recortes) */}
-                                            <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-4 rounded-3xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all w-[260px] cursor-pointer" onClick={() => abrirDetalles(ticket)} draggable={true} onDragStart={(e) => handleDragStart(e, ticket.id)}>
+                                            <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-4 rounded-3xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all w-[260px] cursor-pointer relative" onClick={() => abrirDetalles(ticket)} draggable={true} onDragStart={(e) => handleDragStart(e, ticket.id)}>
                                                 
                                                 <div className="flex justify-between items-center mb-3">
-                                                    <div className="w-6 h-6 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-sm">
+                                                    <div className="w-6 h-6 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-sm z-10">
                                                         {index + 1}
                                                     </div>
-                                                    <div className="bg-gray-800 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                                                    <div className="bg-gray-800 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1 z-10">
                                                         <MdAccessTime className="text-xs"/> {ticket.horario_preferencia}
                                                     </div>
                                                 </div>
@@ -292,6 +332,54 @@ export default function GestionRutas() {
                             <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No hay rutas ni reportes pendientes en esta fecha</p>
                         </div>
                     )}
+                </div>
+            ) : (
+                /* --- VISTA 3: MAPA (NUEVA UI PROFESIONAL) --- */
+                <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
+                    {/* Lista lateral del mapa */}
+                    <div className="w-full md:w-80 bg-white rounded-[2rem] border border-gray-100 shadow-sm flex flex-col overflow-hidden shrink-0">
+                        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
+                            <h4 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
+                                <MdPinDrop className="text-blue-500"/> Zonas Activas
+                            </h4>
+                            <p className="text-[10px] font-bold text-gray-400 mt-1">Reportes agendados para ubicación.</p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-gray-50/30">
+                            {/* Mostrar todos los tickets del día listos para el mapa */}
+                            {ordenarRuta([...pendientesGlobales, ...ticketsDelDia]).map(ticket => (
+                                <div key={ticket.id} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:border-blue-300 transition-colors cursor-pointer" onClick={() => abrirDetalles(ticket)}>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] font-black text-gray-400 tracking-widest">{ticket.folio_corto}</span>
+                                        <span className={`w-2 h-2 rounded-full ${ticket.asignadoA === 'pendientes' ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></span>
+                                    </div>
+                                    <p className="text-xs font-black text-gray-800 truncate">{ticket.cliente}</p>
+                                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-1"><MdLocationOn className="text-blue-500"/> {ticket.zona}</p>
+                                </div>
+                            ))}
+                            {ticketsDelDia.length === 0 && pendientesGlobales.length === 0 && (
+                                <p className="text-xs text-center font-bold text-gray-400 mt-10">No hay ubicaciones para esta fecha.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Contenedor del Mapa (Placeholder listo para API) */}
+                    <div className="flex-1 bg-gray-100 rounded-[2rem] border border-gray-200 overflow-hidden relative shadow-inner group flex items-center justify-center">
+                        {/* Patrón de fondo simulando calles */}
+                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, black 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
+                        
+                        <div className="relative z-10 flex flex-col items-center justify-center text-center p-8 bg-white/90 backdrop-blur-md rounded-3xl border border-white/50 shadow-xl max-w-sm">
+                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                                <MdMap className="text-3xl"/>
+                            </div>
+                            <h3 className="text-base font-black text-gray-800 mb-2">Módulo de Mapa Integrado</h3>
+                            <p className="text-xs font-medium text-gray-500 mb-6">
+                                La interfaz está lista. Para visualizar los puntos interactivos y trazar rutas reales de tus técnicos, se requiere conectar una clave API de <strong className="text-gray-700">Google Maps</strong> o <strong className="text-gray-700">Mapbox</strong>.
+                            </p>
+                            <button className="px-6 py-3 bg-gray-900 hover:bg-black text-white text-xs font-black rounded-xl transition-all shadow-md active:scale-95">
+                                Conectar API de Mapas
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
