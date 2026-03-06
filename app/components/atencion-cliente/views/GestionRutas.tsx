@@ -3,6 +3,7 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react'; 
+import dynamic from 'next/dynamic'; // <-- IMPORTANTE PARA EL MAPA
 import { 
     MdDragIndicator, MdPerson, MdLocationOn, 
     MdAutoAwesome, MdEngineering, MdAssignment, MdMap, MdCheckCircle, MdAccessTime,
@@ -13,6 +14,17 @@ import { useTickets } from '../../../hooks/useTickets';
 import { useColaboradores } from '../../../hooks/useColaboradores';
 import ModalDetallesTicket from './ModalDetallesTicket';
 
+// IMPORTACIÓN DINÁMICA DEL MAPA (Evita errores de SSR en Next.js)
+const MapaRutas = dynamic(() => import('./MapaRutas'), { 
+    ssr: false, 
+    loading: () => (
+        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/50 rounded-[2rem] border-2 border-dashed border-gray-200">
+            <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+            <p className="text-xs font-bold text-gray-500 animate-pulse">Cargando cartografía satelital...</p>
+        </div>
+    )
+});
+
 export default function GestionRutas() {
     const { tickets, moverTicket, reprogramarTicket, loading: loadingTickets } = useTickets();
     const { colaboradoresReales, loading: loadingColabs } = useColaboradores();
@@ -21,8 +33,6 @@ export default function GestionRutas() {
     const [modalAbierto, setModalAbierto] = useState(false);
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
     const [fechaFiltro, setFechaFiltro] = useState(() => new Date().toISOString().split('T')[0]);
-    
-    // AÑADIDA LA VISTA DE MAPA
     const [vistaActiva, setVistaActiva] = useState('TABLERO'); 
 
     const colabsSeguros = colaboradoresReales || [];
@@ -41,7 +51,6 @@ export default function GestionRutas() {
         tecnicos = colabsSeguros.slice(0, 3);
     }
 
-    // --- ALGORITMO ORDENADOR (RECONSTRUIDO) ---
     const ordenarRuta = (ticketsRuta) => {
         const getPesoHorario = (h) => {
             const text = (h || '').toLowerCase();
@@ -62,23 +71,17 @@ export default function GestionRutas() {
         return [...ticketsRuta].sort((a, b) => {
             const hA = getPesoHorario(a.horario_preferencia);
             const hB = getPesoHorario(b.horario_preferencia);
-            
-            // 1. Horario (Mañana primero)
             if (hA !== hB) return hA - hB;
             
-            // 2. Prioridad (Crítica primero)
             const pA = getPesoPrioridad(a.prioridad);
             const pB = getPesoPrioridad(b.prioridad);
             if (pA !== pB) return pB - pA;
             
-            // 3. Ubicación (Agrupar por zona si tienen el mismo horario y prioridad)
             return (a.zona || '').localeCompare(b.zona || '');
         });
     };
 
-    // --- CEREBRO AUTO-ORGANIZAR (NUEVO MOTOR LOGÍSTICO COMPLETO) ---
     const asignarConIA = async () => {
-        // Ahora toma TODOS los tickets (pendientes y asignados de este día) para re-optimizar
         const ticketsAOrganizar = [...pendientesGlobales, ...ticketsDelDia];
         
         if(ticketsAOrganizar.length === 0) {
@@ -88,7 +91,6 @@ export default function GestionRutas() {
 
         setIsUpdating(true);
 
-        // 1. Agrupar por zona (Logística geográfica)
         const ticketsPorZona = {};
         ticketsAOrganizar.forEach(t => {
             const z = t.zona || 'Sin Zona';
@@ -96,20 +98,14 @@ export default function GestionRutas() {
             ticketsPorZona[z].push(t);
         });
 
-        // Zonas más pesadas primero
         const zonasOrdenadas = Object.keys(ticketsPorZona).sort((a,b) => ticketsPorZona[b].length - ticketsPorZona[a].length);
-
-        // Memoria temporal de asignaciones
         let asignaciones = tecnicos.map(t => ({ id: t.id, tickets: [] }));
 
-        // 2. Repartir zonas completas a los técnicos
         zonasOrdenadas.forEach(zona => {
-            // Buscamos al técnico con menos carga actual
             asignaciones.sort((a, b) => a.tickets.length - b.tickets.length);
             asignaciones[0].tickets.push(...ticketsPorZona[zona]);
         });
 
-        // 3. Guardar en Base de Datos (solo los que cambiaron de dueño o estaban pendientes)
         for (let tecnicoCarga of asignaciones) {
             for (let ticket of tecnicoCarga.tickets) {
                 if (ticket.asignadoA !== tecnicoCarga.id) {
@@ -188,7 +184,6 @@ export default function GestionRutas() {
                         <input type="date" value={fechaFiltro} onChange={(e) => setFechaFiltro(e.target.value)} className="bg-transparent text-xs font-black text-blue-900 outline-none cursor-pointer" />
                     </div>
 
-                    {/* SELECTOR DE TRES VISTAS AHORA */}
                     <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 shadow-inner">
                         <button onClick={() => setVistaActiva('TABLERO')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TABLERO' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`} title="Modo Tablero (Drag & Drop)">
                             <MdViewColumn className="text-lg"/>
@@ -204,7 +199,6 @@ export default function GestionRutas() {
             </div>
 
             {vistaActiva === 'TABLERO' ? (
-                /* --- VISTA 1: KANBAN --- */
                 <div className="flex-1 flex gap-5 overflow-x-auto custom-scrollbar pb-4 px-1">
                     <div className="w-80 min-w-[20rem] flex flex-col bg-gray-100/60 rounded-[2rem] border-2 border-dashed border-gray-200 p-5 transition-colors hover:bg-gray-100" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, 'pendientes')}>
                         <div className="flex items-center justify-between mb-5 px-2">
@@ -248,9 +242,7 @@ export default function GestionRutas() {
                     })}
                 </div>
             ) : vistaActiva === 'TIMELINE' ? (
-                /* --- VISTA 2: LÍNEA DE TIEMPO --- */
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-1 space-y-6">
-                    
                     {pendientesGlobales.length > 0 && (
                         <div className="bg-orange-50/50 p-6 rounded-[2rem] border-2 border-dashed border-orange-200/50 shadow-sm flex flex-col mb-6" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, 'pendientes')}>
                             <div className="flex items-center gap-3 mb-2 border-b border-orange-200/30 pb-4">
@@ -291,33 +283,21 @@ export default function GestionRutas() {
                                 <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 pt-2 items-center px-2">
                                     {ticketsTecnico.map((ticket, index) => (
                                         <div key={ticket.id} className="flex items-center shrink-0 group">
-                                            
                                             <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-4 rounded-3xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all w-[260px] cursor-pointer relative" onClick={() => abrirDetalles(ticket)} draggable={true} onDragStart={(e) => handleDragStart(e, ticket.id)}>
-                                                
                                                 <div className="flex justify-between items-center mb-3">
-                                                    <div className="w-6 h-6 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-sm z-10">
-                                                        {index + 1}
-                                                    </div>
-                                                    <div className="bg-gray-800 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1 z-10">
-                                                        <MdAccessTime className="text-xs"/> {ticket.horario_preferencia}
-                                                    </div>
+                                                    <div className="w-6 h-6 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-sm z-10">{index + 1}</div>
+                                                    <div className="bg-gray-800 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1 z-10"><MdAccessTime className="text-xs"/> {ticket.horario_preferencia}</div>
                                                 </div>
-
                                                 <div className="pl-1">
                                                     <p className="text-[10px] text-gray-400 font-black mb-1.5 flex justify-between items-center">
                                                         {ticket.folio_corto}
                                                         <span className={`px-2 py-0.5 rounded shadow-sm text-[8px] ${getColoresPrioridad(ticket.prioridad)}`}>{ticket.prioridad}</span>
                                                     </p>
                                                     <p className="text-sm font-black text-gray-800 mb-2 truncate">{ticket.cliente}</p>
-                                                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-100">
-                                                        <MdLocationOn className="text-green-500 text-sm shrink-0"/>
-                                                        <span className="truncate">{ticket.zona}</span>
-                                                    </p>
+                                                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-100"><MdLocationOn className="text-green-500 text-sm shrink-0"/><span className="truncate">{ticket.zona}</span></p>
                                                 </div>
                                             </div>
-                                            {index < ticketsTecnico.length - 1 && (
-                                                <MdArrowForward className="mx-4 text-gray-200 text-2xl shrink-0 group-hover:text-blue-400 transition-colors"/>
-                                            )}
+                                            {index < ticketsTecnico.length - 1 && <MdArrowForward className="mx-4 text-gray-200 text-2xl shrink-0 group-hover:text-blue-400 transition-colors"/>}
                                         </div>
                                     ))}
                                     <div className="w-4 shrink-0"></div>
@@ -334,10 +314,9 @@ export default function GestionRutas() {
                     )}
                 </div>
             ) : (
-                /* --- VISTA 3: MAPA (NUEVA UI PROFESIONAL) --- */
+                /* --- VISTA 3: MAPA (CONECTADO REAL) --- */
                 <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
-                    {/* Lista lateral del mapa */}
-                    <div className="w-full md:w-80 bg-white rounded-[2rem] border border-gray-100 shadow-sm flex flex-col overflow-hidden shrink-0">
+                    <div className="w-full md:w-80 bg-white rounded-[2rem] border border-gray-100 shadow-sm flex flex-col overflow-hidden shrink-0 z-10">
                         <div className="p-5 border-b border-gray-100 bg-gray-50/50">
                             <h4 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
                                 <MdPinDrop className="text-blue-500"/> Zonas Activas
@@ -345,7 +324,6 @@ export default function GestionRutas() {
                             <p className="text-[10px] font-bold text-gray-400 mt-1">Reportes agendados para ubicación.</p>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-gray-50/30">
-                            {/* Mostrar todos los tickets del día listos para el mapa */}
                             {ordenarRuta([...pendientesGlobales, ...ticketsDelDia]).map(ticket => (
                                 <div key={ticket.id} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:border-blue-300 transition-colors cursor-pointer" onClick={() => abrirDetalles(ticket)}>
                                     <div className="flex justify-between items-center mb-1">
@@ -362,23 +340,11 @@ export default function GestionRutas() {
                         </div>
                     </div>
 
-                    {/* Contenedor del Mapa (Placeholder listo para API) */}
-                    <div className="flex-1 bg-gray-100 rounded-[2rem] border border-gray-200 overflow-hidden relative shadow-inner group flex items-center justify-center">
-                        {/* Patrón de fondo simulando calles */}
-                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, black 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
-                        
-                        <div className="relative z-10 flex flex-col items-center justify-center text-center p-8 bg-white/90 backdrop-blur-md rounded-3xl border border-white/50 shadow-xl max-w-sm">
-                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
-                                <MdMap className="text-3xl"/>
-                            </div>
-                            <h3 className="text-base font-black text-gray-800 mb-2">Módulo de Mapa Integrado</h3>
-                            <p className="text-xs font-medium text-gray-500 mb-6">
-                                La interfaz está lista. Para visualizar los puntos interactivos y trazar rutas reales de tus técnicos, se requiere conectar una clave API de <strong className="text-gray-700">Google Maps</strong> o <strong className="text-gray-700">Mapbox</strong>.
-                            </p>
-                            <button className="px-6 py-3 bg-gray-900 hover:bg-black text-white text-xs font-black rounded-xl transition-all shadow-md active:scale-95">
-                                Conectar API de Mapas
-                            </button>
-                        </div>
+                    <div className="flex-1 bg-gray-100 rounded-[2rem] border border-gray-200 overflow-hidden relative shadow-inner z-0">
+                        <MapaRutas 
+                            tickets={[...pendientesGlobales, ...ticketsDelDia]} 
+                            onVerDetalles={abrirDetalles} 
+                        />
                     </div>
                 </div>
             )}
@@ -388,48 +354,23 @@ export default function GestionRutas() {
     );
 }
 
-// Subcomponente de Tarjeta Draggable
 function TicketCard({ ticket, onDragStart, getColores, onVerDetalles, onReprogramar }) {
     return (
-        <div 
-            draggable={true} 
-            onDragStart={(e) => onDragStart(e, ticket.id)}
-            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm shadow-gray-200/50 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group relative select-none w-full max-w-full flex flex-col"
-        >
+        <div draggable={true} onDragStart={(e) => onDragStart(e, ticket.id)} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm shadow-gray-200/50 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group relative select-none w-full max-w-full flex flex-col">
             <div className="flex justify-between items-start mb-3">
-                <span className="text-[10px] font-black text-gray-400 tracking-widest bg-gray-50 px-2 py-0.5 rounded border border-gray-100 truncate">
-                    {ticket?.folio_corto || 'TKT-000'}
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm shrink-0 ml-2 ${getColores(ticket?.prioridad)}`}>
-                    {ticket?.prioridad || 'Baja'}
-                </span>
+                <span className="text-[10px] font-black text-gray-400 tracking-widest bg-gray-50 px-2 py-0.5 rounded border border-gray-100 truncate">{ticket?.folio_corto || 'TKT-000'}</span>
+                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm shrink-0 ml-2 ${getColores(ticket?.prioridad)}`}>{ticket?.prioridad || 'Baja'}</span>
             </div>
-            
-            <h5 className="text-xs font-black text-gray-800 mb-1.5 flex items-center gap-2 min-w-0">
-                <MdPerson className="text-blue-500 shrink-0"/> 
-                <span className="truncate">{ticket?.cliente || 'Sin Cliente'}</span>
-            </h5>
-            
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 bg-gray-50 p-1.5 rounded-lg border border-gray-50 min-w-0">
-                <MdLocationOn className="text-green-500 text-sm shrink-0"/> 
-                <span className="truncate">{ticket?.zona || 'Sin Zona'}</span>
-            </div>
-
+            <h5 className="text-xs font-black text-gray-800 mb-1.5 flex items-center gap-2 min-w-0"><MdPerson className="text-blue-500 shrink-0"/> <span className="truncate">{ticket?.cliente || 'Sin Cliente'}</span></h5>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 bg-gray-50 p-1.5 rounded-lg border border-gray-50 min-w-0"><MdLocationOn className="text-green-500 text-sm shrink-0"/> <span className="truncate">{ticket?.zona || 'Sin Zona'}</span></div>
             <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                 <div className="relative overflow-hidden group/date cursor-pointer">
                     <input type="date" value={ticket?.fecha_agendada} onChange={(e) => onReprogramar(ticket.id, e.target.value)} className="absolute opacity-0 inset-0 cursor-pointer z-10" title="Agendar / Posponer ticket" />
-                    <button className="flex items-center gap-1 text-[9px] font-black text-orange-500 bg-orange-50 group-hover/date:bg-orange-100 px-2 py-1.5 rounded transition-colors uppercase tracking-widest">
-                        <MdEvent className="text-[11px]"/> Posponer
-                    </button>
+                    <button className="flex items-center gap-1 text-[9px] font-black text-orange-500 bg-orange-50 group-hover/date:bg-orange-100 px-2 py-1.5 rounded transition-colors uppercase tracking-widest"><MdEvent className="text-[11px]"/> Posponer</button>
                 </div>
-                <button onClick={() => onVerDetalles(ticket)} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-wider transition-colors z-10 flex items-center gap-1">
-                    <MdAccessTime/> Detalles
-                </button>
+                <button onClick={() => onVerDetalles(ticket)} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-wider transition-colors z-10 flex items-center gap-1"><MdAccessTime/> Detalles</button>
             </div>
-            
-            <div className="absolute top-1/2 -right-3 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white rounded-full p-1 shadow-sm border border-gray-100">
-                <MdDragIndicator className="text-gray-400 text-xl"/>
-            </div>
+            <div className="absolute top-1/2 -right-3 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white rounded-full p-1 shadow-sm border border-gray-100"><MdDragIndicator className="text-gray-400 text-xl"/></div>
         </div>
     );
 }
