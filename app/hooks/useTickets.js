@@ -36,7 +36,8 @@ export function useTickets() {
                 horario_preferencia: t.horario_preferencia || 'Lo antes posible',
                 visita: t.requiere_visita,
                 asignadoA: t.tecnico_asignado_id || 'pendientes',
-                descripcion: t.descripcion
+                descripcion: t.descripcion,
+                notas_resolucion: t.notas_resolucion || '' // <-- NUEVO: Memoria de notas
             }));
             setTickets(ticketsFormateados);
         }
@@ -67,69 +68,72 @@ export function useTickets() {
             alert(`Error de Base de Datos: ${error.message}`);
             return { error };
         }
-
-        if (!data || data.length === 0) {
-            console.warn("[Seguridad] Supabase bloqueó la actualización (0 filas). Revisa políticas RLS.");
-            alert("No se guardó el cambio. Revisa que la tabla 'tickets' tenga habilitada la política RLS para 'UPDATE'.");
-            return { error: 'RLS_BLOCKED' };
-        }
         
         await fetchTickets();
         return { success: true };
     };
 
     const reprogramarTicket = async (ticketId, nuevaFecha) => {
-        const { error } = await supabase
-            .from('tickets')
-            .update({ fecha_agendada: nuevaFecha }) 
-            .eq('id', ticketId);
-            
-        if (error) {
-            console.error("Error al posponer:", error);
-            alert("Hubo un error al posponer el ticket.");
-            return { error };
-        }
-        
+        const { error } = await supabase.from('tickets').update({ fecha_agendada: nuevaFecha }).eq('id', ticketId);
+        if (error) alert("Hubo un error al posponer el ticket.");
         await fetchTickets();
         return { success: true };
     };
 
-    // --- NUEVAS FUNCIONES PARA PANEL DE REPORTES ACTIVOS ---
-
     const cambiarEstadoTicket = async (ticketId, nuevoEstado) => {
-        const { error } = await supabase
-            .from('tickets')
-            .update({ estado: nuevoEstado })
-            .eq('id', ticketId);
-            
-        if (error) {
-            console.error("Error al cambiar estado:", error);
-            alert("Hubo un error al actualizar el estado del reporte.");
-            return { error };
-        }
-        
+        const { error } = await supabase.from('tickets').update({ estado: nuevoEstado }).eq('id', ticketId);
+        if (error) alert("Hubo un error al actualizar el estado del reporte.");
         await fetchTickets();
         return { success: true };
     };
 
     const enviarAPapelera = async (ticketId) => {
+        const { error } = await supabase.from('tickets').update({ estado: 'PAPELERA' }).eq('id', ticketId);
+        if (error) alert("Hubo un error al enviar el reporte a la papelera.");
+        await fetchTickets();
+        return { success: true };
+    };
+
+    // --- NUEVAS FUNCIONES DE ESCALAMIENTO Y CIERRE ---
+
+    const escalarAVisita = async (ticketId, horario, notas) => {
         const { error } = await supabase
             .from('tickets')
-            .update({ estado: 'PAPELERA' })
+            .update({ 
+                requiere_visita: true, 
+                estado: 'PENDIENTE', 
+                horario_preferencia: horario,
+                notas_resolucion: notas
+            })
             .eq('id', ticketId);
             
         if (error) {
-            console.error("Error al eliminar (enviar a papelera):", error);
-            alert("Hubo un error al enviar el reporte a la papelera.");
+            alert("Error al escalar a visita.");
             return { error };
         }
-        
+        await fetchTickets();
+        return { success: true };
+    };
+
+    const resolverTicket = async (ticketId, notas) => {
+        const { error } = await supabase
+            .from('tickets')
+            .update({ 
+                estado: 'RESUELTO',
+                notas_resolucion: notas
+            })
+            .eq('id', ticketId);
+            
+        if (error) {
+            alert("Error al resolver el ticket.");
+            return { error };
+        }
         await fetchTickets();
         return { success: true };
     };
 
     return { 
         tickets, loading, crearTicket, moverTicket, reprogramarTicket, 
-        cambiarEstadoTicket, enviarAPapelera, refetch: fetchTickets 
+        cambiarEstadoTicket, enviarAPapelera, escalarAVisita, resolverTicket, refetch: fetchTickets 
     };
 }

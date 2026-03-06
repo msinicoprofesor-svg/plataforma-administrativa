@@ -26,7 +26,7 @@ export default function GestionRutas() {
     const colabsSeguros = colaboradoresReales || [];
     
     // TICKETS GLOBALES (Visita requerida)
-    const ticketsActivos = tickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO' && t.visita === true);
+   const ticketsActivos = tickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO' && t.estado !== 'PAPELERA' && t.visita === true);
     
     // PENDIENTES UNIVERSALES (Siempre visibles sin importar la fecha)
     const pendientesGlobales = ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes');
