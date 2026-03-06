@@ -52,7 +52,20 @@ export default function GestionRutas() {
         tecnicos = colabsSeguros.slice(0, 3);
     }
 
+    // FÓRMULA DE HAVERSINE: Calcula la distancia en kilómetros reales
+    const calcularDistanciaEnKm = (lat1, lon1, lat2, lon2) => {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+        const R = 6371; 
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    };
+
+    // --- NUEVO CEREBRO: ORDENAMIENTO GEOGRÁFICO INTELIGENTE ---
     const ordenarRuta = (ticketsRuta) => {
+        if (ticketsRuta.length <= 1) return ticketsRuta;
+
         const getPesoHorario = (h) => {
             const text = (h || '').toLowerCase();
             if (text.includes('mañana') || text.includes('9am')) return 1;
@@ -65,24 +78,53 @@ export default function GestionRutas() {
             if (text === 'crítica' || text === 'critica') return 4;
             if (text === 'alta') return 3;
             if (text === 'media') return 2;
-            if (text === 'baja') return 1;
-            return 0;
+            return 1;
         };
 
-        return [...ticketsRuta].sort((a, b) => {
-            const hA = getPesoHorario(a.horario_preferencia);
-            const hB = getPesoHorario(b.horario_preferencia);
-            if (hA !== hB) return hA - hB;
-            
-            const pA = getPesoPrioridad(a.prioridad);
-            const pB = getPesoPrioridad(b.prioridad);
-            if (pA !== pB) return pB - pA;
-            
-            return (a.zona || '').localeCompare(b.zona || '');
+        let pendientes = [...ticketsRuta];
+        let ordenados = [];
+
+        // 1. Iniciamos la ruta con el ticket más urgente y temprano
+        pendientes.sort((a, b) => {
+            if (getPesoHorario(a.horario_preferencia) !== getPesoHorario(b.horario_preferencia)) {
+                return getPesoHorario(a.horario_preferencia) - getPesoHorario(b.horario_preferencia);
+            }
+            return getPesoPrioridad(b.prioridad) - getPesoPrioridad(a.prioridad);
         });
+
+        let actual = pendientes.shift();
+        ordenados.push(actual);
+
+        // 2. Buscamos el punto más cercano para armar la línea lógica
+        while (pendientes.length > 0) {
+            let indexMasCercano = 0;
+            let menorCosto = Infinity;
+
+            for (let i = 0; i < pendientes.length; i++) {
+                const candidato = pendientes[i];
+                let costo = calcularDistanciaEnKm(actual.latitud, actual.longitud, candidato.latitud, candidato.longitud);
+
+                // Evitar saltos de horario
+                if (getPesoHorario(candidato.horario_preferencia) > getPesoHorario(actual.horario_preferencia)) {
+                    costo += 5000; // Penalización altísima para no brincar a la tarde sin acabar la mañana
+                }
+
+                // Atraer urgencias
+                costo -= getPesoPrioridad(candidato.prioridad) * 2; 
+
+                if (costo < menorCosto) {
+                    menorCosto = costo;
+                    indexMasCercano = i;
+                }
+            }
+            actual = pendientes.splice(indexMasCercano, 1)[0];
+            ordenados.push(actual);
+        }
+
+        return ordenados;
     };
 
-    // --- NUEVO MOTOR DE IA: EQUIDAD + DISTANCIA GEOGRÁFICA ---
+    // --- NUEVO MOTOR IA: AGRUPACIÓN FÍSICA Y REPARTO EQUITATIVO ---
     const asignarConIA = async () => {
         const ticketsAOrganizar = [...pendientesGlobales, ...ticketsDelDia];
         
@@ -93,93 +135,65 @@ export default function GestionRutas() {
 
         setIsUpdating(true);
 
-        // 1. AGRUPACIÓN: Agrupar por zona y calcular el centroide (punto medio geográfico) de cada colonia
-        const zonas = {};
-        ticketsAOrganizar.forEach(t => {
-            const z = t.zona || 'Sin Zona';
-            if(!zonas[z]) zonas[z] = { nombre: z, tickets: [], latSum: 0, lngSum: 0, conCoords: 0 };
-            zonas[z].tickets.push(t);
-            if (t.latitud && t.longitud) {
-                zonas[z].latSum += t.latitud;
-                zonas[z].lngSum += t.longitud;
-                zonas[z].conCoords++;
-            }
-        });
-
-        // Convertimos el objeto a arreglo y calculamos la latitud/longitud central de cada comunidad
-        const zonasArray = Object.values(zonas).map(z => ({
-            ...z,
-            latCentro: z.conCoords > 0 ? z.latSum / z.conCoords : null,
-            lngCentro: z.conCoords > 0 ? z.lngSum / z.conCoords : null,
-        })).sort((a, b) => b.tickets.length - a.tickets.length); // Atendemos las zonas más pesadas primero
-
-        // 2. EQUIDAD: ¿Cuál es el máximo justo de tickets por técnico?
-        let asignaciones = tecnicos.map(t => ({ id: t.id, tickets: [], latCentro: null, lngCentro: null }));
-        const limiteIdeal = Math.ceil(ticketsAOrganizar.length / tecnicos.length);
-
-        // FÓRMULA DE HAVERSINE: Calcula distancia real en Kilómetros
-        const calcularDistanciaEnKm = (lat1, lon1, lat2, lon2) => {
-            if (!lat1 || !lon1 || !lat2 || !lon2) return 0; 
-            const R = 6371; // Radio de la tierra en KM
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-        };
-
-        // 3. ASIGNACIÓN INTELIGENTE
-        zonasArray.forEach(zona => {
-            // Filtramos a los técnicos que aún no rebasan el "Límite Justo" de carga de trabajo
-            let candidatos = asignaciones.filter(a => a.tickets.length < limiteIdeal);
-            
-            // Si por alguna razón matemática todos ya llegaron a su límite, abrimos a todos nuevamente
-            if (candidatos.length === 0) candidatos = asignaciones;
-
-            let mejorTecnico = candidatos[0];
-            let menorDistancia = Infinity;
-
-            if (zona.latCentro && zona.lngCentro) {
-                // Evaluar cuál de los candidatos libres está más cerca geográficamente
-                candidatos.forEach(tec => {
-                    if (tec.latCentro && tec.lngCentro) {
-                        const dist = calcularDistanciaEnKm(zona.latCentro, zona.lngCentro, tec.latCentro, tec.lngCentro);
-                        
-                        // Penalizamos levemente la distancia si el técnico ya tiene muchos tickets para fomentar equidad (1 ticket extra = +2km virtuales)
-                        const penalizacionPorCarga = tec.tickets.length * 2; 
-                        const calificacionTotal = dist + penalizacionPorCarga;
-
-                        if (calificacionTotal < menorDistancia) {
-                            menorDistancia = calificacionTotal;
-                            mejorTecnico = tec;
-                        }
-                    } else {
-                        // Si el técnico aún no tiene ruta trazada (está libre), es el candidato perfecto (distancia 0)
-                        const calificacionTotal = tec.tickets.length * 2;
-                        if (calificacionTotal < menorDistancia) {
-                            menorDistancia = calificacionTotal;
-                            mejorTecnico = tec;
-                        }
+        // 1. CLUSTERING GEOGRÁFICO (Unimos los que estén a menos de 3km)
+        let clusters = [];
+        ticketsAOrganizar.forEach(ticket => {
+            let agregado = false;
+            for (let cluster of clusters) {
+                if (ticket.latitud && ticket.longitud && cluster.latCentro && cluster.lngCentro) {
+                    const dist = calcularDistanciaEnKm(ticket.latitud, ticket.longitud, cluster.latCentro, cluster.lngCentro);
+                    if (dist < 3) { // 3 KM DE TOLERANCIA
+                        cluster.tickets.push(ticket);
+                        cluster.latCentro = ((cluster.latCentro * (cluster.tickets.length - 1)) + ticket.latitud) / cluster.tickets.length;
+                        cluster.lngCentro = ((cluster.lngCentro * (cluster.tickets.length - 1)) + ticket.longitud) / cluster.tickets.length;
+                        agregado = true;
+                        break;
                     }
-                });
-            } else {
-                // Si la comunidad no tiene coordenadas, se la asignamos estrictamente al que tenga menos trabajo
-                mejorTecnico = candidatos.sort((a, b) => a.tickets.length - b.tickets.length)[0];
-            }
-
-            // Le inyectamos TODOS los tickets de esta colonia a este técnico (agrupados)
-            mejorTecnico.tickets.push(...zona.tickets);
-            
-            // Recalculamos el centro geográfico de la ruta de este técnico para que su siguiente asignación tenga lógica
-            if (zona.latCentro && zona.lngCentro) {
-                const ticketsConCoords = mejorTecnico.tickets.filter(t => t.latitud && t.longitud);
-                if (ticketsConCoords.length > 0) {
-                    mejorTecnico.latCentro = ticketsConCoords.reduce((sum, t) => sum + t.latitud, 0) / ticketsConCoords.length;
-                    mejorTecnico.lngCentro = ticketsConCoords.reduce((sum, t) => sum + t.longitud, 0) / ticketsConCoords.length;
+                } else if (!ticket.latitud && !cluster.latCentro && ticket.zona === cluster.zonaTexto) {
+                    // Fallback por texto si no tienen coordenadas en BD
+                    cluster.tickets.push(ticket);
+                    agregado = true;
+                    break;
                 }
             }
+            if (!agregado) {
+                clusters.push({
+                    tickets: [ticket], latCentro: ticket.latitud, lngCentro: ticket.longitud, zonaTexto: ticket.zona
+                });
+            }
         });
 
-        // 4. GUARDAR EN SUPABASE
+        // 2. REPARTO JUSTO Y EQUITATIVO
+        clusters.sort((a, b) => b.tickets.length - a.tickets.length); // Asignar bloques grandes primero
+        let asignaciones = tecnicos.map(t => ({ id: t.id, tickets: [], latUltima: null, lngUltima: null }));
+
+        clusters.forEach(cluster => {
+            let mejorTecnico = asignaciones[0];
+            let mejorCalificacion = Infinity;
+
+            asignaciones.forEach(tec => {
+                // PESO 1: EQUIDAD. (Multiplicamos sus tickets x 100 para que los que tienen menos tickets siempre ganen primero)
+                let calificacion = tec.tickets.length * 100;
+
+                // PESO 2: DISTANCIA. (Solo desempata o apoya si las cargas de trabajo son similares)
+                if (cluster.latCentro && tec.latUltima) {
+                    calificacion += calcularDistanciaEnKm(cluster.latCentro, cluster.lngCentro, tec.latUltima, tec.lngUltima);
+                }
+
+                if (calificacion < mejorCalificacion) {
+                    mejorCalificacion = calificacion;
+                    mejorTecnico = tec;
+                }
+            });
+
+            mejorTecnico.tickets.push(...cluster.tickets);
+            if (cluster.latCentro) {
+                mejorTecnico.latUltima = cluster.latCentro;
+                mejorTecnico.lngUltima = cluster.lngCentro;
+            }
+        });
+
+        // 3. GUARDAR RESULTADOS
         for (let tecnicoCarga of asignaciones) {
             for (let ticket of tecnicoCarga.tickets) {
                 if (ticket.asignadoA !== tecnicoCarga.id) {
@@ -256,7 +270,7 @@ export default function GestionRutas() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3">
-                    <button onClick={asignarConIA} disabled={isUpdating} className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 hover:from-purple-200 hover:to-fuchsia-200 text-purple-700 px-4 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 border border-purple-200 disabled:opacity-50" title="Repartir por zona y horario">
+                    <button onClick={asignarConIA} disabled={isUpdating} className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 hover:from-purple-200 hover:to-fuchsia-200 text-purple-700 px-4 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 border border-purple-200 disabled:opacity-50" title="Repartir equitativamente por zona">
                         <MdAutoAwesome className="text-lg text-purple-600"/> Auto-Organizar
                     </button>
 
