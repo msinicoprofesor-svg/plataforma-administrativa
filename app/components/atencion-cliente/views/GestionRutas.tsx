@@ -25,10 +25,14 @@ export default function GestionRutas() {
 
     const colabsSeguros = colaboradoresReales || [];
     
-    // Tickets que requieren visita
+    // TICKETS GLOBALES (Visita requerida)
     const ticketsActivos = tickets.filter(t => t.estado !== 'RESUELTO' && t.estado !== 'CANCELADO' && t.visita === true);
-    // Tickets filtrados por el día seleccionado
-    const ticketsDelDia = ticketsActivos.filter(t => t.fecha_agendada === fechaFiltro);
+    
+    // PENDIENTES UNIVERSALES (Siempre visibles sin importar la fecha)
+    const pendientesGlobales = ticketsActivos.filter(t => !t.asignadoA || t.asignadoA === 'pendientes');
+    
+    // ASIGNADOS DEL DÍA
+    const ticketsDelDia = ticketsActivos.filter(t => t.fecha_agendada === fechaFiltro && t.asignadoA !== 'pendientes');
 
     let tecnicos = colabsSeguros.filter(c => {
         const rol = c?.rol || '';
@@ -40,40 +44,31 @@ export default function GestionRutas() {
         tecnicos = colabsSeguros.slice(0, 3);
     }
 
-    // --- ALGORITMO INTELIGENTE DE AUTO-ASIGNACIÓN ---
+    // --- ALGORITMO IA ---
     const asignarConIA = async () => {
-        const pendientes = ticketsDelDia.filter(t => !t.asignadoA || t.asignadoA === 'pendientes');
-        if(pendientes.length === 0) {
-            alert("No hay tickets pendientes para organizar en esta fecha.");
+        if(pendientesGlobales.length === 0) {
+            alert("No hay tickets pendientes universales para organizar.");
             return;
         }
 
         setIsUpdating(true);
-
-        // 1. Ordenar por Prioridad y Horario
         const valoresPrioridad = { 'Crítica': 4, 'Alta': 3, 'Media': 2, 'Baja': 1 };
-        let ticketsOrdenados = [...pendientes].sort((a, b) => {
+        let ticketsOrdenados = [...pendientesGlobales].sort((a, b) => {
             if(valoresPrioridad[b.prioridad] !== valoresPrioridad[a.prioridad]) {
                 return valoresPrioridad[b.prioridad] - valoresPrioridad[a.prioridad];
             }
-            // Si es la misma prioridad, el más viejo primero
             return new Date(a.fecha) - new Date(b.fecha);
         });
 
-        // 2. Asignar por Zona y Carga de trabajo
         for (let ticket of ticketsOrdenados) {
             let techDestino = null;
-
-            // Intentar buscar un técnico que ya vaya a esa misma zona hoy
             let mejorMatch = tecnicos.find(tec => {
                 const ticketsTec = ticketsDelDia.filter(t => t.asignadoA === tec.id);
                 return ticketsTec.some(t => t.zona === ticket.zona);
             });
 
-            if (mejorMatch) {
-                techDestino = mejorMatch;
-            } else {
-                // Si nadie va a esa zona, buscar al técnico con menos reportes asignados
+            if (mejorMatch) techDestino = mejorMatch;
+            else {
                 techDestino = [...tecnicos].sort((a, b) => {
                     const cargaA = ticketsDelDia.filter(t => t.asignadoA === a.id).length;
                     const cargaB = ticketsDelDia.filter(t => t.asignadoA === b.id).length;
@@ -81,14 +76,12 @@ export default function GestionRutas() {
                 })[0];
             }
 
-            if (techDestino) {
-               await moverTicket(ticket.id, techDestino.id);
-            }
+            if (techDestino) await moverTicket(ticket.id, techDestino.id, fechaFiltro);
         }
         setIsUpdating(false);
     };
 
-    // --- DRAG & DROP ESTRICTO ---
+    // --- DRAG & DROP ---
     const handleDragStart = (e, ticketId) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData('text/plain', String(ticketId)); 
@@ -104,7 +97,7 @@ export default function GestionRutas() {
         
         if (ticketId) {
             setIsUpdating(true);
-            await moverTicket(ticketId, columnaDestino);
+            await moverTicket(ticketId, columnaDestino, fechaFiltro);
             setIsUpdating(false);
         }
     };
@@ -136,7 +129,7 @@ export default function GestionRutas() {
                 </div>
             )}
 
-            {/* BARRA SUPERIOR (CALENDARIO, VISTAS E IA) */}
+            {/* BARRA SUPERIOR */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-3xl shadow-sm border border-gray-100 shrink-0 gap-4">
                 <div>
                     <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
@@ -148,31 +141,20 @@ export default function GestionRutas() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3">
-                    
-                    {/* NUEVO BOTÓN AUTO-ASIGNAR */}
-                    <button 
-                        onClick={asignarConIA}
-                        disabled={isUpdating}
-                        className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 hover:from-purple-200 hover:to-fuchsia-200 text-purple-700 px-4 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 border border-purple-200 disabled:opacity-50"
-                    >
+                    <button onClick={asignarConIA} disabled={isUpdating} className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-fuchsia-100 hover:from-purple-200 hover:to-fuchsia-200 text-purple-700 px-4 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 border border-purple-200 disabled:opacity-50">
                         <MdAutoAwesome className="text-lg text-purple-600"/> Auto-Organizar
                     </button>
 
                     <div className="flex items-center gap-2 bg-blue-50/50 px-4 py-2.5 rounded-2xl border border-blue-100 shadow-inner">
                         <MdEvent className="text-blue-500 text-lg"/>
-                        <input 
-                            type="date" 
-                            value={fechaFiltro}
-                            onChange={(e) => setFechaFiltro(e.target.value)}
-                            className="bg-transparent text-xs font-black text-blue-900 outline-none cursor-pointer"
-                        />
+                        <input type="date" value={fechaFiltro} onChange={(e) => setFechaFiltro(e.target.value)} className="bg-transparent text-xs font-black text-blue-900 outline-none cursor-pointer" />
                     </div>
 
                     <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 shadow-inner">
-                        <button onClick={() => setVistaActiva('TABLERO')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TABLERO' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`} title="Modo Tablero (Drag & Drop)">
+                        <button onClick={() => setVistaActiva('TABLERO')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TABLERO' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
                             <MdViewColumn className="text-lg"/>
                         </button>
-                        <button onClick={() => setVistaActiva('TIMELINE')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TIMELINE' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`} title="Modo Línea de Tiempo">
+                        <button onClick={() => setVistaActiva('TIMELINE')} className={`p-2 rounded-xl transition-all ${vistaActiva === 'TIMELINE' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
                             <MdViewTimeline className="text-lg"/>
                         </button>
                     </div>
@@ -180,15 +162,16 @@ export default function GestionRutas() {
             </div>
 
             {vistaActiva === 'TABLERO' ? (
-                /* --- VISTA 1: TABLERO KANBAN --- */
+                /* --- VISTA 1: KANBAN --- */
                 <div className="flex-1 flex gap-5 overflow-x-auto custom-scrollbar pb-4 px-1">
+                    {/* COLUMNA PENDIENTES UNIVERSAL */}
                     <div className="w-80 min-w-[20rem] flex flex-col bg-gray-100/60 rounded-[2rem] border-2 border-dashed border-gray-200 p-5 transition-colors hover:bg-gray-100" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, 'pendientes')}>
                         <div className="flex items-center justify-between mb-5 px-2">
                             <h4 className="text-xs font-black text-gray-700 uppercase tracking-widest flex items-center gap-2"><MdAssignment className="text-gray-400"/> Sin Asignar</h4>
-                            <span className="bg-white text-gray-800 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-sm border border-gray-100">{ticketsDelDia.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').length}</span>
+                            <span className="bg-white text-gray-800 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-sm border border-gray-100">{pendientesGlobales.length}</span>
                         </div>
                         <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-2">
-                            {ticketsDelDia.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').map(ticket => (
+                            {pendientesGlobales.map(ticket => (
                                 <TicketCard key={ticket.id} ticket={ticket} onDragStart={handleDragStart} getColores={getColoresPrioridad} onVerDetalles={abrirDetalles} onReprogramar={reprogramarTicket} />
                             ))}
                         </div>
@@ -196,6 +179,7 @@ export default function GestionRutas() {
 
                     {tecnicos.map(tecnico => {
                         const partesNombre = (tecnico?.nombre || 'Técnico').split(' ');
+                        const ticketsTecnico = ticketsDelDia.filter(t => t.asignadoA === tecnico.id);
                         return (
                             <div key={tecnico.id} className="w-80 min-w-[20rem] flex flex-col bg-white rounded-[2rem] border border-gray-100 p-5 shadow-sm transition-colors hover:border-blue-300" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, tecnico.id)}>
                                 <div className="flex items-start gap-4 mb-5 p-4 bg-blue-50/50 rounded-[1.5rem] border border-blue-100/50">
@@ -206,13 +190,13 @@ export default function GestionRutas() {
                                         <h4 className="text-sm font-black text-blue-950 leading-tight truncate">{partesNombre[0]} {partesNombre[1] || ''}</h4>
                                         <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-wider mt-1 truncate">{tecnico?.puesto || 'Técnico'}</p>
                                     </div>
-                                    <span className="bg-white text-blue-800 text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">{ticketsDelDia.filter(t => t.asignadoA === tecnico.id).length}</span>
+                                    <span className="bg-white text-blue-800 text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">{ticketsTecnico.length}</span>
                                 </div>
                                 <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 pb-2 bg-gray-50/30 rounded-3xl p-3 border border-gray-50">
-                                    {ticketsDelDia.filter(t => t.asignadoA === tecnico.id).map(ticket => (
+                                    {ticketsTecnico.map(ticket => (
                                         <TicketCard key={ticket.id} ticket={ticket} onDragStart={handleDragStart} getColores={getColoresPrioridad} onVerDetalles={abrirDetalles} onReprogramar={reprogramarTicket}/>
                                     ))}
-                                    {ticketsDelDia.filter(t => t.asignadoA === tecnico.id).length === 0 && (
+                                    {ticketsTecnico.length === 0 && (
                                         <div className="h-full min-h-[150px] flex flex-col items-center justify-center text-[10px] font-bold text-gray-400 border-2 border-dashed border-gray-200/60 rounded-2xl">
                                             <MdAssignment className="text-2xl mb-2 opacity-30"/> Libre en esta fecha
                                         </div>
@@ -223,28 +207,22 @@ export default function GestionRutas() {
                     })}
                 </div>
             ) : (
-                /* --- VISTA 2: LÍNEA DE TIEMPO (CORREGIDA) --- */
+                /* --- VISTA 2: LÍNEA DE TIEMPO (CORTES SOLUCIONADOS NATIVAMENTE) --- */
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-1 space-y-6">
                     
-                    {/* NUEVO: PANEL DE PENDIENTES EN TIMELINE */}
-                    {ticketsDelDia.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').length > 0 && (
+                    {pendientesGlobales.length > 0 && (
                         <div className="bg-orange-50/50 p-6 rounded-[2rem] border-2 border-dashed border-orange-200/50 shadow-sm flex flex-col mb-6" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, 'pendientes')}>
                             <div className="flex items-center gap-3 mb-2 border-b border-orange-200/30 pb-4">
-                                <div className="w-10 h-10 bg-orange-100 text-orange-500 rounded-2xl flex items-center justify-center font-black shadow-inner">
-                                    <MdAssignment className="text-xl"/>
-                                </div>
+                                <div className="w-10 h-10 bg-orange-100 text-orange-500 rounded-2xl flex items-center justify-center font-black shadow-inner"><MdAssignment className="text-xl"/></div>
                                 <div>
-                                    <h4 className="text-sm font-black text-orange-900 uppercase tracking-wide">Reportes sin asignar</h4>
+                                    <h4 className="text-sm font-black text-orange-900 uppercase tracking-wide">Reportes sin asignar (Universales)</h4>
                                     <p className="text-[10px] font-bold text-orange-400 mt-0.5">Pendientes de programar en ruta o arrastrar</p>
                                 </div>
-                                <span className="bg-white text-orange-600 text-[10px] font-black px-3 py-1.5 rounded-xl ml-auto border border-orange-200 shadow-sm">
-                                    {ticketsDelDia.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').length} Pendientes
-                                </span>
+                                <span className="bg-white text-orange-600 text-[10px] font-black px-3 py-1.5 rounded-xl ml-auto border border-orange-200 shadow-sm">{pendientesGlobales.length} Pendientes</span>
                             </div>
                             
-                            {/* COLCHÓN SUPERIOR CORREGIDO (pt-8) */}
-                            <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 pt-8 items-center px-2">
-                                {ticketsDelDia.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').map(ticket => (
+                            <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 pt-2 items-center px-2">
+                                {pendientesGlobales.map(ticket => (
                                     <div key={ticket.id} className="min-w-[260px] shrink-0">
                                         <TicketCard ticket={ticket} onDragStart={handleDragStart} getColores={getColoresPrioridad} onVerDetalles={abrirDetalles} onReprogramar={reprogramarTicket} />
                                     </div>
@@ -260,60 +238,55 @@ export default function GestionRutas() {
 
                         return (
                             <div key={tecnico.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col" onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDrop={(e) => handleDrop(e, tecnico.id)}>
-                                <div className="flex items-center gap-3 mb-2 border-b border-gray-50 pb-4">
-                                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black shadow-sm">
-                                        <MdEngineering className="text-xl"/>
-                                    </div>
+                                <div className="flex items-center gap-3 mb-4 border-b border-gray-50 pb-4">
+                                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black shadow-sm"><MdEngineering className="text-xl"/></div>
                                     <div>
                                         <h4 className="text-sm font-black text-blue-950 uppercase tracking-wide">{tecnico.nombre}</h4>
                                         <p className="text-[10px] font-bold text-gray-400 mt-0.5">Línea de ruta programada</p>
                                     </div>
-                                    <span className="bg-gray-100 text-gray-500 text-[10px] font-black px-3 py-1.5 rounded-xl ml-auto border border-gray-200">
-                                        {ticketsTecnico.length} Paradas
-                                    </span>
+                                    <span className="bg-gray-100 text-gray-500 text-[10px] font-black px-3 py-1.5 rounded-xl ml-auto border border-gray-200">{ticketsTecnico.length} Paradas</span>
                                 </div>
 
-                                {/* COLCHÓN SUPERIOR CORREGIDO (pt-8 en vez de pt-2) */}
-                                <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 pt-8 items-center px-2">
-                                    {ticketsTecnico.map((ticket, index) => {
-                                        const horaReporte = ticket.fecha.split(',')[1] || ticket.fecha;
-                                        return (
-                                            <div key={ticket.id} className="flex items-center shrink-0 group">
-                                                <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-5 rounded-3xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all w-[260px] relative cursor-pointer" onClick={() => abrirDetalles(ticket)} draggable={true} onDragStart={(e) => handleDragStart(e, ticket.id)}>
-                                                    
-                                                    <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-lg border-2 border-white">
+                                <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 pt-2 items-center px-2">
+                                    {ticketsTecnico.map((ticket, index) => (
+                                        <div key={ticket.id} className="flex items-center shrink-0 group">
+                                            
+                                            {/* TARJETA TIMELINE CON HORA Y NÚMERO INTEGRADOS (Evita recortes) */}
+                                            <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-4 rounded-3xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all w-[260px] cursor-pointer" onClick={() => abrirDetalles(ticket)} draggable={true} onDragStart={(e) => handleDragStart(e, ticket.id)}>
+                                                
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <div className="w-6 h-6 bg-blue-600 text-white text-xs font-black flex items-center justify-center rounded-full shadow-sm">
                                                         {index + 1}
                                                     </div>
-
-                                                    <div className="absolute -top-3 right-4 bg-gray-800 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-md flex items-center gap-1">
-                                                        <MdAccessTime className="text-xs"/> {horaReporte}
-                                                    </div>
-
-                                                    <div className="pl-2 pt-2">
-                                                        <p className="text-[10px] text-gray-400 font-black mb-1.5 flex justify-between items-center">
-                                                            {ticket.folio_corto}
-                                                            <span className={`px-2 py-0.5 rounded shadow-sm text-[8px] ${getColoresPrioridad(ticket.prioridad)}`}>{ticket.prioridad}</span>
-                                                        </p>
-                                                        <p className="text-sm font-black text-gray-800 mb-2 truncate">{ticket.cliente}</p>
-                                                        <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-100">
-                                                            <MdLocationOn className="text-green-500 text-sm shrink-0"/>
-                                                            <span className="truncate">{ticket.zona}</span>
-                                                        </p>
+                                                    <div className="bg-gray-800 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                                                        <MdAccessTime className="text-xs"/> {ticket.horario_preferencia}
                                                     </div>
                                                 </div>
-                                                {index < ticketsTecnico.length - 1 && (
-                                                    <MdArrowForward className="mx-4 text-gray-200 text-2xl shrink-0 group-hover:text-blue-400 transition-colors"/>
-                                                )}
+
+                                                <div className="pl-1">
+                                                    <p className="text-[10px] text-gray-400 font-black mb-1.5 flex justify-between items-center">
+                                                        {ticket.folio_corto}
+                                                        <span className={`px-2 py-0.5 rounded shadow-sm text-[8px] ${getColoresPrioridad(ticket.prioridad)}`}>{ticket.prioridad}</span>
+                                                    </p>
+                                                    <p className="text-sm font-black text-gray-800 mb-2 truncate">{ticket.cliente}</p>
+                                                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-100">
+                                                        <MdLocationOn className="text-green-500 text-sm shrink-0"/>
+                                                        <span className="truncate">{ticket.zona}</span>
+                                                    </p>
+                                                </div>
                                             </div>
-                                        );
-                                    })}
+                                            {index < ticketsTecnico.length - 1 && (
+                                                <MdArrowForward className="mx-4 text-gray-200 text-2xl shrink-0 group-hover:text-blue-400 transition-colors"/>
+                                            )}
+                                        </div>
+                                    ))}
                                     <div className="w-4 shrink-0"></div>
                                 </div>
                             </div>
                         );
                     })}
 
-                    {tecnicos.every(tecnico => ticketsDelDia.filter(t => t.asignadoA === tecnico.id).length === 0) && ticketsDelDia.filter(t => !t.asignadoA || t.asignadoA === 'pendientes').length === 0 && (
+                    {tecnicos.every(tecnico => ticketsDelDia.filter(t => t.asignadoA === tecnico.id).length === 0) && pendientesGlobales.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2rem] border border-gray-100 shadow-sm">
                             <MdViewTimeline className="text-6xl text-gray-100 mb-4"/>
                             <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No hay rutas ni reportes pendientes en esta fecha</p>

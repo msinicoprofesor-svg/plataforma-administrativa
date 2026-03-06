@@ -32,8 +32,8 @@ export function useTickets() {
                 prioridad: t.prioridad,
                 estado: t.estado,
                 fecha: new Date(t.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }),
-                // NUEVO: MEMORIA DE CALENDARIO
                 fecha_agendada: t.fecha_agendada || new Date().toISOString().split('T')[0], 
+                horario_preferencia: t.horario_preferencia || 'Lo antes posible', // <-- NUEVO: HORA DEL CLIENTE
                 visita: t.requiere_visita,
                 asignadoA: t.tecnico_asignado_id || 'pendientes',
                 descripcion: t.descripcion
@@ -49,14 +49,17 @@ export function useTickets() {
         return { error };
     };
 
-    // LÓGICA DE GUARDADO DE RUTAS
-    const moverTicket = async (ticketId, tecnicoId) => {
+    // NUEVO: Ahora recibe la fecha de destino para agendar automáticamente al arrastrar
+    const moverTicket = async (ticketId, tecnicoId, fechaDestino = null) => {
         const asignado_id = tecnicoId === 'pendientes' ? null : tecnicoId;
         const estado_nuevo = tecnicoId === 'pendientes' ? 'PENDIENTE' : 'EN_RUTA';
 
+        const payload = { tecnico_asignado_id: asignado_id, estado: estado_nuevo };
+        if (fechaDestino) payload.fecha_agendada = fechaDestino; // Asignación de calendario
+
         const { data, error } = await supabase
             .from('tickets')
-            .update({ tecnico_asignado_id: asignado_id, estado: estado_nuevo })
+            .update(payload)
             .eq('id', ticketId)
             .select(); 
             
@@ -76,11 +79,10 @@ export function useTickets() {
         return { success: true };
     };
 
-    // NUEVA FUNCIÓN: REPROGRAMAR FECHA
     const reprogramarTicket = async (ticketId, nuevaFecha) => {
         const { error } = await supabase
             .from('tickets')
-            .update({ fecha_agendada: nuevaFecha }) // Actualiza la fecha de forma persistente
+            .update({ fecha_agendada: nuevaFecha }) 
             .eq('id', ticketId);
             
         if (error) {
