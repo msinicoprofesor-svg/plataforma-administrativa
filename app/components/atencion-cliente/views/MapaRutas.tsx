@@ -3,7 +3,7 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -15,9 +15,22 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-export default function MapaRutas({ tickets, onVerDetalles }) {
+// AÑADIDO: Recibe la variable "dibujarRuta" para saber si debe conectar los puntos con una línea
+export default function MapaRutas({ tickets, onVerDetalles, dibujarRuta = false }) {
     // Centro por defecto: Doctor Mora, Guanajuato
     const defaultCenter = [21.1444, -100.3167];
+
+    // Preparamos las coordenadas para asegurar que todas tengan un punto y la línea se pueda dibujar
+    const puntosValidos = tickets.map((ticket, index) => {
+        // En lugar de usar random() (que hacía bailar los pines), usamos un offset matemático predecible 
+        // para los tickets que aún no tienen coordenadas reales, así la línea se dibuja estable.
+        const lat = ticket.latitud || defaultCenter[0] + (index * 0.003);
+        const lng = ticket.longitud || defaultCenter[1] + (index * 0.003);
+        return { ...ticket, lat, lng };
+    });
+
+    // Extraemos solo los arreglos de [lat, lng] requeridos por la etiqueta Polyline
+    const routeCoordinates = puntosValidos.map(t => [t.lat, t.lng]);
 
     return (
         <MapContainer 
@@ -31,15 +44,29 @@ export default function MapaRutas({ tickets, onVerDetalles }) {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
             
-            {tickets.map((ticket, index) => {
-                // Si la BD tiene coordenadas, las usa. Si no, genera unas falsas cerca del centro para visualización inicial
-                const lat = ticket.latitud || defaultCenter[0] + (Math.random() - 0.5) * 0.02;
-                const lng = ticket.longitud || defaultCenter[1] + (Math.random() - 0.5) * 0.02;
+            {/* LA MAGIA: Dibuja la línea conectando los puntos si seleccionaste a un técnico */}
+            {dibujarRuta && routeCoordinates.length > 1 && (
+                <Polyline 
+                    positions={routeCoordinates} 
+                    pathOptions={{ color: '#2563EB', weight: 4, dashArray: '10, 10', opacity: 0.8 }} 
+                />
+            )}
 
+            {puntosValidos.map((ticket, index) => {
                 return (
-                    <Marker key={ticket.id} position={[lat, lng]}>
+                    <Marker key={ticket.id} position={[ticket.lat, ticket.lng]}>
                         <Popup className="rounded-2xl">
                             <div className="text-center p-1">
+                                
+                                {/* Mostramos el número de orden encima del badge de prioridad si estamos viendo una ruta */}
+                                {dibujarRuta && (
+                                    <div className="mb-2 flex justify-center">
+                                        <span className="w-6 h-6 bg-blue-600 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-md">
+                                            {index + 1}
+                                        </span>
+                                    </div>
+                                )}
+
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-sm mb-2 inline-block ${
                                     ticket.prioridad === 'Crítica' ? 'bg-red-500' : 
                                     ticket.prioridad === 'Alta' ? 'bg-orange-500' : 

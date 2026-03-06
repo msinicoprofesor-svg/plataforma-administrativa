@@ -3,7 +3,7 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react'; 
-import dynamic from 'next/dynamic'; // <-- IMPORTANTE PARA EL MAPA
+import dynamic from 'next/dynamic'; 
 import { 
     MdDragIndicator, MdPerson, MdLocationOn, 
     MdAutoAwesome, MdEngineering, MdAssignment, MdMap, MdCheckCircle, MdAccessTime,
@@ -14,7 +14,6 @@ import { useTickets } from '../../../hooks/useTickets';
 import { useColaboradores } from '../../../hooks/useColaboradores';
 import ModalDetallesTicket from './ModalDetallesTicket';
 
-// IMPORTACIÓN DINÁMICA DEL MAPA (Evita errores de SSR en Next.js)
 const MapaRutas = dynamic(() => import('./MapaRutas'), { 
     ssr: false, 
     loading: () => (
@@ -34,6 +33,9 @@ export default function GestionRutas() {
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
     const [fechaFiltro, setFechaFiltro] = useState(() => new Date().toISOString().split('T')[0]);
     const [vistaActiva, setVistaActiva] = useState('TABLERO'); 
+    
+    // NUEVO ESTADO: Controla a quién estamos viendo en el mapa
+    const [tecnicoMapaSeleccionado, setTecnicoMapaSeleccionado] = useState('TODOS');
 
     const colabsSeguros = colaboradoresReales || [];
     
@@ -151,6 +153,14 @@ export default function GestionRutas() {
             default: return 'bg-gray-400 text-white';
         }
     };
+
+    // --- NUEVO: CÁLCULO DE TICKETS PARA EL MAPA SEGÚN EL FILTRO ---
+    let ticketsMapa = ordenarRuta([...pendientesGlobales, ...ticketsDelDia]);
+    if (tecnicoMapaSeleccionado === 'PENDIENTES') {
+        ticketsMapa = ordenarRuta(pendientesGlobales);
+    } else if (tecnicoMapaSeleccionado !== 'TODOS') {
+        ticketsMapa = ordenarRuta(ticketsDelDia.filter(t => t.asignadoA === tecnicoMapaSeleccionado));
+    }
 
     return (
         <div className="h-full flex flex-col space-y-6 animate-fade-in pb-10 relative">
@@ -314,18 +324,38 @@ export default function GestionRutas() {
                     )}
                 </div>
             ) : (
-                /* --- VISTA 3: MAPA (CONECTADO REAL) --- */
+                /* --- VISTA 3: MAPA (ACTUALIZADA CON FILTROS DE TÉCNICOS) --- */
                 <div className="flex-1 flex flex-col md:flex-row gap-5 overflow-hidden">
                     <div className="w-full md:w-80 bg-white rounded-[2rem] border border-gray-100 shadow-sm flex flex-col overflow-hidden shrink-0 z-10">
-                        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-                            <h4 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
+                        
+                        {/* HEADER DEL MAPA CON BOTONES DE FILTRO */}
+                        <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                            <h4 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2 mb-3">
                                 <MdPinDrop className="text-blue-500"/> Zonas Activas
                             </h4>
-                            <p className="text-[10px] font-bold text-gray-400 mt-1">Reportes agendados para ubicación.</p>
+                            <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                                <button onClick={() => setTecnicoMapaSeleccionado('TODOS')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase whitespace-nowrap transition-colors ${tecnicoMapaSeleccionado === 'TODOS' ? 'bg-gray-800 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>Todos</button>
+                                <button onClick={() => setTecnicoMapaSeleccionado('PENDIENTES')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase whitespace-nowrap transition-colors ${tecnicoMapaSeleccionado === 'PENDIENTES' ? 'bg-orange-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-orange-600 hover:bg-orange-50'}`}>Sin Asignar</button>
+                                {tecnicos.map(tec => (
+                                    <button key={tec.id} onClick={() => setTecnicoMapaSeleccionado(tec.id)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase whitespace-nowrap transition-colors ${tecnicoMapaSeleccionado === tec.id ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-blue-600 hover:bg-blue-50'}`}>
+                                        {tec.nombre.split(' ')[0]}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
+
+                        {/* LISTA DE PINES FILTRADA */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-gray-50/30">
-                            {ordenarRuta([...pendientesGlobales, ...ticketsDelDia]).map(ticket => (
-                                <div key={ticket.id} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:border-blue-300 transition-colors cursor-pointer" onClick={() => abrirDetalles(ticket)}>
+                            {ticketsMapa.map((ticket, index) => (
+                                <div key={ticket.id} className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:border-blue-300 transition-colors cursor-pointer relative" onClick={() => abrirDetalles(ticket)}>
+                                    
+                                    {/* Muestra el orden numérico solo si se seleccionó un técnico en específico */}
+                                    {tecnicoMapaSeleccionado !== 'TODOS' && tecnicoMapaSeleccionado !== 'PENDIENTES' && (
+                                        <div className="absolute -left-2 -top-2 w-6 h-6 bg-blue-600 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-md z-10">
+                                            {index + 1}
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between items-center mb-1">
                                         <span className="text-[10px] font-black text-gray-400 tracking-widest">{ticket.folio_corto}</span>
                                         <span className={`w-2 h-2 rounded-full ${ticket.asignadoA === 'pendientes' ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></span>
@@ -334,16 +364,18 @@ export default function GestionRutas() {
                                     <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-1"><MdLocationOn className="text-blue-500"/> {ticket.zona}</p>
                                 </div>
                             ))}
-                            {ticketsDelDia.length === 0 && pendientesGlobales.length === 0 && (
-                                <p className="text-xs text-center font-bold text-gray-400 mt-10">No hay ubicaciones para esta fecha.</p>
+                            {ticketsMapa.length === 0 && (
+                                <p className="text-xs text-center font-bold text-gray-400 mt-10">No hay ubicaciones para esta selección.</p>
                             )}
                         </div>
                     </div>
 
                     <div className="flex-1 bg-gray-100 rounded-[2rem] border border-gray-200 overflow-hidden relative shadow-inner z-0">
+                        {/* Se le pasan exclusivamente los tickets filtrados al mapa */}
                         <MapaRutas 
-                            tickets={[...pendientesGlobales, ...ticketsDelDia]} 
+                            tickets={ticketsMapa} 
                             onVerDetalles={abrirDetalles} 
+                            dibujarRuta={tecnicoMapaSeleccionado !== 'TODOS' && tecnicoMapaSeleccionado !== 'PENDIENTES'}
                         />
                     </div>
                 </div>
