@@ -37,7 +37,10 @@ export function useTickets() {
                 visita: t.requiere_visita,
                 asignadoA: t.tecnico_asignado_id || 'pendientes',
                 descripcion: t.descripcion,
-                notas_resolucion: t.notas_resolucion || '' // <-- NUEVO: Memoria de notas
+                notas_resolucion: t.notas_resolucion || '',
+                // MAGIA AQUÍ: Extraemos las coordenadas para que el mapa las lea
+                latitud: t.latitud,
+                longitud: t.longitud
             }));
             setTickets(ticketsFormateados);
         }
@@ -94,8 +97,6 @@ export function useTickets() {
         return { success: true };
     };
 
-    // --- NUEVAS FUNCIONES DE ESCALAMIENTO Y CIERRE ---
-
     const escalarAVisita = async (ticketId, horario, notas) => {
         const { error } = await supabase
             .from('tickets')
@@ -115,12 +116,11 @@ export function useTickets() {
         return { success: true };
     };
 
-   // Reemplaza solo esta función casi al final de app/hooks/useTickets.js
     const resolverTicket = async (ticketId, notas, estadoFinal = 'RESUELTO') => {
         const { error } = await supabase
             .from('tickets')
             .update({ 
-                estado: estadoFinal, // <-- AHORA RESPETA EL TEXTO EXACTO DEL DROPDOWN
+                estado: estadoFinal, 
                 notas_resolucion: notas
             })
             .eq('id', ticketId);
@@ -132,6 +132,7 @@ export function useTickets() {
         await fetchTickets();
         return { success: true };
     };
+    
     return { 
         tickets, loading, crearTicket, moverTicket, reprogramarTicket, 
         cambiarEstadoTicket, enviarAPapelera, escalarAVisita, resolverTicket, refetch: fetchTickets 
