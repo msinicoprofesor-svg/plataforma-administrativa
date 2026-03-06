@@ -75,7 +75,10 @@ export default function RegistroReporte() {
             horario_preferencia: horarioVisita || 'Lo antes posible',
             marca_id: clienteSeleccionado.marca_id,
             region_id: clienteSeleccionado.region_id,
-            estado: 'PENDIENTE'
+            estado: 'PENDIENTE',
+            // MAGIA AQUÍ: Copiamos las coordenadas exactas del expediente del cliente al reporte
+            latitud: clienteSeleccionado.latitud,
+            longitud: clienteSeleccionado.longitud
         };
 
         const { error } = await crearTicket(nuevoTicket);
