@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { 
     MdSearch, MdPersonAdd, MdFilterList, MdEdit, MdDelete, 
     MdLocationOn, MdDomain, MdWifi, MdFiberManualRecord, MdClose, MdSave,
-    MdPerson, MdMap, MdSettingsEthernet
+    MdPerson, MdMap, MdSettingsEthernet, MdCheckCircle
 } from "react-icons/md";
 
 // Importamos el hook
@@ -21,10 +21,11 @@ export default function DirectorioClientes() {
     // DATOS DE SUPABASE
     const { clientes, marcas, regiones, loading, agregarCliente } = useClientes();
 
-    // ESTADO DEL FORMULARIO COMPLETO
+    // ESTADO DEL FORMULARIO COMPLETO (Añadido latitud y longitud ocultas)
     const estadoInicial = {
         nombre_completo: '', numero_contrato: '', telefono: '', telefono_adicional: '',
         cp: '', estado: '', municipio: '', comunidad: '', direccion: '', coordenadas: '',
+        latitud: null, longitud: null, 
         marca_id: '', region_id: '', paquete: '', costo: '', tipo_conexion: '', fecha_instalacion: '', ip: '',
         estado_servicio: 'ACTIVO'
     };
@@ -62,26 +63,38 @@ export default function DirectorioClientes() {
         }
     };
 
+    // --- NUEVA LÓGICA: TRADUCTOR DE ENLACES A COORDENADAS ---
+    const handleLinkChange = (e) => {
+        const link = e.target.value;
+        
+        // Expresión regular para buscar patrones de latitud y longitud en links de Maps
+        // Busca patrones como @21.144,-100.31 o q=21.144,-100.31
+        const regexCoordenadas = /@?(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const match = link.match(regexCoordenadas);
+
+        setFormData(prev => ({
+            ...prev,
+            coordenadas: link,
+            latitud: match ? parseFloat(match[1]) : null,
+            longitud: match ? parseFloat(match[2]) : null
+        }));
+    };
+
     // LÓGICA CONDICIONAL: ¿Es marca de internet?
     const marcaSeleccionada = marcas.find(m => m.id.toString() === formData.marca_id.toString())?.nombre || '';
     const esMarcaInternet = ['JAVAK', 'Fibrox MX', 'DMG', 'WifiCel'].includes(marcaSeleccionada);
 
-    // ========================================================================
-    // GUARDAR CLIENTE (CORREGIDO PARA EVITAR ERROR 400 EN SUPABASE)
-    // ========================================================================
+    // GUARDAR CLIENTE 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Creamos una copia exacta de los datos del formulario
         const datosLimpios = { ...formData };
 
-        // LIMPIEZA: Si están vacíos, los convertimos a "null" para que Supabase no marque error de formato
         if (datosLimpios.costo === '') datosLimpios.costo = null;
         if (datosLimpios.fecha_instalacion === '') datosLimpios.fecha_instalacion = null;
         if (datosLimpios.marca_id === '') datosLimpios.marca_id = null;
         if (datosLimpios.region_id === '') datosLimpios.region_id = null;
         
-        // Si no es internet, borramos la selección de antena/fibra por limpieza
         if (!esMarcaInternet) datosLimpios.tipo_conexion = null;
 
         await agregarCliente(datosLimpios);
@@ -178,7 +191,6 @@ export default function DirectorioClientes() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col animate-slide-up overflow-hidden border border-gray-200">
                         
-                        {/* HEADER MODAL */}
                         <div className="flex justify-between items-center px-8 py-5 border-b border-gray-100 bg-white shrink-0">
                             <div>
                                 <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
@@ -192,11 +204,10 @@ export default function DirectorioClientes() {
                             </button>
                         </div>
 
-                        {/* BODY MODAL SCROLLABLE */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gray-50/50">
                             <form id="formCliente" onSubmit={handleSubmit} className="space-y-8">
                                 
-                                {/* SECCIÓN 1: DATOS PERSONALES */}
+                                {/* SECCIÓN 1 */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                     <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdPerson className="text-blue-500"/> 1. Datos Generales</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -226,7 +237,7 @@ export default function DirectorioClientes() {
                                     </div>
                                 </div>
 
-                                {/* SECCIÓN 2: DIRECCIÓN */}
+                                {/* SECCIÓN 2: DIRECCIÓN Y MAPS */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                     <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdMap className="text-green-500"/> 2. Ubicación de Instalación</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -261,14 +272,25 @@ export default function DirectorioClientes() {
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Calle y Número</label>
                                             <input type="text" required value={formData.direccion} onChange={(e) => setFormData({...formData, direccion: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
                                         </div>
+                                        
+                                        {/* ENLACE MAPS CON LECTOR INTELIGENTE */}
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Enlace Maps (Coordenadas)</label>
-                                            <input type="text" value={formData.coordenadas} onChange={(e) => setFormData({...formData, coordenadas: e.target.value})} placeholder="https://maps.app.goo.gl/..." className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-blue-600 outline-none focus:bg-white focus:border-blue-400 transition-all"/>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                                                Enlace Maps
+                                                {formData.latitud && <span className="text-[9px] text-green-500 font-black flex items-center gap-1"><MdCheckCircle/> ¡Coordenadas detectadas!</span>}
+                                            </label>
+                                            <input 
+                                                type="text" 
+                                                value={formData.coordenadas} 
+                                                onChange={handleLinkChange} 
+                                                placeholder="Pega el enlace web aquí..." 
+                                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-bold outline-none transition-all ${formData.latitud ? 'border-green-300 text-green-700 focus:border-green-500 focus:bg-white' : 'border-gray-200 text-blue-600 focus:bg-white focus:border-blue-400'}`}
+                                            />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* SECCIÓN 3: TÉCNICA Y CONTRATACIÓN */}
+                                {/* SECCIÓN 3 */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                     <h4 className="text-sm font-black text-gray-800 flex items-center gap-2 mb-4 border-b border-gray-50 pb-3"><MdSettingsEthernet className="text-orange-500"/> 3. Información Técnica</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -285,7 +307,6 @@ export default function DirectorioClientes() {
                                             <input type="date" value={formData.fecha_instalacion} onChange={(e) => setFormData({...formData, fecha_instalacion: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 outline-none focus:bg-white focus:border-blue-400 transition-all cursor-pointer"/>
                                         </div>
                                         
-                                        {/* CONDICIONAL: TIPO DE CONEXIÓN */}
                                         {esMarcaInternet && (
                                             <div>
                                                 <label className="block text-[10px] font-bold text-orange-500 uppercase mb-1.5">Tipo de Conexión</label>
@@ -307,7 +328,6 @@ export default function DirectorioClientes() {
                             </form>
                         </div>
 
-                        {/* FOOTER MODAL */}
                         <div className="p-5 border-t border-gray-100 bg-white shrink-0 flex justify-end gap-3">
                             <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors">
                                 Cancelar
