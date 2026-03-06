@@ -11,7 +11,7 @@ import {
 
 import { useTickets } from '../../../hooks/useTickets';
 
-// IMPORTACIÓN DE LOS 3 MODALES
+// IMPORTACIÓN DE LOS MODALES
 import ModalDetallesTicket from './ModalDetallesTicket';
 import ModalEscalarVisita from './ModalEscalarVisita';
 import ModalResolverTicket from './ModalResolverTicket';
@@ -27,15 +27,14 @@ export default function ListaReportes() {
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
     
     const [modalEscalar, setModalEscalar] = useState({ isOpen: false, ticket: null });
-    const [modalResolver, setModalResolver] = useState({ isOpen: false, ticket: null });
+    // CORRECCIÓN: Agregamos "estadoDestino" para recordar la palabra exacta
+    const [modalResolver, setModalResolver] = useState({ isOpen: false, ticket: null, estadoDestino: '' });
 
-    // HOOK CON TODAS LAS FUNCIONES (Incluyendo las nuevas)
     const { 
         tickets, loading, cambiarEstadoTicket, enviarAPapelera, 
         escalarAVisita, resolverTicket 
     } = useTickets();
 
-    // LÓGICA DE FILTRADO
     const reportesFiltrados = tickets.filter(r => {
         if (r.estado === 'PAPELERA') return false; 
         const pasaPrioridad = filtroPrioridad === 'TODAS' || r.prioridad === filtroPrioridad;
@@ -58,18 +57,17 @@ export default function ListaReportes() {
         setModalAbierto(true);
     };
 
-    // --- INTERCEPTOR INTELIGENTE DE ESTADOS ---
     const handleCambioEstado = (reporte, nuevoEstado) => {
         if (nuevoEstado === 'PASAR_A_VISITA') {
             setModalEscalar({ isOpen: true, ticket: reporte });
         } else if (nuevoEstado === 'RESUELTO' || nuevoEstado === 'SOLUCIONADO') {
-            setModalResolver({ isOpen: true, ticket: reporte });
+            // CORRECCIÓN: Guardamos la palabra exacta en el estado temporal
+            setModalResolver({ isOpen: true, ticket: reporte, estadoDestino: nuevoEstado });
         } else {
             cambiarEstadoTicket(reporte.id, nuevoEstado);
         }
     };
 
-    // Componente interno para el Selector
     const SelectorEstado = ({ reporte }) => {
         const esCerrado = reporte.estado === 'RESUELTO' || reporte.estado === 'SOLUCIONADO';
         
@@ -252,25 +250,16 @@ export default function ListaReportes() {
                 )}
             </div>
 
-            {/* RENDERIZADO DE MODALES */}
-            <ModalDetallesTicket 
-                isOpen={modalAbierto} 
-                onClose={() => setModalAbierto(false)} 
-                ticket={ticketSeleccionado} 
-            />
+            <ModalDetallesTicket isOpen={modalAbierto} onClose={() => setModalAbierto(false)} ticket={ticketSeleccionado} />
             
-            <ModalEscalarVisita
-                isOpen={modalEscalar.isOpen}
-                onClose={() => setModalEscalar({ isOpen: false, ticket: null })}
-                ticket={modalEscalar.ticket}
-                onConfirm={escalarAVisita}
-            />
+            <ModalEscalarVisita isOpen={modalEscalar.isOpen} onClose={() => setModalEscalar({ isOpen: false, ticket: null })} ticket={modalEscalar.ticket} onConfirm={escalarAVisita} />
 
-            <ModalResolverTicket
-                isOpen={modalResolver.isOpen}
-                onClose={() => setModalResolver({ isOpen: false, ticket: null })}
-                ticket={modalResolver.ticket}
-                onConfirm={resolverTicket}
+            {/* CORRECCIÓN: Le enviamos al onConfirm la palabra exacta que el usuario seleccionó */}
+            <ModalResolverTicket 
+                isOpen={modalResolver.isOpen} 
+                onClose={() => setModalResolver({ isOpen: false, ticket: null, estadoDestino: '' })} 
+                ticket={modalResolver.ticket} 
+                onConfirm={(ticketId, notas) => resolverTicket(ticketId, notas, modalResolver.estadoDestino)} 
             />
         </div>
     );

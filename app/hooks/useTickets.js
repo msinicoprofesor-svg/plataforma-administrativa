@@ -115,11 +115,12 @@ export function useTickets() {
         return { success: true };
     };
 
-    const resolverTicket = async (ticketId, notas) => {
+   // Reemplaza solo esta función casi al final de app/hooks/useTickets.js
+    const resolverTicket = async (ticketId, notas, estadoFinal = 'RESUELTO') => {
         const { error } = await supabase
             .from('tickets')
             .update({ 
-                estado: 'RESUELTO',
+                estado: estadoFinal, // <-- AHORA RESPETA EL TEXTO EXACTO DEL DROPDOWN
                 notas_resolucion: notas
             })
             .eq('id', ticketId);
@@ -131,7 +132,6 @@ export function useTickets() {
         await fetchTickets();
         return { success: true };
     };
-
     return { 
         tickets, loading, crearTicket, moverTicket, reprogramarTicket, 
         cambiarEstadoTicket, enviarAPapelera, escalarAVisita, resolverTicket, refetch: fetchTickets 
