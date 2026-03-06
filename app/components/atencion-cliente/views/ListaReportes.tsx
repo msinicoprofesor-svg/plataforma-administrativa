@@ -10,28 +10,36 @@ import {
 } from "react-icons/md";
 
 import { useTickets } from '../../../hooks/useTickets';
+
+// IMPORTACIÓN DE LOS 3 MODALES
 import ModalDetallesTicket from './ModalDetallesTicket';
+import ModalEscalarVisita from './ModalEscalarVisita';
+import ModalResolverTicket from './ModalResolverTicket';
 
 export default function ListaReportes() {
     // ESTADOS UI
     const [formatoVista, setFormatoVista] = useState('TARJETAS'); 
     const [filtroPrioridad, setFiltroPrioridad] = useState('TODAS'); 
-    const [filtroEstado, setFiltroEstado] = useState('TODOS'); // NUEVO FILTRO
+    const [filtroEstado, setFiltroEstado] = useState('TODOS'); 
     
-    // ESTADOS MODAL
+    // ESTADOS MODALES
     const [modalAbierto, setModalAbierto] = useState(false);
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
+    
+    const [modalEscalar, setModalEscalar] = useState({ isOpen: false, ticket: null });
+    const [modalResolver, setModalResolver] = useState({ isOpen: false, ticket: null });
 
-    // HOOK CON NUEVAS FUNCIONES DE PAPELERA Y ESTADO
-    const { tickets, loading, cambiarEstadoTicket, enviarAPapelera } = useTickets();
+    // HOOK CON TODAS LAS FUNCIONES (Incluyendo las nuevas)
+    const { 
+        tickets, loading, cambiarEstadoTicket, enviarAPapelera, 
+        escalarAVisita, resolverTicket 
+    } = useTickets();
 
-    // LÓGICA DE FILTRADO (Excluimos Papelera)
+    // LÓGICA DE FILTRADO
     const reportesFiltrados = tickets.filter(r => {
-        if (r.estado === 'PAPELERA') return false; // Nunca mostrar los borrados
-        
+        if (r.estado === 'PAPELERA') return false; 
         const pasaPrioridad = filtroPrioridad === 'TODAS' || r.prioridad === filtroPrioridad;
         const pasaEstado = filtroEstado === 'TODOS' || r.estado === filtroEstado;
-        
         return pasaPrioridad && pasaEstado;
     });
 
@@ -50,7 +58,18 @@ export default function ListaReportes() {
         setModalAbierto(true);
     };
 
-    // Componente interno para el Selector Dinámico de Estados
+    // --- INTERCEPTOR INTELIGENTE DE ESTADOS ---
+    const handleCambioEstado = (reporte, nuevoEstado) => {
+        if (nuevoEstado === 'PASAR_A_VISITA') {
+            setModalEscalar({ isOpen: true, ticket: reporte });
+        } else if (nuevoEstado === 'RESUELTO' || nuevoEstado === 'SOLUCIONADO') {
+            setModalResolver({ isOpen: true, ticket: reporte });
+        } else {
+            cambiarEstadoTicket(reporte.id, nuevoEstado);
+        }
+    };
+
+    // Componente interno para el Selector
     const SelectorEstado = ({ reporte }) => {
         const esCerrado = reporte.estado === 'RESUELTO' || reporte.estado === 'SOLUCIONADO';
         
@@ -59,7 +78,7 @@ export default function ListaReportes() {
                 <MdFiberManualRecord className={`text-[8px] ${esCerrado ? 'text-green-500' : 'text-orange-500'}`}/>
                 <select 
                     value={reporte.estado}
-                    onChange={(e) => cambiarEstadoTicket(reporte.id, e.target.value)}
+                    onChange={(e) => handleCambioEstado(reporte, e.target.value)}
                     className={`text-[10px] font-black uppercase tracking-widest outline-none bg-transparent cursor-pointer appearance-none pr-2 ${esCerrado ? 'text-green-700' : 'text-orange-700'}`}
                 >
                     {reporte.visita ? (
@@ -88,18 +107,11 @@ export default function ListaReportes() {
     return (
         <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10 h-full flex flex-col relative">
             
-            {/* BARRA DE HERRAMIENTAS MULTI-FILTRO */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-3xl shadow-sm border border-gray-100 shrink-0">
-                
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    {/* FILTRO DE PRIORIDAD */}
                     <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-2xl border border-gray-200/50 shadow-inner flex-1 md:flex-none">
                         <MdFilterList className="text-gray-400 text-lg"/>
-                        <select 
-                            value={filtroPrioridad}
-                            onChange={(e) => setFiltroPrioridad(e.target.value)}
-                            className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer w-full p-1"
-                        >
+                        <select value={filtroPrioridad} onChange={(e) => setFiltroPrioridad(e.target.value)} className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer w-full p-1">
                             <option value="TODAS">Todas las Prioridades</option>
                             <option value="Crítica">Crítica</option>
                             <option value="Alta">Alta</option>
@@ -108,14 +120,9 @@ export default function ListaReportes() {
                         </select>
                     </div>
 
-                    {/* NUEVO FILTRO DE ESTADO */}
                     <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-2xl border border-gray-200/50 shadow-inner flex-1 md:flex-none">
                         <MdLabelOutline className="text-gray-400 text-lg"/>
-                        <select 
-                            value={filtroEstado}
-                            onChange={(e) => setFiltroEstado(e.target.value)}
-                            className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer w-full p-1"
-                        >
+                        <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="bg-transparent text-xs font-bold text-gray-600 outline-none cursor-pointer w-full p-1">
                             <option value="TODOS">Todos los Estados</option>
                             <option value="PENDIENTE">Pendientes</option>
                             <option value="EN_RUTA">En Ruta / Proceso</option>
@@ -134,7 +141,6 @@ export default function ListaReportes() {
                 </div>
             </div>
 
-            {/* CONTENEDOR DE REPORTES */}
             <div className="flex-1 overflow-y-auto custom-scrollbar relative px-1">
                 
                 {loading && (
@@ -176,27 +182,13 @@ export default function ListaReportes() {
                                 </div>
 
                                 <div className="pt-5 mt-5 border-t border-gray-100 flex justify-between items-center">
-                                    {/* SELECTOR DE ESTADO INTERACTIVO */}
                                     <SelectorEstado reporte={reporte} />
                                     
                                     <div className="flex items-center gap-1">
-                                        {/* BOTÓN PAPELERA */}
-                                        <button 
-                                            onClick={() => {
-                                                if(window.confirm('¿Seguro que deseas enviar este reporte a la papelera?')) {
-                                                    enviarAPapelera(reporte.id);
-                                                }
-                                            }}
-                                            className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                            title="Enviar a papelera"
-                                        >
+                                        <button onClick={() => { if(window.confirm('¿Seguro que deseas enviar este reporte a la papelera?')) enviarAPapelera(reporte.id); }} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Enviar a papelera">
                                             <MdDelete className="text-base" />
                                         </button>
-
-                                        <button 
-                                            onClick={() => abrirDetalles(reporte)} 
-                                            className="text-[11px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50"
-                                        >
+                                        <button onClick={() => abrirDetalles(reporte)} className="text-[11px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50">
                                             Ver detalles <MdArrowForward/>
                                         </button>
                                     </div>
@@ -237,21 +229,10 @@ export default function ListaReportes() {
                                         </td>
                                         <td className="py-4 px-6 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button 
-                                                    onClick={() => {
-                                                        if(window.confirm('¿Seguro que deseas enviar este reporte a la papelera?')) {
-                                                            enviarAPapelera(reporte.id);
-                                                        }
-                                                    }}
-                                                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                                    title="Enviar a papelera"
-                                                >
+                                                <button onClick={() => { if(window.confirm('¿Seguro que deseas enviar este reporte a la papelera?')) enviarAPapelera(reporte.id); }} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Enviar a papelera">
                                                     <MdDelete className="text-base" />
                                                 </button>
-                                                <button 
-                                                    onClick={() => abrirDetalles(reporte)}
-                                                    className="px-3 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"
-                                                >
+                                                <button onClick={() => abrirDetalles(reporte)} className="px-3 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">
                                                     Ver Detalles
                                                 </button>
                                             </div>
@@ -271,10 +252,25 @@ export default function ListaReportes() {
                 )}
             </div>
 
+            {/* RENDERIZADO DE MODALES */}
             <ModalDetallesTicket 
                 isOpen={modalAbierto} 
                 onClose={() => setModalAbierto(false)} 
                 ticket={ticketSeleccionado} 
+            />
+            
+            <ModalEscalarVisita
+                isOpen={modalEscalar.isOpen}
+                onClose={() => setModalEscalar({ isOpen: false, ticket: null })}
+                ticket={modalEscalar.ticket}
+                onConfirm={escalarAVisita}
+            />
+
+            <ModalResolverTicket
+                isOpen={modalResolver.isOpen}
+                onClose={() => setModalResolver({ isOpen: false, ticket: null })}
+                ticket={modalResolver.ticket}
+                onConfirm={resolverTicket}
             />
         </div>
     );
