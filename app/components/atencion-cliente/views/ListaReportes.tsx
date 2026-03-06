@@ -27,7 +27,6 @@ export default function ListaReportes() {
     const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
     
     const [modalEscalar, setModalEscalar] = useState({ isOpen: false, ticket: null });
-    // CORRECCIÓN: Agregamos "estadoDestino" para recordar la palabra exacta
     const [modalResolver, setModalResolver] = useState({ isOpen: false, ticket: null, estadoDestino: '' });
 
     const { 
@@ -35,10 +34,25 @@ export default function ListaReportes() {
         escalarAVisita, resolverTicket 
     } = useTickets();
 
+    // LÓGICA DE FILTRADO (CON AGRUPACIÓN INTELIGENTE)
     const reportesFiltrados = tickets.filter(r => {
         if (r.estado === 'PAPELERA') return false; 
+        
         const pasaPrioridad = filtroPrioridad === 'TODAS' || r.prioridad === filtroPrioridad;
-        const pasaEstado = filtroEstado === 'TODOS' || r.estado === filtroEstado;
+        
+        let pasaEstado = false;
+        if (filtroEstado === 'TODOS') {
+            pasaEstado = true;
+        } else if (filtroEstado === 'RESUELTO') {
+            // Agrupa tickets de Visita y Remotos finalizados
+            pasaEstado = r.estado === 'RESUELTO' || r.estado === 'SOLUCIONADO';
+        } else if (filtroEstado === 'EN_RUTA') {
+            // Agrupa tickets en tránsito o siendo trabajados remotamente
+            pasaEstado = r.estado === 'EN_RUTA' || r.estado === 'EN_PROCESO';
+        } else {
+            pasaEstado = r.estado === filtroEstado;
+        }
+
         return pasaPrioridad && pasaEstado;
     });
 
@@ -61,7 +75,6 @@ export default function ListaReportes() {
         if (nuevoEstado === 'PASAR_A_VISITA') {
             setModalEscalar({ isOpen: true, ticket: reporte });
         } else if (nuevoEstado === 'RESUELTO' || nuevoEstado === 'SOLUCIONADO') {
-            // CORRECCIÓN: Guardamos la palabra exacta en el estado temporal
             setModalResolver({ isOpen: true, ticket: reporte, estadoDestino: nuevoEstado });
         } else {
             cambiarEstadoTicket(reporte.id, nuevoEstado);
@@ -254,7 +267,6 @@ export default function ListaReportes() {
             
             <ModalEscalarVisita isOpen={modalEscalar.isOpen} onClose={() => setModalEscalar({ isOpen: false, ticket: null })} ticket={modalEscalar.ticket} onConfirm={escalarAVisita} />
 
-            {/* CORRECCIÓN: Le enviamos al onConfirm la palabra exacta que el usuario seleccionó */}
             <ModalResolverTicket 
                 isOpen={modalResolver.isOpen} 
                 onClose={() => setModalResolver({ isOpen: false, ticket: null, estadoDestino: '' })} 
