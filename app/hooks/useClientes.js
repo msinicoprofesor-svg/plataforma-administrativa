@@ -2,7 +2,7 @@
 /* ARCHIVO: app/hooks/useClientes.js                                          */
 /* -------------------------------------------------------------------------- */
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // <-- AQUÍ ESTÁ LA CORRECCIÓN
+import { supabase } from '../lib/supabase';
 
 export function useClientes() {
     const [clientes, setClientes] = useState([]);
@@ -15,7 +15,6 @@ export function useClientes() {
         fetchClientes();
     }, []);
 
-    // 1. Traer marcas y regiones para los formularios
     const fetchCatalogos = async () => {
         const [resMarcas, resRegiones] = await Promise.all([
             supabase.from('marcas').select('*'),
@@ -25,7 +24,6 @@ export function useClientes() {
         if (!resRegiones.error) setRegiones(resRegiones.data);
     };
 
-    // 2. Traer la lista de clientes reales
     const fetchClientes = async () => {
         setLoading(true);
         const { data, error } = await supabase
@@ -38,7 +36,6 @@ export function useClientes() {
             .order('created_at', { ascending: false });
         
         if (!error && data) {
-            // Formateamos los datos para que tu tabla los lea perfectamente
             const clientesFormateados = data.map(c => ({
                 id: c.id,
                 nombre: c.nombre_completo,
@@ -49,21 +46,22 @@ export function useClientes() {
                 telefono: c.telefono || 'N/A',
                 direccion: c.direccion || '',
                 marca_id: c.marca_id,
-                region_id: c.region_id
+                region_id: c.region_id,
+                // NUEVO: Extraemos coordenadas de la base de datos
+                latitud: c.latitud,
+                longitud: c.longitud
             }));
             setClientes(clientesFormateados);
         }
         setLoading(false);
     };
 
-    // 3. Crear un cliente nuevo
     const agregarCliente = async (datosNuevoCliente) => {
         const { data, error } = await supabase.from('clientes').insert([datosNuevoCliente]).select();
-        if (!error) fetchClientes(); // Recargamos la tabla automáticamente
+        if (!error) fetchClientes(); 
         return { data, error };
     };
 
-    // 4. Actualizar estado o datos
     const actualizarCliente = async (id, datos) => {
         const { error } = await supabase.from('clientes').update(datos).eq('id', id);
         if (!error) fetchClientes();
