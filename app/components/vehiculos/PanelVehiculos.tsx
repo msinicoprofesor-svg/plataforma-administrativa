@@ -2,14 +2,12 @@
 /* ARCHIVO: app/components/vehiculos/PanelVehiculos.tsx                       */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState, useRef } from 'react';
-import { 
-    MdDirectionsCar, MdAdd, MdClose, MdCheckCircle, MdEngineering, 
-    MdOutlineFormatColorFill, MdConfirmationNumber, MdShield, MdListAlt, MdPhotoCamera 
-} from 'react-icons/md';
+import { useState } from 'react';
+import { MdDirectionsCar, MdAdd, MdEngineering, MdListAlt } from 'react-icons/md';
 import { FaCarSide, FaTruckPickup, FaMotorcycle } from 'react-icons/fa';
 
 import { useVehiculos } from '../../hooks/useVehiculos';
+import ModalVehiculo from './ModalVehiculo';
 
 export default function PanelVehiculos({ usuarioActivo }) {
     const { vehiculos, loading, agregarVehiculo } = useVehiculos();
@@ -21,45 +19,16 @@ export default function PanelVehiculos({ usuarioActivo }) {
     const [modalAbierto, setModalAbierto] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Estados para la carga de fotografía
-    const [imagenFile, setImagenFile] = useState(null);
-    const [imagenPreview, setImagenPreview] = useState(null);
-    const fileInputRef = useRef(null);
-
-    const [formData, setFormData] = useState({
-        marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff',
-        placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta'
-    });
-
-    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-    // Carga la vista previa en el navegador antes de subir
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setImagenFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => setImagenPreview(reader.result);
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleGuardar = async (e) => {
-        e.preventDefault();
+    // Conectamos el Modal externo con la base de datos
+    const handleGuardar = async (formData, archivoFinal) => {
         setIsSubmitting(true);
-        // Le pasamos la info y la foto
-        const res = await agregarVehiculo(formData, imagenFile);
+        const res = await agregarVehiculo(formData, archivoFinal);
         setIsSubmitting(false);
-        
         if (res.success) {
             setModalAbierto(false);
-            setFormData({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff', placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta' });
-            setImagenFile(null);
-            setImagenPreview(null);
         }
     };
 
-    // Componente Inteligente: Muestra la foto real o un "Placeholder" si no hay foto
     const RenderMiniatura = ({ tipo, color, url }) => {
         if (url) {
             return (
@@ -69,7 +38,6 @@ export default function PanelVehiculos({ usuarioActivo }) {
             );
         }
         
-        // Si registraron un auto viejo sin foto, le mostramos el ícono gris opaco
         const style = { color: color || '#94a3b8', filter: 'drop-shadow(0px 10px 8px rgba(0,0,0,0.15))' };
         return (
             <div className="h-40 flex items-center justify-center w-full relative overflow-hidden bg-gradient-to-b from-gray-50 to-gray-100/50 rounded-t-[2rem]">
@@ -83,8 +51,7 @@ export default function PanelVehiculos({ usuarioActivo }) {
     };
 
     const vehiculosFiltrados = filtroEstado === 'TODOS' 
-        ? vehiculos 
-        : vehiculos.filter(v => v.estado === filtroEstado);
+        ? vehiculos : vehiculos.filter(v => v.estado === filtroEstado);
 
     const stats = {
         disponibles: vehiculos.filter(v => v.estado === 'DISPONIBLE').length,
@@ -178,113 +145,12 @@ export default function PanelVehiculos({ usuarioActivo }) {
                 )}
             </div>
 
-            {/* MODAL DE REGISTRO */}
-            {modalAbierto && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
-                        
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdDirectionsCar className="text-blue-600"/> Alta de Vehículo</h3>
-                            <button onClick={() => {
-                                setModalAbierto(false);
-                                setImagenPreview(null);
-                                setImagenFile(null);
-                            }} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                            <form id="formVehiculo" onSubmit={handleGuardar} className="space-y-6">
-                                
-                                {/* CAJA DE SUBIDA DE FOTO */}
-                                <div className="flex flex-col items-center justify-center mb-6">
-                                    <div 
-                                        onClick={() => fileInputRef.current.click()}
-                                        className="w-full h-40 bg-gray-50 hover:bg-gray-100 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden"
-                                    >
-                                        {imagenPreview ? (
-                                            <img src={imagenPreview} alt="Preview" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <>
-                                                <MdPhotoCamera className="text-4xl text-gray-400 mb-2" />
-                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Subir Foto del Vehículo</span>
-                                                <span className="text-[10px] font-medium text-gray-400 mt-1">Formatos recomendados: JPG, PNG</span>
-                                            </>
-                                        )}
-                                    </div>
-                                    <input 
-                                        type="file" 
-                                        accept="image/*" 
-                                        className="hidden" 
-                                        ref={fileInputRef} 
-                                        onChange={handleImageChange} 
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Marca</label>
-                                        <input required name="marca" value={formData.marca} onChange={handleChange} placeholder="Ej. Nissan, Chevrolet" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Modelo</label>
-                                        <input required name="modelo" value={formData.modelo} onChange={handleChange} placeholder="Ej. NP300, Beat" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Año</label>
-                                        <input required type="number" name="anio" value={formData.anio} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Tipo</label>
-                                        <select name="tipo_vehiculo" value={formData.tipo_vehiculo} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 cursor-pointer">
-                                            <option value="camioneta">Camioneta</option>
-                                            <option value="auto">Auto Sedán</option>
-                                            <option value="hatchback">Hatchback</option>
-                                            <option value="van">Van / Furgoneta</option>
-                                            <option value="moto">Motocicleta</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Color Básico</label>
-                                        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 focus-within:border-blue-500 transition-colors">
-                                            <MdOutlineFormatColorFill className="text-gray-400 text-lg ml-2"/>
-                                            <input type="color" name="color" value={formData.color} onChange={handleChange} className="w-full h-8 cursor-pointer bg-transparent border-none outline-none rounded" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-5">
-                                    <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-2">Datos Legales / Operativos</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdConfirmationNumber/> Placas</label>
-                                            <input required name="placas" value={formData.placas} onChange={handleChange} placeholder="Ej. GTO-1234" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-gray-800 uppercase outline-none focus:border-blue-500" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Niv. / Número de Serie</label>
-                                            <input required name="serie" value={formData.serie} onChange={handleChange} placeholder="17 Caracteres" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 uppercase outline-none focus:border-blue-500" />
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdShield/> Número Póliza Seguro</label>
-                                            <input name="poliza" value={formData.poliza} onChange={handleChange} placeholder="Opcional" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                            </form>
-                        </div>
-
-                        <div className="p-6 border-t border-gray-100 bg-white">
-                            <button form="formVehiculo" type="submit" disabled={isSubmitting} className="w-full bg-green-500 hover:bg-green-600 text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/30 active:scale-95 disabled:opacity-50">
-                                {isSubmitting ? 'Guardando y Subiendo Foto...' : <><MdCheckCircle className="text-xl"/> Registrar Vehículo</>}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            <ModalVehiculo 
+                isOpen={modalAbierto} 
+                onClose={() => setModalAbierto(false)} 
+                onSave={handleGuardar} 
+                isSubmitting={isSubmitting} 
+            />
         </div>
     );
 }
