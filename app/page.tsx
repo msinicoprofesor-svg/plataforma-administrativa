@@ -39,6 +39,9 @@ import Cobertura from './components/tecnica/Cobertura';
 import MesaControl from './components/tecnica/MesaControl'; 
 import PanelVentas from './components/ventas/PanelVentas'; 
 
+import PanelVehiculos from './components/vehiculos/PanelVehiculos';
+
+
 export default function Home() {
   const auth = useUsuarios(); 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -316,6 +319,14 @@ export default function Home() {
                     <Directorio colaboradores={colaboradoresVisibles} busqueda={busqueda} setBusqueda={setBusqueda} paginacion={paginacion} onNuevo={() => { setColaboradorEditar(null); setIsViewOnly(false); setIsModalOpen(true); }} onVer={(col) => { setColaboradorEditar(col); setIsViewOnly(true); setIsModalOpen(true); }} onEditar={(col) => { setColaboradorEditar(col); setIsViewOnly(false); setIsModalOpen(true); }} onEliminar={eliminarColaborador} onImportar={importarMasivo} />
                 </div>
             )}
+
+            {/* --- SECCIÓN: FLOTILLA VEHICULAR --- */}
+            {activeModule === 'vehiculos_panel' && (
+                <div className="animate-slide-up h-full pb-10">
+                    <PanelVehiculos usuarioActivo={u} />
+                </div>
+            )}
+
          </main>
       </div>
 

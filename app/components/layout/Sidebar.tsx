@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/layout/Sidebar.tsx (ACTUALIZADO CON APP TÉCNICO)   */
+/* ARCHIVO: app/components/layout/Sidebar.tsx                                 */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { 
@@ -7,7 +7,7 @@ import {
   MdFactCheck, MdInventory2, MdCardGiftcard, MdBusiness, MdEngineering, 
   MdWork, MdLocalOffer, MdClose, MdFormatPaint, MdPoll, MdShare, 
   MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent, MdPeopleAlt,
-  MdPhoneIphone // <-- NUEVO ICONO IMPORTADO
+  MdPhoneIphone, MdDirectionsCar // <-- NUEVO ICONO DE COCHE
 } from "react-icons/md";
 import { FaStoreAlt, FaUserCircle } from "react-icons/fa";
 
@@ -23,6 +23,10 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
   const verMesa = tienePermiso(usuario, 'marketing_mesa');
 
   const verAlmacen = tienePermiso(usuario, 'almacen_operativo');
+
+  // --- NUEVOS PERMISOS VEHICULARES ---
+  // Por ahora lo dejamos en true para que puedas visualizar y desarrollar el módulo
+  const verFlotilla = true; 
 
   const verCentroDiseno = tienePermiso(usuario, 'marketing_solicitudes');
   const verEstudios = tienePermiso(usuario, 'marketing_estudios');
@@ -69,8 +73,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
                 <SectionTitle label="Atención al Cliente" isOpen={isOpen} />
                 <MenuButton icon={<MdSupportAgent />} label="Reportes y Rutas" active={activeModule === 'atencion_cliente'} onClick={() => setActiveModule('atencion_cliente')} isOpen={isOpen} />
                 <MenuButton icon={<MdPeopleAlt />} label="Directorio Clientes" active={activeModule === 'atencion_directorio'} onClick={() => setActiveModule('atencion_directorio')} isOpen={isOpen} />
-                
-                {/* --- NUEVO BOTÓN: APP MÓVIL --- */}
                 <MenuButton icon={<MdPhoneIphone />} label="App Técnico (Móvil)" active={activeModule === 'tecnico_movil'} onClick={() => setActiveModule('tecnico_movil')} isOpen={isOpen} />
             </>
           )}
@@ -87,6 +89,15 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
                 <SectionTitle label="Logística" isOpen={isOpen} />
                 <MenuButton icon={<MdInventory2 />} label="Almacén General" active={activeModule === 'almacen_operativo'} onClick={() => setActiveModule('almacen_operativo')} isOpen={isOpen} />
+            </>
+          )}
+
+          {/* --- NUEVA SECCIÓN: FLOTILLA --- */}
+          {verFlotilla && (
+            <>
+                <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
+                <SectionTitle label="Flotilla" isOpen={isOpen} />
+                <MenuButton icon={<MdDirectionsCar />} label="Control Vehicular" active={activeModule === 'vehiculos_panel'} onClick={() => setActiveModule('vehiculos_panel')} isOpen={isOpen} />
             </>
           )}
 
