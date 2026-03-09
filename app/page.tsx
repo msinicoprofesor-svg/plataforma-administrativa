@@ -261,9 +261,14 @@ export default function Home() {
                 </div>
             )}
 
+            {/* --- SECCIÓN: APP TÉCNICO MÓVIL --- */}
             {activeModule === 'tecnico_movil' && verAtencionCliente && (
                 <div className="animate-fade-in h-full w-full">
-                    <DashboardTecnico tecnicoId={u?.id || "1"} />
+                    {/* LE PASAMOS LA LLAVE PARA ABRIR EL SIDEBAR: onOpenMenu */}
+                    <DashboardTecnico 
+                        tecnicoId={u?.id || "1"} 
+                        onOpenMenu={() => setSidebarOpen(true)} 
+                    />
                 </div>
             )}
 

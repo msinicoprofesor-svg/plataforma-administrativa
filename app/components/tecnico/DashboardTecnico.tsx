@@ -5,32 +5,24 @@
 import { useState, useEffect } from 'react';
 import VistaMovil from './views/VistaMovil';
 
-// NOTA: Asumimos que el login ya le pasó el ID del técnico a este componente.
-// Por ahora le pondremos un ID quemado (Ej. "1") si no recibe nada, para que puedas hacer pruebas.
-export default function DashboardTecnico({ tecnicoId = "1" }) {
-    // Por defecto asumimos que es celular para que cargue rápido
+// NUEVO: Recibimos "onOpenMenu" como llave para abrir el Sidebar
+export default function DashboardTecnico({ tecnicoId = "1", onOpenMenu }) {
     const [isMobile, setIsMobile] = useState(true); 
 
     useEffect(() => {
-        // Función que mide la pantalla
         const checkScreenSize = () => {
-            setIsMobile(window.innerWidth < 768); // Menos de 768px se considera celular
+            setIsMobile(window.innerWidth < 768); 
         };
-        
-        // Chequeo inicial
         checkScreenSize();
-        
-        // Escuchamos si el usuario voltea el celular o cambia el tamaño de la ventana
         window.addEventListener('resize', checkScreenSize);
         return () => window.removeEventListener('resize', checkScreenSize);
     }, []);
 
-    // Si es celular, cargamos la App Móvil
     if (isMobile) {
-        return <VistaMovil tecnicoId={tecnicoId} />;
+        // PASAMOS LA LLAVE A LA VISTA MÓVIL
+        return <VistaMovil tecnicoId={tecnicoId} onOpenMenu={onOpenMenu} />;
     }
 
-    // Si es computadora, le mostramos un aviso (o a futuro, la VistaEscritorio)
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
             <div className="w-20 h-20 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center text-4xl mb-4 shadow-inner">

@@ -10,7 +10,8 @@ import {
 
 import { useRutaTecnico } from '../../../hooks/useRutaTecnico';
 
-export default function VistaMovil({ tecnicoId }) {
+// NUEVO: Recibimos "onOpenMenu" desde el DashboardTecnico
+export default function VistaMovil({ tecnicoId, onOpenMenu }) {
     const { miRuta, loading, actualizarEstadoEnCampo } = useRutaTecnico(tecnicoId);
     
     const [ticketCerrando, setTicketCerrando] = useState(null);
@@ -27,16 +28,12 @@ export default function VistaMovil({ tecnicoId }) {
         }
     };
 
-    // --- NUEVA LÓGICA DE NAVEGACIÓN ---
     const abrirNavegacion = (lat, lng, direccion, enlace_maps) => {
         if (enlace_maps && enlace_maps.includes('http')) {
-            // Prioridad 1: El enlace original del cliente (Cero margen de error)
             window.open(enlace_maps, '_blank');
         } else if (lat && lng) {
-            // Prioridad 2: Coordenadas matemáticas de Supabase
             window.open(`https://maps.google.com/?q=${lat},${lng}`, '_blank');
         } else {
-            // Prioridad 3: Buscar la calle por texto
             window.open(`https://maps.google.com/?q=${encodeURIComponent(direccion)}`, '_blank');
         }
     };
@@ -55,12 +52,6 @@ export default function VistaMovil({ tecnicoId }) {
         setIsSubmitting(false);
         setTicketCerrando(null);
         setNotasCierre('');
-    };
-
-    const abrirMenuPrincipal = () => {
-        // Regresa el sistema al módulo de inicio y recarga para mostrar el menú lateral
-        localStorage.setItem('javak_modulo_activo', 'dashboard');
-        window.location.reload();
     };
 
     if (loading) {
@@ -82,8 +73,9 @@ export default function VistaMovil({ tecnicoId }) {
                 <p className="text-sm font-medium text-gray-500 mb-8">
                     No tienes tickets pendientes asignados para el día de hoy. Excelente trabajo.
                 </p>
-                <button onClick={abrirMenuPrincipal} className="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center gap-2">
-                    <MdMenu /> Regresar al Menú
+                {/* BOTÓN CON LA NUEVA FUNCIÓN */}
+                <button onClick={onOpenMenu} className="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center gap-2">
+                    <MdMenu /> Abrir Menú
                 </button>
             </div>
         );
@@ -92,11 +84,11 @@ export default function VistaMovil({ tecnicoId }) {
     return (
         <div className="min-h-screen bg-gray-100 pb-24">
             
-            {/* HEADER MÓVIL (Con botón de Hamburguesa) */}
             <div className="bg-white px-5 py-6 rounded-b-[2rem] shadow-sm sticky top-0 z-20 border-b border-gray-200">
                 <div className="flex justify-between items-center mb-2">
                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Tu hoja de ruta</p>
-                    <button onClick={abrirMenuPrincipal} className="w-10 h-10 bg-gray-50 flex items-center justify-center rounded-full text-gray-600 hover:bg-gray-200 transition-colors shadow-sm border border-gray-100">
+                    {/* BOTÓN CON LA NUEVA FUNCIÓN */}
+                    <button onClick={onOpenMenu} className="w-10 h-10 bg-gray-50 flex items-center justify-center rounded-full text-gray-600 hover:bg-gray-200 transition-colors shadow-sm border border-gray-100">
                         <MdMenu className="text-xl"/>
                     </button>
                 </div>
@@ -122,7 +114,6 @@ export default function VistaMovil({ tecnicoId }) {
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/30">
-                                        {/* NÚMERO VISUAL SECUENCIAL PERFECTO: 1, 2, 3... */}
                                         {index + 1}
                                     </div>
                                     <div>
