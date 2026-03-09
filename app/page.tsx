@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/page.tsx (CONECTADO A ATENCIÓN AL CLIENTE)                    */
+/* ARCHIVO: app/page.tsx (CONECTADO A APP TÉCNICO)                            */
 /* -------------------------------------------------------------------------- */
 'use client';
 
@@ -7,7 +7,6 @@ import { useState, useEffect } from 'react';
 import { MdDashboard, MdEmail, MdLock } from "react-icons/md";
 import { FaStoreAlt } from "react-icons/fa";
 
-// --- IMPORTS DE HOOKS ---
 import { useColaboradores } from './hooks/useColaboradores';
 import { useVentas } from './hooks/useVentas'; 
 import { useUsuarios } from './hooks/useUsuarios'; 
@@ -15,10 +14,8 @@ import { useInventarioOperativo } from './hooks/useInventarioOperativo';
 import { useLikeStore } from './hooks/useLikeStore'; 
 import { useSolicitudesContenido } from './hooks/useSolicitudesContenido';
 
-// --- CONFIGURACIÓN DE PERMISOS ---
 import { tienePermiso } from './config/permisos'; 
 
-// --- IMPORTS DE COMPONENTES ---
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import InventarioOperativo from './components/operaciones/InventarioOperativo';
@@ -30,16 +27,15 @@ import PanelSolicitudes from './components/marketing/PanelSolicitudes';
 import PanelEstudios from './components/marketing/estudios/PanelEstudios'; 
 import PanelSocial from './components/marketing/social/PanelSocial';
 
-// --- COMPONENTES NUEVOS (JAVAK) ---
 import PanelAtencionCliente from './components/atencion-cliente/PanelAtencionCliente';
-import DirectorioClientes from './components/atencion-cliente/views/DirectorioClientes'; // Importación Agregada
+import DirectorioClientes from './components/atencion-cliente/views/DirectorioClientes'; 
+// --- IMPORTACIÓN DEL NUEVO MÓDULO MÓVIL ---
+import DashboardTecnico from './components/tecnico/DashboardTecnico'; 
 
-// --- COMPONENTES RRHH ---
 import Directorio from './components/rrhh/Directorio';
 import PanelRRHH from './components/rrhh/PanelRRHH'; 
 import ModalColaborador from './components/rrhh/ModalColaborador';
 
-// OTRAS VISTAS
 import Cobertura from './components/tecnica/Cobertura'; 
 import MesaControl from './components/tecnica/MesaControl'; 
 import PanelVentas from './components/ventas/PanelVentas'; 
@@ -49,7 +45,6 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeModule, setActiveModule] = useState('dashboard'); 
   
-  // --- ESTADOS PARA LOGIN ---
   const [emailInput, setEmailInput] = useState('');
   const [passInput, setPassInput] = useState('');
   const [errorLogin, setErrorLogin] = useState('');
@@ -61,7 +56,6 @@ export default function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- HOOKS DE DATOS ---
   const { 
     colaboradoresVisibles, colaboradoresReales, busqueda, setBusqueda, 
     eliminarColaborador, agregarColaborador, importarMasivo, actualizarColaborador, 
@@ -73,14 +67,10 @@ export default function Home() {
   const likeStoreData = useLikeStore();           
   const solicitudesData = useSolicitudesContenido(); 
 
-  // Estados Modal RRHH
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [colaboradorEditar, setColaboradorEditar] = useState(null);
   const [isViewOnly, setIsViewOnly] = useState(false);
 
-  // ---------------------------------------------------------------------------
-  // LÓGICA DE USUARIO ENRIQUECIDO
-  // ---------------------------------------------------------------------------
   const uBasico = auth.usuarioActivo;
   const perfilReal = colaboradoresReales.find(c => c.email === uBasico?.email);
 
@@ -92,13 +82,11 @@ export default function Home() {
       rol: uBasico.rol 
   } : null;
 
-  // --- VALIDACIÓN DE PERMISOS ---
   const verVentas = tienePermiso(u, 'marketing_ventas');
   const verCobertura = tienePermiso(u, 'marketing_cobertura');
   const verMesa = tienePermiso(u, 'marketing_mesa');
   const verLogistica = tienePermiso(u, 'almacen_operativo');
   
-  // Permiso temporal para JAVAK (mientras se agrega al archivo de permisos)
   const verAtencionCliente = true; 
 
   const verSolicitudesDiseno = tienePermiso(u, 'marketing_solicitudes');
@@ -112,11 +100,9 @@ export default function Home() {
 
   const verRRHH = tienePermiso(u, 'rrhh_hub') || tienePermiso(u, 'rrhh_incidencias') || tienePermiso(u, 'rrhh_mural') || tienePermiso(u, 'rrhh_nomina');
 
-  // LÓGICA ESPECIAL LIKESTORE: ¿Quién ve la versión FULL y quién solo Catálogo?
   const ROLES_TIENDA_FULL = ['GERENTE_MKT', 'CREADOR_CONTENIDO', 'COMMUNITY_MANAGER', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL'];
   const esMarketingFull = u && ROLES_TIENDA_FULL.includes(u.rol);
 
-  // Redirección Inicial
   useEffect(() => {
     if (u) {
         if (tienePermiso(u, 'marketing_ventas') && !tienePermiso(u, 'marketing_dashboard')) {
@@ -127,7 +113,6 @@ export default function Home() {
     }
   }, [u?.email]);
 
-  // --- LÓGICA DE LOGIN (CORREGIDA PARA ASYNC CON SUPABASE) ---
   const handleLogin = async (e) => {
       e.preventDefault();
       setErrorLogin(''); 
@@ -154,9 +139,6 @@ export default function Home() {
     });
   };
 
-  // ==========================================================================
-  // RENDER
-  // ==========================================================================
   if (!u) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8] p-4 relative overflow-hidden">
@@ -173,7 +155,6 @@ export default function Home() {
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5">
-                {/* MOSTRAR ERROR SI EXISTE */}
                 {errorLogin && (
                     <div className="bg-red-50 text-red-500 text-xs font-bold p-3 rounded-xl border border-red-100 text-center animate-pulse">
                         {errorLogin}
@@ -220,7 +201,9 @@ export default function Home() {
   }
 
   const isLikeStore = activeModule === 'likestore';
-  const mainContainerClasses = isLikeStore ? "flex-1 overflow-hidden w-full h-full relative p-0" : "flex-1 overflow-y-auto px-4 md:px-8 pb-20 md:pb-8 custom-scrollbar w-full";
+  // Modificamos esto para que la vista del técnico ocupe todo el espacio de forma limpia
+  const isTecnicoMovil = activeModule === 'tecnico_movil';
+  const mainContainerClasses = (isLikeStore || isTecnicoMovil) ? "flex-1 overflow-hidden w-full h-full relative p-0 bg-gray-100" : "flex-1 overflow-y-auto px-4 md:px-8 pb-20 md:pb-8 custom-scrollbar w-full";
 
   return (
     <div className="flex h-screen bg-[#F5F7FA] font-sans text-gray-900 overflow-hidden relative">
@@ -231,7 +214,7 @@ export default function Home() {
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
-         {!isLikeStore && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
+         {!isLikeStore && !isTecnicoMovil && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
          
          <main className={mainContainerClasses}>
             {activeModule === 'marketing_dashboard' && (
@@ -242,20 +225,25 @@ export default function Home() {
                 </div>
             )}
 
-            {/* --- MÓDULOS JAVAK (NUEVOS) --- */}
             {activeModule === 'atencion_cliente' && verAtencionCliente && (
                 <div className="animate-slide-up h-full pb-10">
                     <PanelAtencionCliente />
                 </div>
             )}
-            {/* NUEVA VISTA PARA DIRECTORIO INDEPENDIENTE */}
+            
             {activeModule === 'atencion_directorio' && verAtencionCliente && (
                 <div className="animate-slide-up h-full pb-10 pt-4 md:pt-6">
                     <DirectorioClientes />
                 </div>
             )}
 
-            {/* --- MÓDULOS OPERATIVOS --- */}
+            {/* --- SECCIÓN: APP TÉCNICO MÓVIL (NUEVA) --- */}
+            {activeModule === 'tecnico_movil' && verAtencionCliente && (
+                <div className="animate-fade-in h-full w-full">
+                    <DashboardTecnico tecnicoId={u?.id || "1"} />
+                </div>
+            )}
+
             {activeModule === 'marketing_ventas' && verVentas && <div className="animate-slide-up h-full pb-10"><PanelVentas ventas={ventasData.ventas} cobertura={ventasData.cobertura} cupones={ventasData.cupones} validarCupon={ventasData.validarCupon} onRegistrarVenta={ventasData.registrarVenta} vendedorActual={u} /></div>}
             {activeModule === 'marketing_cobertura' && verCobertura && <div className="animate-slide-up h-full pb-10"><Cobertura cobertura={ventasData.cobertura} onAgregarZona={ventasData.agregarZona} onActualizarZona={ventasData.actualizarZona} usuarioActual={u} /></div>}
             {activeModule === 'marketing_mesa' && verMesa && <div className="animate-slide-up h-full pb-10"><MesaControl ventas={ventasData.ventas} cobertura={ventasData.cobertura} onActualizarEstado={ventasData.actualizarEstadoVenta} usuarioActual={u} /></div>}
@@ -277,7 +265,6 @@ export default function Home() {
             {activeModule === 'marketing_promociones' && verPromociones && <div className="animate-slide-up h-full pb-10"><PanelMarketing cupones={ventasData.cupones} cobertura={ventasData.cobertura} onAgregarCupon={ventasData.agregarCupon} onEliminarCupon={ventasData.eliminarCupon} /></div>}
             {activeModule === 'marketing_importar' && verImportar && <div className="animate-slide-up h-full"><ImportarInteracciones colaboradores={colaboradoresReales} historial={historial} onProcesar={registrarPuntosMasivos} onEliminarHistorial={eliminarImportacion} /></div>}
             
-            {/* --- LIKESTORE INTELIGENTE (FULL vs CATÁLOGO) --- */}
             {activeModule === 'likestore' && verLikeStore && (
                 <div className="animate-slide-up w-full h-full">
                     {esMarketingFull ? (
@@ -290,7 +277,6 @@ export default function Home() {
             
             {activeModule === 'almacen_operativo' && verLogistica && <div className="animate-slide-up h-full pb-10"><InventarioOperativo useData={inventarioOps} /></div>}
 
-            {/* --- SECCIÓN RRHH --- */}
             {activeModule.startsWith('rrhh_') && verRRHH && (
                 <div className="animate-slide-up h-full pb-10">
                     <PanelRRHH usuario={u} colaboradores={colaboradoresReales} moduloActivo={activeModule} />

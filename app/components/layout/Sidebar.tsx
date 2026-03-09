@@ -1,35 +1,29 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/layout/Sidebar.tsx (ACTUALIZADO CON DIRECTORIO)    */
+/* ARCHIVO: app/components/layout/Sidebar.tsx (ACTUALIZADO CON APP TÉCNICO)   */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { 
   MdDashboard, MdPeople, MdOutlineCloudUpload, MdMap, MdAttachMoney, 
   MdFactCheck, MdInventory2, MdCardGiftcard, MdBusiness, MdEngineering, 
   MdWork, MdLocalOffer, MdClose, MdFormatPaint, MdPoll, MdShare, 
-  MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent, MdPeopleAlt 
+  MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent, MdPeopleAlt,
+  MdPhoneIphone // <-- NUEVO ICONO IMPORTADO
 } from "react-icons/md";
 import { FaStoreAlt, FaUserCircle } from "react-icons/fa";
 
-// Importamos la función maestra de seguridad
 import { tienePermiso } from '../../config/permisos'; 
 
 export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModule, usuario, onLogout }) {
   
-  // --- 1. CONSULTA DE PERMISOS (ATOMICA) ---
-  
-  // ATENCIÓN AL CLIENTE (NUEVO MÓDULO JAVAK)
-  const verAtencionCliente = true; // TODO: Cambiar a tienePermiso(usuario, 'atencion_cliente') cuando lo agregues a permisos.js
+  const verAtencionCliente = true; 
 
-  // OPERACIONES
   const verDashboard = tienePermiso(usuario, 'marketing_dashboard');
   const verVentas = tienePermiso(usuario, 'marketing_ventas');
   const verCobertura = tienePermiso(usuario, 'marketing_cobertura');
   const verMesa = tienePermiso(usuario, 'marketing_mesa');
 
-  // LOGÍSTICA
   const verAlmacen = tienePermiso(usuario, 'almacen_operativo');
 
-  // MARKETING
   const verCentroDiseno = tienePermiso(usuario, 'marketing_solicitudes');
   const verEstudios = tienePermiso(usuario, 'marketing_estudios');
   const verSocial = tienePermiso(usuario, 'marketing_social');
@@ -38,29 +32,24 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
   const verImportar = tienePermiso(usuario, 'marketing_importar');
   const verLikeStore = tienePermiso(usuario, 'likestore');
 
-  // RRHH
   const verHubRRHH = tienePermiso(usuario, 'rrhh_hub'); 
   const verMural = tienePermiso(usuario, 'rrhh_mural');
   const verIncidencias = tienePermiso(usuario, 'rrhh_incidencias');
   const verNomina = tienePermiso(usuario, 'rrhh_nomina');
 
-  // SOPORTE
   const verSoporte = tienePermiso(usuario, 'soporte_tickets');
 
-  // --- 2. LÓGICA DE VISIBILIDAD DE SECCIONES ---
   const verSeccionMarketing = verCentroDiseno || verEstudios || verSocial || verPromociones || verColaboradores || verImportar || verLikeStore;
   const verSeccionRRHH = verMural || verIncidencias || verNomina || verHubRRHH;
 
   return (
     <>
-      {/* Overlay Móvil */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsOpen(false)} />
       )}
 
       <aside className={`fixed inset-y-0 left-0 z-50 bg-white text-gray-600 shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out border-r border-gray-100 flex flex-col ${isOpen ? 'translate-x-0 w-80' : '-translate-x-full md:translate-x-0 md:w-24'} md:relative`}>
         
-        {/* HEADER */}
         <div className="h-24 flex items-center justify-between px-6 md:justify-center">
           <div className={`flex items-center gap-3 transition-all duration-300 ${!isOpen && 'md:justify-center'}`}>
             <div className="w-12 h-12 bg-[#DA291C] rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20 shrink-0">
@@ -73,29 +62,26 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
           </button>
         </div>
         
-        {/* MENU SCROLLABLE */}
         <nav className="flex-1 overflow-y-auto px-4 space-y-1 custom-scrollbar pb-6">
           
-          {/* SECCIÓN: ATENCIÓN AL CLIENTE (NUEVA) */}
           {verAtencionCliente && (
             <>
                 <SectionTitle label="Atención al Cliente" isOpen={isOpen} />
                 <MenuButton icon={<MdSupportAgent />} label="Reportes y Rutas" active={activeModule === 'atencion_cliente'} onClick={() => setActiveModule('atencion_cliente')} isOpen={isOpen} />
-                {/* NUEVO BOTÓN DIRECTORIO */}
                 <MenuButton icon={<MdPeopleAlt />} label="Directorio Clientes" active={activeModule === 'atencion_directorio'} onClick={() => setActiveModule('atencion_directorio')} isOpen={isOpen} />
+                
+                {/* --- NUEVO BOTÓN: APP MÓVIL --- */}
+                <MenuButton icon={<MdPhoneIphone />} label="App Técnico (Móvil)" active={activeModule === 'tecnico_movil'} onClick={() => setActiveModule('tecnico_movil')} isOpen={isOpen} />
             </>
           )}
 
-          {/* SECCIÓN: OPERACIONES */}
           <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
           <SectionTitle label="Operaciones" isOpen={isOpen} />
-          
           {verDashboard && <MenuButton icon={<MdDashboard />} label="Dashboard" active={activeModule === 'marketing_dashboard'} onClick={() => setActiveModule('marketing_dashboard')} isOpen={isOpen} />}
           {verVentas && <MenuButton icon={<MdAttachMoney />} label="Ventas" active={activeModule === 'marketing_ventas'} onClick={() => setActiveModule('marketing_ventas')} isOpen={isOpen} />}
           {verCobertura && <MenuButton icon={<MdMap />} label="Cobertura" active={activeModule === 'marketing_cobertura'} onClick={() => setActiveModule('marketing_cobertura')} isOpen={isOpen} />}
           {verMesa && <MenuButton icon={<MdFactCheck />} label="Mesa de Control" active={activeModule === 'marketing_mesa'} onClick={() => setActiveModule('marketing_mesa')} isOpen={isOpen} />}
 
-          {/* SECCIÓN: LOGÍSTICA */}
           {verAlmacen && (
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
@@ -104,7 +90,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             </>
           )}
 
-          {/* SECCIÓN: MARKETING */}
           {verSeccionMarketing && (
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
@@ -119,7 +104,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             </>
           )}
           
-          {/* SECCIÓN: RRHH */}
           {verSeccionRRHH && (
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
@@ -130,7 +114,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             </>
           )}
           
-          {/* SECCIÓN: SOPORTE */}
           {verSoporte && (
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
@@ -141,7 +124,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
 
         </nav>
 
-        {/* PERFIL USUARIO */}
         <div className={`p-4 mx-4 mb-4 bg-gray-50 rounded-3xl flex items-center gap-3 transition-all border border-gray-100 ${!isOpen && 'md:justify-center md:px-0 md:mx-2'}`}>
             <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 shrink-0 overflow-hidden shadow-sm">
                 {usuario.foto ? <img src={usuario.foto} className="w-full h-full object-cover"/> : <FaUserCircle className="text-xl" />}
@@ -159,7 +141,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
   );
 }
 
-// Subcomponente de Botón (Optimizado)
 function MenuButton({ icon, label, active, onClick, isOpen }) {
   return (
     <button 
