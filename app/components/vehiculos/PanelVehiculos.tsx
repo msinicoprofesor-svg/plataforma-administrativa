@@ -4,7 +4,9 @@
 'use client';
 import { useState } from 'react';
 import { MdDirectionsCar, MdBuild, MdListAlt } from 'react-icons/md';
-import { useVehiculos } from '../../../hooks/useVehiculos';
+
+// CORRECCIÓN: Eran solo dos saltos (../../) no tres (../../../)
+import { useVehiculos } from '../../hooks/useVehiculos';
 
 export default function PanelVehiculos({ usuarioActivo }) {
     const { vehiculos, loading } = useVehiculos();
@@ -27,7 +29,7 @@ export default function PanelVehiculos({ usuarioActivo }) {
                 </div>
             </div>
 
-            {/* ÁREA DE TRABAJO (Aquí inyectaremos la Fase 3 después) */}
+            {/* ÁREA DE TRABAJO */}
             <div className="flex-1 bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 flex flex-col items-center justify-center text-center">
                 <div className="w-24 h-24 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner animate-pulse">
                     <MdDirectionsCar />
