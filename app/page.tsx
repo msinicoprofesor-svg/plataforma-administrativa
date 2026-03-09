@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/page.tsx (CONECTADO A APP TÉCNICO)                            */
+/* ARCHIVO: app/page.tsx (ACTUALIZADO: MEMORIA LOCAL Y SCROLL MÓVIL)          */
 /* -------------------------------------------------------------------------- */
 'use client';
 
@@ -29,7 +29,6 @@ import PanelSocial from './components/marketing/social/PanelSocial';
 
 import PanelAtencionCliente from './components/atencion-cliente/PanelAtencionCliente';
 import DirectorioClientes from './components/atencion-cliente/views/DirectorioClientes'; 
-// --- IMPORTACIÓN DEL NUEVO MÓDULO MÓVIL ---
 import DashboardTecnico from './components/tecnico/DashboardTecnico'; 
 
 import Directorio from './components/rrhh/Directorio';
@@ -43,7 +42,24 @@ import PanelVentas from './components/ventas/PanelVentas';
 export default function Home() {
   const auth = useUsuarios(); 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeModule, setActiveModule] = useState('dashboard'); 
+  
+  // --- MAGIA 1: MEMORIA PERSISTENTE PARA EL MÓDULO ACTIVO ---
+  const [activeModuleState, setActiveModuleState] = useState('dashboard'); 
+
+  useEffect(() => {
+    // Al cargar la página, leemos si había un módulo guardado en la memoria del navegador
+    const moduloGuardado = localStorage.getItem('javak_modulo_activo');
+    if (moduloGuardado) {
+        setActiveModuleState(moduloGuardado);
+    }
+  }, []);
+
+  // Función interceptora que actualiza la RAM y el Disco Duro del navegador al mismo tiempo
+  const setActiveModule = (modulo) => {
+      setActiveModuleState(modulo);
+      localStorage.setItem('javak_modulo_activo', modulo);
+  };
+  const activeModule = activeModuleState;
   
   const [emailInput, setEmailInput] = useState('');
   const [passInput, setPassInput] = useState('');
@@ -104,7 +120,8 @@ export default function Home() {
   const esMarketingFull = u && ROLES_TIENDA_FULL.includes(u.rol);
 
   useEffect(() => {
-    if (u) {
+    // Si acaba de iniciar sesión por primera vez y no hay nada en localStorage
+    if (u && !localStorage.getItem('javak_modulo_activo')) {
         if (tienePermiso(u, 'marketing_ventas') && !tienePermiso(u, 'marketing_dashboard')) {
             setActiveModule('marketing_ventas');
         } else if (activeModule === 'dashboard') {
@@ -129,6 +146,7 @@ export default function Home() {
   const handleLogout = () => {
     auth.logout();
     setActiveModule('dashboard');
+    localStorage.removeItem('javak_modulo_activo'); // Limpiamos la memoria al salir
   };
 
   const descontarPuntos = (idColaborador, puntos) => {
@@ -200,10 +218,16 @@ export default function Home() {
     );
   }
 
+  // --- MAGIA 2: ARREGLO DE SCROLL PARA APP MÓVIL ---
   const isLikeStore = activeModule === 'likestore';
-  // Modificamos esto para que la vista del técnico ocupe todo el espacio de forma limpia
   const isTecnicoMovil = activeModule === 'tecnico_movil';
-  const mainContainerClasses = (isLikeStore || isTecnicoMovil) ? "flex-1 overflow-hidden w-full h-full relative p-0 bg-gray-100" : "flex-1 overflow-y-auto px-4 md:px-8 pb-20 md:pb-8 custom-scrollbar w-full";
+  
+  // Separamos las clases: LikeStore es oculta (hidden), Tecnico permite scroll libre (auto)
+  const mainContainerClasses = isLikeStore 
+    ? "flex-1 overflow-hidden w-full h-full relative p-0 bg-gray-100" 
+    : isTecnicoMovil 
+        ? "flex-1 overflow-y-auto w-full h-full relative p-0 bg-gray-100 custom-scrollbar" 
+        : "flex-1 overflow-y-auto px-4 md:px-8 pb-20 md:pb-8 custom-scrollbar w-full";
 
   return (
     <div className="flex h-screen bg-[#F5F7FA] font-sans text-gray-900 overflow-hidden relative">
@@ -237,7 +261,6 @@ export default function Home() {
                 </div>
             )}
 
-            {/* --- SECCIÓN: APP TÉCNICO MÓVIL (NUEVA) --- */}
             {activeModule === 'tecnico_movil' && verAtencionCliente && (
                 <div className="animate-fade-in h-full w-full">
                     <DashboardTecnico tecnicoId={u?.id || "1"} />
