@@ -2,10 +2,10 @@
 /* ARCHIVO: app/components/vehiculos/PanelVehiculos.tsx                       */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { 
     MdDirectionsCar, MdAdd, MdClose, MdCheckCircle, MdEngineering, 
-    MdOutlineFormatColorFill, MdConfirmationNumber, MdShield, MdListAlt 
+    MdOutlineFormatColorFill, MdConfirmationNumber, MdShield, MdListAlt, MdPhotoCamera 
 } from 'react-icons/md';
 import { FaCarSide, FaTruckPickup, FaMotorcycle } from 'react-icons/fa';
 
@@ -17,12 +17,15 @@ export default function PanelVehiculos({ usuarioActivo }) {
     const ROLES_ADMIN = ['GERENTE_MKT', 'DIRECTOR', 'GERENTE_GENERAL', 'SOPORTE_GENERAL'];
     const esEncargado = ROLES_ADMIN.includes(usuarioActivo?.rol);
 
-    // Estados de la Interfaz
     const [filtroEstado, setFiltroEstado] = useState('TODOS');
     const [modalAbierto, setModalAbierto] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Formulario
+    // Estados para la carga de fotografía
+    const [imagenFile, setImagenFile] = useState(null);
+    const [imagenPreview, setImagenPreview] = useState(null);
+    const fileInputRef = useRef(null);
+
     const [formData, setFormData] = useState({
         marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff',
         placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta'
@@ -30,25 +33,48 @@ export default function PanelVehiculos({ usuarioActivo }) {
 
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-    const handleGuardar = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        const res = await agregarVehiculo(formData);
-        setIsSubmitting(false);
-        if (res.success) {
-            setModalAbierto(false);
-            setFormData({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff', placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta' });
+    // Carga la vista previa en el navegador antes de subir
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImagenFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => setImagenPreview(reader.result);
+            reader.readAsDataURL(file);
         }
     };
 
-    // Función Inteligente: Retorna la silueta correcta pintada del color real
-    const RenderMiniatura = ({ tipo, color }) => {
+    const handleGuardar = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        // Le pasamos la info y la foto
+        const res = await agregarVehiculo(formData, imagenFile);
+        setIsSubmitting(false);
+        
+        if (res.success) {
+            setModalAbierto(false);
+            setFormData({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff', placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta' });
+            setImagenFile(null);
+            setImagenPreview(null);
+        }
+    };
+
+    // Componente Inteligente: Muestra la foto real o un "Placeholder" si no hay foto
+    const RenderMiniatura = ({ tipo, color, url }) => {
+        if (url) {
+            return (
+                <div className="h-40 w-full relative overflow-hidden bg-gray-100 rounded-t-[2rem]">
+                    <img src={url} alt="Vehículo" className="w-full h-full object-cover" />
+                </div>
+            );
+        }
+        
+        // Si registraron un auto viejo sin foto, le mostramos el ícono gris opaco
         const style = { color: color || '#94a3b8', filter: 'drop-shadow(0px 10px 8px rgba(0,0,0,0.15))' };
         return (
-            <div className="h-32 flex items-center justify-center w-full relative overflow-hidden bg-gradient-to-b from-gray-50 to-gray-100/50 rounded-t-[2rem]">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/60 via-transparent to-transparent"></div>
-                <div className="relative z-10 transform hover:scale-110 transition-transform duration-500">
-                    {tipo === 'auto' ? <FaCarSide style={style} className="text-8xl" /> :
+            <div className="h-40 flex items-center justify-center w-full relative overflow-hidden bg-gradient-to-b from-gray-50 to-gray-100/50 rounded-t-[2rem]">
+                <div className="relative z-10 transform scale-90 opacity-50">
+                    {tipo === 'auto' || tipo === 'hatchback' ? <FaCarSide style={style} className="text-8xl" /> :
                      tipo === 'moto' ? <FaMotorcycle style={style} className="text-8xl" /> :
                      <FaTruckPickup style={style} className="text-8xl" />}
                 </div>
@@ -69,7 +95,6 @@ export default function PanelVehiculos({ usuarioActivo }) {
     return (
         <div className="h-full flex flex-col space-y-6 animate-fade-in pb-10">
             
-            {/* ENCABEZADO Y ESTADÍSTICAS */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 shrink-0">
                 <div>
                     <h2 className="text-xl font-black text-gray-800 flex items-center gap-2 uppercase tracking-wide">
@@ -96,7 +121,6 @@ export default function PanelVehiculos({ usuarioActivo }) {
                 </div>
             </div>
 
-            {/* GRILLA DE VEHÍCULOS */}
             <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
                 {loading ? (
                     <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div></div>
@@ -110,7 +134,7 @@ export default function PanelVehiculos({ usuarioActivo }) {
                         {vehiculosFiltrados.map(v => (
                             <div key={v.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col overflow-hidden group">
                                 
-                                {/* MINIATURA DINÁMICA */}
+                                {/* FOTO DEL VEHÍCULO */}
                                 <div className="relative">
                                     <div className="absolute top-4 right-4 z-20">
                                         <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-sm border ${
@@ -121,10 +145,9 @@ export default function PanelVehiculos({ usuarioActivo }) {
                                             {v.estado.replace('_', ' ')}
                                         </span>
                                     </div>
-                                    <RenderMiniatura tipo={v.tipo_vehiculo} color={v.color} />
+                                    <RenderMiniatura tipo={v.tipo_vehiculo} color={v.color} url={v.imagen_url} />
                                 </div>
 
-                                {/* INFO DEL VEHÍCULO */}
                                 <div className="p-5 flex-1 flex flex-col">
                                     <h3 className="text-lg font-black text-gray-900 leading-tight mb-1">{v.marca} {v.modelo}</h3>
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Año {v.anio}</p>
@@ -140,7 +163,6 @@ export default function PanelVehiculos({ usuarioActivo }) {
                                         </div>
                                     </div>
 
-                                    {/* BOTONES DE ACCIÓN RÁPIDA (Para más adelante) */}
                                     <div className="grid grid-cols-2 gap-2 mt-auto">
                                         <button className="py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5">
                                             <MdListAlt className="text-sm"/> Bitácora
@@ -156,19 +178,48 @@ export default function PanelVehiculos({ usuarioActivo }) {
                 )}
             </div>
 
-            {/* MODAL DE REGISTRO DE VEHÍCULO */}
+            {/* MODAL DE REGISTRO */}
             {modalAbierto && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
                         
                         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                             <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdDirectionsCar className="text-blue-600"/> Alta de Vehículo</h3>
-                            <button onClick={() => setModalAbierto(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
+                            <button onClick={() => {
+                                setModalAbierto(false);
+                                setImagenPreview(null);
+                                setImagenFile(null);
+                            }} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                             <form id="formVehiculo" onSubmit={handleGuardar} className="space-y-6">
                                 
+                                {/* CAJA DE SUBIDA DE FOTO */}
+                                <div className="flex flex-col items-center justify-center mb-6">
+                                    <div 
+                                        onClick={() => fileInputRef.current.click()}
+                                        className="w-full h-40 bg-gray-50 hover:bg-gray-100 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden"
+                                    >
+                                        {imagenPreview ? (
+                                            <img src={imagenPreview} alt="Preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <>
+                                                <MdPhotoCamera className="text-4xl text-gray-400 mb-2" />
+                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Subir Foto del Vehículo</span>
+                                                <span className="text-[10px] font-medium text-gray-400 mt-1">Formatos recomendados: JPG, PNG</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        ref={fileInputRef} 
+                                        onChange={handleImageChange} 
+                                    />
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Marca</label>
@@ -190,11 +241,13 @@ export default function PanelVehiculos({ usuarioActivo }) {
                                         <select name="tipo_vehiculo" value={formData.tipo_vehiculo} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 cursor-pointer">
                                             <option value="camioneta">Camioneta</option>
                                             <option value="auto">Auto Sedán</option>
+                                            <option value="hatchback">Hatchback</option>
+                                            <option value="van">Van / Furgoneta</option>
                                             <option value="moto">Motocicleta</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Color (Para miniatura)</label>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Color Básico</label>
                                         <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 focus-within:border-blue-500 transition-colors">
                                             <MdOutlineFormatColorFill className="text-gray-400 text-lg ml-2"/>
                                             <input type="color" name="color" value={formData.color} onChange={handleChange} className="w-full h-8 cursor-pointer bg-transparent border-none outline-none rounded" />
@@ -225,7 +278,7 @@ export default function PanelVehiculos({ usuarioActivo }) {
 
                         <div className="p-6 border-t border-gray-100 bg-white">
                             <button form="formVehiculo" type="submit" disabled={isSubmitting} className="w-full bg-green-500 hover:bg-green-600 text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/30 active:scale-95 disabled:opacity-50">
-                                {isSubmitting ? 'Guardando en BD...' : <><MdCheckCircle className="text-xl"/> Registrar Vehículo</>}
+                                {isSubmitting ? 'Guardando y Subiendo Foto...' : <><MdCheckCircle className="text-xl"/> Registrar Vehículo</>}
                             </button>
                         </div>
                     </div>
