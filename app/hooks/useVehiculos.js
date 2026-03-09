@@ -23,9 +23,22 @@ export function useVehiculos() {
         setLoading(false);
     };
 
+    // NUEVO: Función para registrar vehículos en Supabase
+    const agregarVehiculo = async (nuevoVehiculo) => {
+        const { error } = await supabase.from('vehiculos').insert([nuevoVehiculo]);
+        if (!error) {
+            await fetchVehiculos();
+            return { success: true };
+        } else {
+            console.error("Error al agregar vehículo:", error);
+            alert(`Error al registrar: ${error.message}`);
+            return { success: false, error };
+        }
+    };
+
     useEffect(() => {
         fetchVehiculos();
     }, []);
 
-    return { vehiculos, loading, refetch: fetchVehiculos };
+    return { vehiculos, loading, agregarVehiculo, refetch: fetchVehiculos };
 }

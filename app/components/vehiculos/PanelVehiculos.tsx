@@ -3,22 +3,74 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react';
-import { MdDirectionsCar, MdBuild, MdListAlt } from 'react-icons/md';
+import { 
+    MdDirectionsCar, MdAdd, MdClose, MdCheckCircle, MdEngineering, 
+    MdOutlineFormatColorFill, MdConfirmationNumber, MdShield 
+} from 'react-icons/md';
+import { FaCarSide, FaTruckPickup, FaMotorcycle } from 'react-icons/fa';
 
-// CORRECCIÓN: Eran solo dos saltos (../../) no tres (../../../)
 import { useVehiculos } from '../../hooks/useVehiculos';
 
 export default function PanelVehiculos({ usuarioActivo }) {
-    const { vehiculos, loading } = useVehiculos();
+    const { vehiculos, loading, agregarVehiculo } = useVehiculos();
     
-    // Por ahora validamos de forma general si tiene un rol administrativo
     const ROLES_ADMIN = ['GERENTE_MKT', 'DIRECTOR', 'GERENTE_GENERAL', 'SOPORTE_GENERAL'];
     const esEncargado = ROLES_ADMIN.includes(usuarioActivo?.rol);
 
+    // Estados de la Interfaz
+    const [filtroEstado, setFiltroEstado] = useState('TODOS');
+    const [modalAbierto, setModalAbierto] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Formulario
+    const [formData, setFormData] = useState({
+        marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff',
+        placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta'
+    });
+
+    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+    const handleGuardar = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        const res = await agregarVehiculo(formData);
+        setIsSubmitting(false);
+        if (res.success) {
+            setModalAbierto(false);
+            setFormData({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff', placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta' });
+        }
+    };
+
+    // Función Inteligente: Retorna la silueta correcta pintada del color real
+    const RenderMiniatura = ({ tipo, color }) => {
+        const style = { color: color || '#94a3b8', filter: 'drop-shadow(0px 10px 8px rgba(0,0,0,0.15))' };
+        return (
+            <div className="h-32 flex items-center justify-center w-full relative overflow-hidden bg-gradient-to-b from-gray-50 to-gray-100/50 rounded-t-[2rem]">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/60 via-transparent to-transparent"></div>
+                <div className="relative z-10 transform hover:scale-110 transition-transform duration-500">
+                    {tipo === 'auto' ? <FaCarSide style={style} className="text-8xl" /> :
+                     tipo === 'moto' ? <FaMotorcycle style={style} className="text-8xl" /> :
+                     <FaTruckPickup style={style} className="text-8xl" />}
+                </div>
+            </div>
+        );
+    };
+
+    const vehiculosFiltrados = filtroEstado === 'TODOS' 
+        ? vehiculos 
+        : vehiculos.filter(v => v.estado === filtroEstado);
+
+    const stats = {
+        disponibles: vehiculos.filter(v => v.estado === 'DISPONIBLE').length,
+        ruta: vehiculos.filter(v => v.estado === 'EN_RUTA').length,
+        taller: vehiculos.filter(v => v.estado === 'TALLER').length,
+    };
+
     return (
         <div className="h-full flex flex-col space-y-6 animate-fade-in pb-10">
-            {/* ENCABEZADO */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+            
+            {/* ENCABEZADO Y ESTADÍSTICAS */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 shrink-0">
                 <div>
                     <h2 className="text-xl font-black text-gray-800 flex items-center gap-2 uppercase tracking-wide">
                         <MdDirectionsCar className="text-blue-600 text-2xl" /> Control Vehicular
@@ -27,18 +79,159 @@ export default function PanelVehiculos({ usuarioActivo }) {
                         {esEncargado ? 'Panel de Administración de Flotilla' : 'Panel de Usuario y Bitácora'}
                     </p>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50">
+                        <button onClick={() => setFiltroEstado('TODOS')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TODOS' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Todos ({vehiculos.length})</button>
+                        <button onClick={() => setFiltroEstado('DISPONIBLE')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'DISPONIBLE' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-green-600'}`}>Disponibles ({stats.disponibles})</button>
+                        <button onClick={() => setFiltroEstado('EN_RUTA')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'EN_RUTA' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-blue-600'}`}>En Ruta ({stats.ruta})</button>
+                        <button onClick={() => setFiltroEstado('TALLER')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TALLER' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-orange-600'}`}>Taller ({stats.taller})</button>
+                    </div>
+
+                    {esEncargado && (
+                        <button onClick={() => setModalAbierto(true)} className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95">
+                            <MdAdd className="text-lg"/> Nuevo Vehículo
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* ÁREA DE TRABAJO */}
-            <div className="flex-1 bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 flex flex-col items-center justify-center text-center">
-                <div className="w-24 h-24 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner animate-pulse">
-                    <MdDirectionsCar />
-                </div>
-                <h3 className="text-lg font-black text-gray-800 mb-2">Módulo Conectado a Supabase</h3>
-                <p className="text-sm font-medium text-gray-500 max-w-md">
-                    La estructura base está lista. En el siguiente paso construiremos las miniaturas de los vehículos y la bitácora interactiva 3D.
-                </p>
+            {/* GRILLA DE VEHÍCULOS */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
+                {loading ? (
+                    <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div></div>
+                ) : vehiculosFiltrados.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <MdDirectionsCar className="text-6xl text-gray-200 mb-4"/>
+                        <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No hay vehículos registrados</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6">
+                        {vehiculosFiltrados.map(v => (
+                            <div key={v.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col overflow-hidden group">
+                                
+                                {/* MINIATURA DINÁMICA */}
+                                <div className="relative">
+                                    <div className="absolute top-4 right-4 z-20">
+                                        <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-sm border ${
+                                            v.estado === 'DISPONIBLE' ? 'bg-green-50 text-green-600 border-green-200' :
+                                            v.estado === 'EN_RUTA' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                            'bg-orange-50 text-orange-600 border-orange-200'
+                                        }`}>
+                                            {v.estado.replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                    <RenderMiniatura tipo={v.tipo_vehiculo} color={v.color} />
+                                </div>
+
+                                {/* INFO DEL VEHÍCULO */}
+                                <div className="p-5 flex-1 flex flex-col">
+                                    <h3 className="text-lg font-black text-gray-900 leading-tight mb-1">{v.marca} {v.modelo}</h3>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Año {v.anio}</p>
+                                    
+                                    <div className="bg-gray-50 rounded-2xl p-3 grid grid-cols-2 gap-3 mb-4 flex-1 border border-gray-100">
+                                        <div>
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">Placas</p>
+                                            <p className="text-xs font-black text-gray-700">{v.placas}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">Póliza Seguro</p>
+                                            <p className="text-xs font-black text-gray-700 truncate">{v.poliza || 'S/N'}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* BOTONES DE ACCIÓN RÁPIDA (Para más adelante) */}
+                                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                                        <button className="py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5">
+                                            <MdListAlt className="text-sm"/> Bitácora
+                                        </button>
+                                        <button className="py-2.5 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5">
+                                            <MdEngineering className="text-sm"/> Taller
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
+
+            {/* MODAL DE REGISTRO DE VEHÍCULO */}
+            {modalAbierto && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
+                        
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdDirectionsCar className="text-blue-600"/> Alta de Vehículo</h3>
+                            <button onClick={() => setModalAbierto(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                            <form id="formVehiculo" onSubmit={handleGuardar} className="space-y-6">
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Marca</label>
+                                        <input required name="marca" value={formData.marca} onChange={handleChange} placeholder="Ej. Nissan, Chevrolet" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Modelo</label>
+                                        <input required name="modelo" value={formData.modelo} onChange={handleChange} placeholder="Ej. NP300, Beat" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Año</label>
+                                        <input required type="number" name="anio" value={formData.anio} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Tipo</label>
+                                        <select name="tipo_vehiculo" value={formData.tipo_vehiculo} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 cursor-pointer">
+                                            <option value="camioneta">Camioneta</option>
+                                            <option value="auto">Auto Sedán</option>
+                                            <option value="moto">Motocicleta</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Color (Para miniatura)</label>
+                                        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 focus-within:border-blue-500 transition-colors">
+                                            <MdOutlineFormatColorFill className="text-gray-400 text-lg ml-2"/>
+                                            <input type="color" name="color" value={formData.color} onChange={handleChange} className="w-full h-8 cursor-pointer bg-transparent border-none outline-none rounded" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-5">
+                                    <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-2">Datos Legales / Operativos</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdConfirmationNumber/> Placas</label>
+                                            <input required name="placas" value={formData.placas} onChange={handleChange} placeholder="Ej. GTO-1234" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-gray-800 uppercase outline-none focus:border-blue-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Niv. / Número de Serie</label>
+                                            <input required name="serie" value={formData.serie} onChange={handleChange} placeholder="17 Caracteres" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 uppercase outline-none focus:border-blue-500" />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdShield/> Número Póliza Seguro</label>
+                                            <input name="poliza" value={formData.poliza} onChange={handleChange} placeholder="Opcional" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </form>
+                        </div>
+
+                        <div className="p-6 border-t border-gray-100 bg-white">
+                            <button form="formVehiculo" type="submit" disabled={isSubmitting} className="w-full bg-green-500 hover:bg-green-600 text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/30 active:scale-95 disabled:opacity-50">
+                                {isSubmitting ? 'Guardando en BD...' : <><MdCheckCircle className="text-xl"/> Registrar Vehículo</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }
