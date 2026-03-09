@@ -320,10 +320,13 @@ export default function Home() {
                 </div>
             )}
 
-            {/* --- SECCIÓN: FLOTILLA VEHICULAR --- */}
+           {/* --- SECCIÓN: FLOTILLA VEHICULAR --- */}
             {activeModule === 'vehiculos_panel' && (
                 <div className="animate-slide-up h-full pb-10">
-                    <PanelVehiculos usuarioActivo={u} />
+                    <PanelVehiculos 
+                        usuarioActivo={u} 
+                        colaboradores={colaboradoresReales} 
+                    />
                 </div>
             )}
 
