@@ -5,16 +5,14 @@
 import { useState } from 'react';
 import { 
     MdPhone, MdMap, MdCheckCircle, MdAccessTime, MdWarning, 
-    MdDirectionsCar, MdHomeRepairService, MdLocationOn, MdCheck 
+    MdDirectionsCar, MdHomeRepairService, MdLocationOn, MdCheck, MdMenu 
 } from "react-icons/md";
 
-// Importamos el cerebro que creamos exclusivamente para ellos
 import { useRutaTecnico } from '../../../hooks/useRutaTecnico';
 
 export default function VistaMovil({ tecnicoId }) {
     const { miRuta, loading, actualizarEstadoEnCampo } = useRutaTecnico(tecnicoId);
     
-    // Estados para el Modal de Cierre de Ticket
     const [ticketCerrando, setTicketCerrando] = useState(null);
     const [notasCierre, setNotasCierre] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,13 +27,17 @@ export default function VistaMovil({ tecnicoId }) {
         }
     };
 
-    const abrirNavegacion = (lat, lng, direccion) => {
-        if (lat && lng) {
-            // Abre Google Maps con el pin exacto
-            window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+    // --- NUEVA LÓGICA DE NAVEGACIÓN ---
+    const abrirNavegacion = (lat, lng, direccion, enlace_maps) => {
+        if (enlace_maps && enlace_maps.includes('http')) {
+            // Prioridad 1: El enlace original del cliente (Cero margen de error)
+            window.open(enlace_maps, '_blank');
+        } else if (lat && lng) {
+            // Prioridad 2: Coordenadas matemáticas de Supabase
+            window.open(`https://maps.google.com/?q=${lat},${lng}`, '_blank');
         } else {
-            // Si no hay coordenadas, busca la dirección por texto
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`, '_blank');
+            // Prioridad 3: Buscar la calle por texto
+            window.open(`https://maps.google.com/?q=${encodeURIComponent(direccion)}`, '_blank');
         }
     };
 
@@ -55,6 +57,12 @@ export default function VistaMovil({ tecnicoId }) {
         setNotasCierre('');
     };
 
+    const abrirMenuPrincipal = () => {
+        // Regresa el sistema al módulo de inicio y recarga para mostrar el menú lateral
+        localStorage.setItem('javak_modulo_activo', 'dashboard');
+        window.location.reload();
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 pb-20">
@@ -71,18 +79,27 @@ export default function VistaMovil({ tecnicoId }) {
                     <MdCheckCircle />
                 </div>
                 <h2 className="text-2xl font-black text-gray-800 mb-2">¡Ruta Completada!</h2>
-                <p className="text-sm font-medium text-gray-500">
+                <p className="text-sm font-medium text-gray-500 mb-8">
                     No tienes tickets pendientes asignados para el día de hoy. Excelente trabajo.
                 </p>
+                <button onClick={abrirMenuPrincipal} className="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center gap-2">
+                    <MdMenu /> Regresar al Menú
+                </button>
             </div>
         );
     }
 
     return (
         <div className="min-h-screen bg-gray-100 pb-24">
-            {/* HEADER MÓVIL */}
+            
+            {/* HEADER MÓVIL (Con botón de Hamburguesa) */}
             <div className="bg-white px-5 py-6 rounded-b-[2rem] shadow-sm sticky top-0 z-20 border-b border-gray-200">
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Tu hoja de ruta</p>
+                <div className="flex justify-between items-center mb-2">
+                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Tu hoja de ruta</p>
+                    <button onClick={abrirMenuPrincipal} className="w-10 h-10 bg-gray-50 flex items-center justify-center rounded-full text-gray-600 hover:bg-gray-200 transition-colors shadow-sm border border-gray-100">
+                        <MdMenu className="text-xl"/>
+                    </button>
+                </div>
                 <div className="flex justify-between items-end">
                     <h1 className="text-2xl font-black text-gray-900 leading-none">Mi Ruta Hoy</h1>
                     <span className="bg-gray-900 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-sm">
@@ -91,12 +108,10 @@ export default function VistaMovil({ tecnicoId }) {
                 </div>
             </div>
 
-            {/* LISTA DE TICKETS (TARJETAS) */}
             <div className="p-4 space-y-5 mt-2">
                 {miRuta.map((ticket, index) => (
                     <div key={ticket.id} className="bg-white rounded-[2rem] shadow-sm border border-gray-200 overflow-hidden relative">
                         
-                        {/* ALERTA DE ALMACÉN */}
                         {ticket.requiere_material && (
                             <div className="bg-orange-500 text-white text-[10px] font-black px-4 py-2 flex items-center gap-2 uppercase tracking-widest">
                                 <MdWarning className="text-base"/> Parada en almacén requerida
@@ -104,11 +119,11 @@ export default function VistaMovil({ tecnicoId }) {
                         )}
 
                         <div className="p-5">
-                            {/* ENCABEZADO DE LA TARJETA */}
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/30">
-                                        {ticket.orden || index + 1}
+                                        {/* NÚMERO VISUAL SECUENCIAL PERFECTO: 1, 2, 3... */}
+                                        {index + 1}
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{ticket.folio}</p>
@@ -122,7 +137,6 @@ export default function VistaMovil({ tecnicoId }) {
                                 </div>
                             </div>
 
-                            {/* DATOS DEL CLIENTE Y PROBLEMA */}
                             <h3 className="text-xl font-black text-gray-800 leading-tight mb-2">{ticket.cliente}</h3>
                             <p className="text-xs font-bold text-gray-500 flex items-start gap-1.5 mb-4">
                                 <MdLocationOn className="text-blue-500 text-base shrink-0 mt-0.5"/> 
@@ -137,10 +151,9 @@ export default function VistaMovil({ tecnicoId }) {
                                 )}
                             </div>
 
-                            {/* BOTONES DE ACCIÓN (Maps y Llamadas) */}
                             <div className="grid grid-cols-2 gap-3 mb-6">
                                 <button 
-                                    onClick={() => abrirNavegacion(ticket.latitud, ticket.longitud, ticket.direccion_texto)}
+                                    onClick={() => abrirNavegacion(ticket.latitud, ticket.longitud, ticket.direccion_texto, ticket.enlace_maps)}
                                     className="flex flex-col items-center justify-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 py-3 rounded-2xl transition-colors active:scale-95"
                                 >
                                     <MdMap className="text-2xl text-green-600"/>
@@ -163,7 +176,6 @@ export default function VistaMovil({ tecnicoId }) {
                                 )}
                             </div>
 
-                            {/* FLUJO DE ESTADOS (Botones Inteligentes) */}
                             <div className="pt-5 border-t border-gray-100">
                                 {ticket.estado === 'PENDIENTE' && (
                                     <button onClick={() => cambiarEstado(ticket.id, 'EN_RUTA')} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 shadow-md">
@@ -189,7 +201,6 @@ export default function VistaMovil({ tecnicoId }) {
                 ))}
             </div>
 
-            {/* MODAL DE CIERRE DE TICKET (PANTALLA COMPLETA) */}
             {ticketCerrando && (
                 <div className="fixed inset-0 z-50 bg-white flex flex-col animate-slide-up">
                     <div className="p-5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">

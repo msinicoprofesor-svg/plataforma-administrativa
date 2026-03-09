@@ -17,21 +17,20 @@ export function useRutaTecnico(tecnicoId) {
     const fetchMiRuta = async () => {
         setLoading(true);
         
-        // Solo traemos los tickets de HOY, asignados a ESTE técnico, que no estén resueltos
         const hoy = new Date().toISOString().split('T')[0];
 
         const { data, error } = await supabase
             .from('tickets')
             .select(`
                 *,
-                clientes (nombre_completo, telefono, telefono_adicional, direccion, comunidad)
+                clientes (nombre_completo, telefono, telefono_adicional, direccion, comunidad, coordenadas)
             `)
             .eq('tecnico_asignado_id', tecnicoId)
             .eq('fecha_agendada', hoy)
             .neq('estado', 'RESUELTO')
             .neq('estado', 'CANCELADO')
             .neq('estado', 'PAPELERA')
-            .order('orden_ruta', { ascending: true }); // MÁGIA: Respeta el orden de "Auto-Organizar"
+            .order('orden_ruta', { ascending: true }); // Sigue respetando el orden logístico
 
         if (!error && data) {
             const rutaFormateada = data.map(t => ({
@@ -42,6 +41,7 @@ export function useRutaTecnico(tecnicoId) {
                 direccion_texto: `${t.clientes?.direccion || ''}, ${t.clientes?.comunidad || ''}`.trim(),
                 latitud: t.latitud,
                 longitud: t.longitud,
+                enlace_maps: t.clientes?.coordenadas || null, // <-- NUEVO: Extraemos el enlace original
                 tipo_reporte: t.tipo_reporte,
                 prioridad: t.prioridad,
                 estado: t.estado,
@@ -58,7 +58,6 @@ export function useRutaTecnico(tecnicoId) {
         setLoading(false);
     };
 
-    // Función para que el técnico cambie su estado desde la calle
     const actualizarEstadoEnCampo = async (ticketId, nuevoEstado, notas = '') => {
         const payload = { estado: nuevoEstado };
         if (notas) payload.notas_resolucion = notas;
@@ -69,7 +68,7 @@ export function useRutaTecnico(tecnicoId) {
             .eq('id', ticketId);
 
         if (!error) {
-            await fetchMiRuta(); // Recargamos para que desaparezca si ya se resolvió
+            await fetchMiRuta(); 
             return { success: true };
         } else {
             alert("Hubo un problema de conexión al actualizar el ticket.");
