@@ -32,8 +32,9 @@ export default function PanelVehiculos({ usuarioActivo }) {
     const RenderMiniatura = ({ tipo, color, url }) => {
         if (url) {
             return (
-                <div className="h-40 w-full relative overflow-hidden bg-gray-100 rounded-t-[2rem]">
-                    <img src={url} alt="Vehículo" className="w-full h-full object-cover" />
+                // CORRECCIÓN: Fondo blanco puro, object-contain y padding para un look de "Showroom"
+                <div className="h-40 w-full relative overflow-hidden bg-white rounded-t-[2rem] flex items-center justify-center border-b border-gray-50">
+                    <img src={url} alt="Vehículo" className="w-full h-full object-contain p-2 hover:scale-105 transition-transform duration-500" />
                 </div>
             );
         }
@@ -44,6 +45,7 @@ export default function PanelVehiculos({ usuarioActivo }) {
                 <div className="relative z-10 transform scale-90 opacity-50">
                     {tipo === 'auto' || tipo === 'hatchback' ? <FaCarSide style={style} className="text-8xl" /> :
                      tipo === 'moto' ? <FaMotorcycle style={style} className="text-8xl" /> :
+                     tipo === 'van' ? <FaTruckPickup style={style} className="text-8xl" /> :
                      <FaTruckPickup style={style} className="text-8xl" />}
                 </div>
             </div>
@@ -101,7 +103,7 @@ export default function PanelVehiculos({ usuarioActivo }) {
                         {vehiculosFiltrados.map(v => (
                             <div key={v.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col overflow-hidden group">
                                 
-                                {/* FOTO DEL VEHÍCULO */}
+                                {/* FOTO DEL VEHÍCULO CORREGIDA */}
                                 <div className="relative">
                                     <div className="absolute top-4 right-4 z-20">
                                         <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-sm border ${
