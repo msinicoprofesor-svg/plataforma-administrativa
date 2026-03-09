@@ -23,11 +23,9 @@ export function useVehiculos() {
         setLoading(false);
     };
 
-    // MODIFICADO: Ahora recibe la información y el archivo de imagen físico
     const agregarVehiculo = async (nuevoVehiculo, imagenFile) => {
         let imagen_url = null;
 
-        // 1. Si hay foto, primero la subimos al Storage de Supabase
         if (imagenFile) {
             const fileExt = imagenFile.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -43,7 +41,6 @@ export function useVehiculos() {
                 return { success: false, error: uploadError };
             }
 
-            // 2. Obtenemos el enlace público de la foto recién subida
             const { data: publicUrlData } = supabase.storage
                 .from('vehiculos-fotos')
                 .getPublicUrl(filePath);
@@ -51,7 +48,6 @@ export function useVehiculos() {
             imagen_url = publicUrlData.publicUrl;
         }
 
-        // 3. Empaquetamos los datos y guardamos en la tabla
         const payload = { ...nuevoVehiculo };
         if (imagen_url) payload.imagen_url = imagen_url;
 
@@ -67,9 +63,27 @@ export function useVehiculos() {
         }
     };
 
+    // NUEVO: Función para que el administrador asigne o libere un vehículo
+    const asignarVehiculo = async (vehiculoId, responsableId) => {
+        // responsableId puede ser el ID del técnico, o "null" para liberarlo
+        const { error } = await supabase
+            .from('vehiculos')
+            .update({ responsable_id: responsableId })
+            .eq('id', vehiculoId);
+
+        if (!error) {
+            await fetchVehiculos();
+            return { success: true };
+        } else {
+            console.error("Error al asignar vehículo:", error);
+            alert(`Error al asignar: ${error.message}`);
+            return { success: false, error };
+        }
+    };
+
     useEffect(() => {
         fetchVehiculos();
     }, []);
 
-    return { vehiculos, loading, agregarVehiculo, refetch: fetchVehiculos };
+    return { vehiculos, loading, agregarVehiculo, asignarVehiculo, refetch: fetchVehiculos };
 }
