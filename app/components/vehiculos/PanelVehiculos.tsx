@@ -28,9 +28,9 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const [vehiculoAAsignar, setVehiculoAAsignar] = useState(null);
     const [busquedaAsignacion, setBusquedaAsignacion] = useState('');
 
-    const handleGuardar = async (formData, archivoFinal) => {
+    const handleGuardar = async (formData, archivoFinal, rendersFiles) => {
         setIsSubmitting(true);
-        const res = await agregarVehiculo(formData, archivoFinal);
+        const res = await agregarVehiculo(formData, archivoFinal, rendersFiles);
         setIsSubmitting(false);
         if (res.success) setModalAbierto(false);
     };

@@ -23,32 +23,45 @@ export function useVehiculos() {
         setLoading(false);
     };
 
-    const agregarVehiculo = async (nuevoVehiculo, imagenFile) => {
+    // MODIFICADO: Ahora recibe los renders interactivos como tercer parámetro
+    const agregarVehiculo = async (nuevoVehiculo, imagenFile, archivosRenders = {}) => {
         let imagen_url = null;
 
+        // 1. Subir la miniatura principal
         if (imagenFile) {
             const fileExt = imagenFile.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `vehiculos/${fileName}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('vehiculos-fotos')
-                .upload(filePath, imagenFile);
-
-            if (uploadError) {
-                console.error("Error subiendo foto:", uploadError);
-                alert(`Error al subir foto: ${uploadError.message}`);
-                return { success: false, error: uploadError };
+            const { error: uploadError } = await supabase.storage.from('vehiculos-fotos').upload(filePath, imagenFile);
+            if (!uploadError) {
+                const { data } = supabase.storage.from('vehiculos-fotos').getPublicUrl(filePath);
+                imagen_url = data.publicUrl;
+            } else {
+                console.error("Error subiendo foto principal:", uploadError);
             }
-
-            const { data: publicUrlData } = supabase.storage
-                .from('vehiculos-fotos')
-                .getPublicUrl(filePath);
-
-            imagen_url = publicUrlData.publicUrl;
         }
 
-        const payload = { ...nuevoVehiculo };
+        // 2. Subir los renders interactivos (si existen)
+        const urlsRenders = {};
+        for (const [key, file] of Object.entries(archivosRenders)) {
+            if (file) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `render-${key}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+                const filePath = `vehiculos/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage.from('vehiculos-fotos').upload(filePath, file);
+                if (!uploadError) {
+                    const { data } = supabase.storage.from('vehiculos-fotos').getPublicUrl(filePath);
+                    urlsRenders[key] = data.publicUrl;
+                } else {
+                    console.error(`Error subiendo render ${key}:`, uploadError);
+                }
+            }
+        }
+
+        // 3. Empaquetar todo
+        const payload = { ...nuevoVehiculo, ...urlsRenders };
         if (imagen_url) payload.imagen_url = imagen_url;
 
         const { error } = await supabase.from('vehiculos').insert([payload]);
@@ -63,14 +76,8 @@ export function useVehiculos() {
         }
     };
 
-    // NUEVO: Función para que el administrador asigne o libere un vehículo
     const asignarVehiculo = async (vehiculoId, responsableId) => {
-        // responsableId puede ser el ID del técnico, o "null" para liberarlo
-        const { error } = await supabase
-            .from('vehiculos')
-            .update({ responsable_id: responsableId })
-            .eq('id', vehiculoId);
-
+        const { error } = await supabase.from('vehiculos').update({ responsable_id: responsableId }).eq('id', vehiculoId);
         if (!error) {
             await fetchVehiculos();
             return { success: true };
@@ -81,9 +88,7 @@ export function useVehiculos() {
         }
     };
 
-    useEffect(() => {
-        fetchVehiculos();
-    }, []);
+    useEffect(() => { fetchVehiculos(); }, []);
 
     return { vehiculos, loading, agregarVehiculo, asignarVehiculo, refetch: fetchVehiculos };
 }
