@@ -13,14 +13,12 @@ import { FaCarSide, FaTruckPickup, FaMotorcycle, FaUserCircle } from 'react-icon
 import { useVehiculos } from '../../hooks/useVehiculos';
 import ModalVehiculo from './ModalVehiculo';
 import ChecklistDiario from './ChecklistDiario';
-// NUEVOS IMPORT:
+
+// IMPORTS DE LA FASE 3
 import TerminarRuta from './TerminarRuta';
 import ReportarPercance from './ReportarPercance';
 
-
-
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
-    // Agregamos 'refetch' para actualizar la vista en tiempo real
     const { vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo, refetch } = useVehiculos();
     
     const ROLES_ADMIN = ['GERENTE_MKT', 'DIRECTOR', 'GERENTE_GENERAL', 'SOPORTE_GENERAL'];
@@ -34,8 +32,6 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const [isViewOnly, setIsViewOnly] = useState(false);
 
     const [modoChecklist, setModoChecklist] = useState(false);
-    
-    // Estados para los nuevos flujos del conductor
     const [modoTerminarRuta, setModoTerminarRuta] = useState(false);
     const [modoPercance, setModoPercance] = useState(false);
 
@@ -104,7 +100,6 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     if (!esEncargado) {
         const miVehiculo = vehiculos.find(v => v.responsable_id === usuarioActivo?.id);
 
-        // 1. SI NO TIENE VEHÍCULO
         if (!miVehiculo) {
             return (
                 <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
@@ -115,12 +110,15 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
             );
         }
 
-        // 2. SI ESTÁ EN RUTA (NUEVO DASHBOARD CORPORATIVO)
         if (miVehiculo.estado === 'EN_RUTA') {
             
-            // FASE 3: Aquí cargaremos los componentes <TerminarRuta /> y <ReportarPercance />
-            if (modoTerminarRuta) return <div className="p-10 text-center"><h1 className="text-2xl font-black">Módulo Terminar Ruta</h1><p>En construcción (Fase 3)</p><button onClick={() => setModoTerminarRuta(false)} className="mt-5 text-blue-500 underline">Volver</button></div>;
-            if (modoPercance) return <div className="p-10 text-center"><h1 className="text-2xl font-black">Módulo Percances</h1><p>En construcción (Fase 3)</p><button onClick={() => setModoPercance(false)} className="mt-5 text-blue-500 underline">Volver</button></div>;
+            // CONEXIÓN REAL DE COMPONENTES
+            if (modoTerminarRuta) {
+                return <TerminarRuta vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onVolver={() => setModoTerminarRuta(false)} onCompletado={() => { setModoTerminarRuta(false); refetch(); }} />;
+            }
+            if (modoPercance) {
+                return <ReportarPercance vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onVolver={() => setModoPercance(false)} onCompletado={() => { setModoPercance(false); refetch(); }} />;
+            }
 
             return (
                 <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
@@ -139,9 +137,7 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
             );
         }
 
-        // 3. SI ESTÁ DISPONIBLE (ESPERANDO CHECKLIST)
         if (modoChecklist) {
-            // Al completarse, refetch() actualizará la BD y miVehiculo.estado cambiará a EN_RUTA automáticamente
             return <ChecklistDiario vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onCompletado={() => { setModoChecklist(false); refetch(); }} />;
         }
 
@@ -261,8 +257,7 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                                                 Asignar Auto
                                             </button>
                                         )}
-                                        {/* MODIFICADO: Conectado temporalmente a Fase 3 */}
-                                        <button onClick={() => alert("Módulo de Historial de Bitácoras en construcción (Fase 3)")} className="py-2.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 border border-gray-200">
+                                        <button onClick={() => alert("Módulo de Historial de Bitácoras en construcción (Siguiente Fase)")} className="py-2.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 border border-gray-200">
                                             <MdListAlt className="text-sm"/> Bitácora
                                         </button>
                                     </div>
