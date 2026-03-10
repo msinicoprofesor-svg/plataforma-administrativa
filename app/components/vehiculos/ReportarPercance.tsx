@@ -135,4 +135,10 @@ export default function ReportarPercance({ vehiculoId, usuarioId, onVolver, onCo
             </div>
 
             <div className="fixed bottom-0 left-0 right-0 p-5 bg-white/80 backdrop-blur-md border-t border-gray-100 pb-safe z-[110]">
-                <button onClick={handleGuardar} disabled={loading} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale
+                <button onClick={handleGuardar} disabled={loading} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 shadow-xl shadow-red-500/30 disabled:opacity-50 transition-all">
+                    {loading ? 'Enviando Alerta...' : 'Enviar Reporte de Percance'}
+                </button>
+            </div>
+        </div>
+    );
+}
