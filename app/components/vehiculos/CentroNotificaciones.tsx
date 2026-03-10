@@ -3,7 +3,7 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useEffect } from 'react';
-import { MdClose, MdNotifications, MdWarning, MdBuild, MdInventory, MdDirectionsCar } from 'react-icons/md';
+import { MdClose, MdNotifications, MdWarning, MdBuild, MdInventory, MdDirectionsCar, MdCheckCircle } from 'react-icons/md'; // <--- CORRECCIÓN AQUÍ
 import { supabase } from '../../lib/supabase';
 
 export default function CentroNotificaciones({ isOpen, onClose }) {
