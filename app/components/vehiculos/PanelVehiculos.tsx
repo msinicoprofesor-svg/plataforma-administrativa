@@ -7,7 +7,7 @@ import {
     MdDirectionsCar, MdAdd, MdListAlt, MdCheckCircle, 
     MdPersonAdd, MdPersonOff, MdLockOutline, MdClose, MdSearch,
     MdEdit, MdVisibility, MdDelete, MdWarning, MdHistory, MdLocalGasStation,
-    MdBuild // <--- NUEVO ICONO AÑADIDO
+    MdBuild, MdNotifications // <--- NUEVO ICONO AÑADIDO
 } from 'react-icons/md';
 import { FaCarSide, FaTruckPickup, FaMotorcycle, FaUserCircle } from 'react-icons/fa';
 
@@ -21,7 +21,8 @@ import ReportarPercance from './ReportarPercance';
 import ModalBitacoras from './ModalBitacoras';
 import BitacoraGlobal from './BitacoraGlobal'; 
 import CargarGasolina from './CargarGasolina'; 
-import PanelMantenimiento from './PanelMantenimiento'; // <--- NUEVO IMPORT DEL TALLER
+import PanelMantenimiento from './PanelMantenimiento';
+import CentroNotificaciones from './CentroNotificaciones'; // <--- NUEVO IMPORT DEL RADAR
 
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const { vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo, refetch } = useVehiculos();
@@ -50,7 +51,8 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     
     // ESTADOS DEL ADMINISTRADOR (INTERRUPTORES DE VISTA)
     const [mostrarAuditoriaGlobal, setMostrarAuditoriaGlobal] = useState(false);
-    const [mostrarMantenimiento, setMostrarMantenimiento] = useState(false); // <--- NUEVO ESTADO TALLER
+    const [mostrarMantenimiento, setMostrarMantenimiento] = useState(false); 
+    const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false); // <--- ESTADO DE LA CAMPANA
 
     const handleAbrirModal = (vehiculo = null, viewOnly = false) => {
         setVehiculoAEditar(vehiculo);
@@ -194,7 +196,7 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
 
     return (
         <div className="h-full flex flex-col space-y-6 animate-fade-in pb-10">
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 shrink-0">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 shrink-0 z-10 relative">
                 <div>
                     <h2 className="text-xl font-black text-gray-800 flex items-center gap-2 uppercase tracking-wide"><MdDirectionsCar className="text-blue-600 text-2xl" /> Control Vehicular</h2>
                     <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">Panel de Administración de Flotilla</p>
@@ -208,7 +210,12 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                     </div>
                     
                     <div className="flex gap-2">
-                        {/* BOTONES DIRECTOS DEL ADMIN */}
+                        {/* BOTÓN MAGISTRAL: LA CAMPANITA DEL RADAR */}
+                        <button onClick={() => setMostrarNotificaciones(true)} className="relative flex items-center justify-center w-10 h-10 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-2xl transition-all shadow-sm active:scale-95">
+                            <MdNotifications className="text-xl"/>
+                            <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+                        </button>
+
                         <button onClick={() => setMostrarAuditoriaGlobal(true)} className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95">
                             <MdHistory className="text-lg text-blue-500"/> Auditoría
                         </button>
@@ -224,7 +231,7 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-1 relative z-0">
                 {loading ? (
                     <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div></div>
                 ) : vehiculosFiltrados.length === 0 ? (
@@ -342,12 +349,11 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                 </div>
             )}
 
-            {/* MODAL DE HISTORIAL */}
-            <ModalBitacoras 
-                isOpen={modalHistorialAbierto} 
-                onClose={() => setModalHistorialAbierto(false)} 
-                vehiculo={vehiculoHistorial} 
-            />
+            {/* MODALES DEL SISTEMA */}
+            <ModalBitacoras isOpen={modalHistorialAbierto} onClose={() => setModalHistorialAbierto(false)} vehiculo={vehiculoHistorial} />
+            
+            {/* EL RADAR MAESTRO */}
+            <CentroNotificaciones isOpen={mostrarNotificaciones} onClose={() => setMostrarNotificaciones(false)} />
 
         </div>
     );
