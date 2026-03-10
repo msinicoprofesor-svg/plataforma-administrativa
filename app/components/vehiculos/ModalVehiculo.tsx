@@ -31,7 +31,6 @@ async function getCroppedImg(imageSrc, pixelCrop) {
   });
 }
 
-// MODIFICADO: Agregamos vehiculoAEditar e isViewOnly a los props
 export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, vehiculoAEditar, isViewOnly }) {
     const [formData, setFormData] = useState({
         marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff',
@@ -45,13 +44,13 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
     const [imagenRecortadaURL, setImagenRecortadaURL] = useState(null); 
     const [archivoFinal, setArchivoFinal] = useState(null); 
     
+    // MODIFICADO: Solo las 4 vistas requeridas
     const [renders, setRenders] = useState({
-        img_base: null, img_llantas_ok: null, img_llantas_error: null, img_motor_ok: null, img_motor_error: null
+        img_cenital: null, img_lateral: null, img_diagonal: null, img_cofre: null
     });
 
     const fileInputRef = useRef(null);
 
-    // NUEVO: Efecto Camaleón para precargar datos cuando entra a modo Edición o Lectura
     useEffect(() => {
         if (vehiculoAEditar && isOpen) {
             setFormData({
@@ -111,7 +110,7 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
     const handleClose = () => {
         setFormData({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff', placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta' });
         setImageSrc(null); setImagenRecortadaURL(null); setArchivoFinal(null);
-        setRenders({ img_base: null, img_llantas_ok: null, img_llantas_error: null, img_motor_ok: null, img_motor_error: null });
+        setRenders({ img_cenital: null, img_lateral: null, img_diagonal: null, img_cofre: null });
         onClose();
     };
 
@@ -123,17 +122,15 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
     if (!isOpen) return null;
 
     const RenderInput = ({ title, renderKey }) => {
-        // Si estamos editando y ya hay foto previa en la base de datos, mostramos un indicador visual
         const tieneRenderPrevio = vehiculoAEditar && vehiculoAEditar[renderKey];
-        
         return (
             <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{title}</label>
-                <div className={`relative flex items-center justify-center border-2 border-dashed rounded-xl p-2 transition-colors ${renders[renderKey] || tieneRenderPrevio ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
+                <div className={`relative flex items-center justify-center border-2 border-dashed rounded-xl p-2 transition-colors ${renders[renderKey] || tieneRenderPrevio ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
                     <input type="file" accept="image/png" onChange={(e) => handleRenderChange(e, renderKey)} disabled={isSubmitting || isViewOnly} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
                     <div className="flex flex-col items-center pointer-events-none text-center">
-                        <MdImage className={`text-xl ${renders[renderKey] || tieneRenderPrevio ? 'text-green-500' : 'text-gray-400'}`} />
-                        <span className={`text-[8px] font-bold uppercase mt-1 ${renders[renderKey] || tieneRenderPrevio ? 'text-green-600' : 'text-gray-400'}`}>
+                        <MdImage className={`text-xl ${renders[renderKey] || tieneRenderPrevio ? 'text-blue-500' : 'text-gray-400'}`} />
+                        <span className={`text-[8px] font-bold uppercase mt-1 ${renders[renderKey] || tieneRenderPrevio ? 'text-blue-600' : 'text-gray-400'}`}>
                             {renders[renderKey] ? renders[renderKey].name : (tieneRenderPrevio ? 'Render Guardado' : 'Cargar PNG')}
                         </span>
                     </div>
@@ -142,7 +139,6 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
         );
     };
 
-    // Título dinámico
     const tituloModal = isViewOnly ? 'Detalles de Vehículo' : (vehiculoAEditar ? 'Editar Vehículo' : 'Alta de Vehículo');
 
     return (
@@ -205,21 +201,20 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
                             </div>
                         </div>
 
-                        {/* SECCIÓN RENDERS */}
-                        <div className="p-5 bg-purple-50/50 rounded-2xl border border-purple-100 space-y-4">
-                            <h4 className="text-xs font-black text-purple-900 uppercase tracking-widest mb-1">Renders Interactivos (Bitácora Móvil)</h4>
-                            {!isViewOnly && <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-4">Sube nuevas imágenes para reemplazar las actuales, o déjalo vacío para conservarlas.</p>}
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                                <RenderInput title="Auto Base" renderKey="img_base" />
-                                <RenderInput title="Llantas OK" renderKey="img_llantas_ok" />
-                                <RenderInput title="Llantas Falla" renderKey="img_llantas_error" />
-                                <RenderInput title="Motor OK" renderKey="img_motor_ok" />
-                                <RenderInput title="Motor Falla" renderKey="img_motor_error" />
+                        {/* SECCIÓN RENDERS DE 4 ÁNGULOS */}
+                        <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-4">
+                            <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-1">Imágenes Base (Bitácora Móvil)</h4>
+                            {!isViewOnly && <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider mb-4">Sube las 4 vistas del vehículo sin fondo (PNG).</p>}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <RenderInput title="Vista Superior" renderKey="img_cenital" />
+                                <RenderInput title="Vista Lateral" renderKey="img_lateral" />
+                                <RenderInput title="Vista Diagonal" renderKey="img_diagonal" />
+                                <RenderInput title="Vista Cofre Abierto" renderKey="img_cofre" />
                             </div>
                         </div>
 
-                        <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-5">
-                            <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-2">Datos Legales</h4>
+                        <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200 space-y-5">
+                            <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest mb-2">Datos Legales</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdConfirmationNumber/> Placas</label><input required name="placas" value={formData.placas} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-gray-800 uppercase outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
                                 <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Niv. / Serie</label><input required name="serie" value={formData.serie} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 uppercase outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
