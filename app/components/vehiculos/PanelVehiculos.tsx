@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { 
     MdDirectionsCar, MdAdd, MdListAlt, MdCheckCircle, 
     MdPersonAdd, MdPersonOff, MdLockOutline, MdClose, MdSearch,
-    MdEdit, MdVisibility, MdDelete, MdWarning, MdHistory
+    MdEdit, MdVisibility, MdDelete, MdWarning, MdHistory, MdLocalGasStation
 } from 'react-icons/md';
 import { FaCarSide, FaTruckPickup, FaMotorcycle, FaUserCircle } from 'react-icons/fa';
 
@@ -14,11 +14,12 @@ import { useVehiculos } from '../../hooks/useVehiculos';
 import ModalVehiculo from './ModalVehiculo';
 import ChecklistDiario from './ChecklistDiario';
 
-// IMPORTS DE LA FASE 3 Y AUDITORÍA
+// IMPORTS
 import TerminarRuta from './TerminarRuta';
 import ReportarPercance from './ReportarPercance';
 import ModalBitacoras from './ModalBitacoras';
-import BitacoraGlobal from './BitacoraGlobal'; // <--- NUEVO IMPORT
+import BitacoraGlobal from './BitacoraGlobal'; 
+import CargarGasolina from './CargarGasolina'; // <--- NUEVO IMPORT DE GASOLINA
 
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const { vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo, refetch } = useVehiculos();
@@ -33,17 +34,17 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const [vehiculoAEditar, setVehiculoAEditar] = useState(null);
     const [isViewOnly, setIsViewOnly] = useState(false);
 
+    // ESTADOS DEL CONDUCTOR
     const [modoChecklist, setModoChecklist] = useState(false);
     const [modoTerminarRuta, setModoTerminarRuta] = useState(false);
     const [modoPercance, setModoPercance] = useState(false);
+    const [modoGasolina, setModoGasolina] = useState(false); // <--- NUEVO ESTADO PARA GASOLINA
 
     const [vehiculoAAsignar, setVehiculoAAsignar] = useState(null);
     const [busquedaAsignacion, setBusquedaAsignacion] = useState('');
     
     const [vehiculoHistorial, setVehiculoHistorial] = useState(null);
     const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
-
-    // NUEVO ESTADO: Controla si vemos los autos físicos o la auditoría
     const [mostrarAuditoriaGlobal, setMostrarAuditoriaGlobal] = useState(false);
 
     const handleAbrirModal = (vehiculo = null, viewOnly = false) => {
@@ -119,12 +120,11 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
         }
 
         if (miVehiculo.estado === 'EN_RUTA') {
-            if (modoTerminarRuta) {
-                return <TerminarRuta vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onVolver={() => setModoTerminarRuta(false)} onCompletado={() => { setModoTerminarRuta(false); refetch(); }} />;
-            }
-            if (modoPercance) {
-                return <ReportarPercance vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onVolver={() => setModoPercance(false)} onCompletado={() => { setModoPercance(false); refetch(); }} />;
-            }
+            if (modoTerminarRuta) return <TerminarRuta vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onVolver={() => setModoTerminarRuta(false)} onCompletado={() => { setModoTerminarRuta(false); refetch(); }} />;
+            if (modoPercance) return <ReportarPercance vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onVolver={() => setModoPercance(false)} onCompletado={() => { setModoPercance(false); refetch(); }} />;
+            
+            // NUEVO: INTERCEPTOR DEL MÓDULO DE GASOLINA
+            if (modoGasolina) return <CargarGasolina vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onVolver={() => setModoGasolina(false)} onCompletado={() => { setModoGasolina(false); refetch(); }} />;
 
             return (
                 <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
@@ -137,6 +137,10 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                     
                     <div className="flex flex-col gap-4 w-full max-w-xs">
                         <button onClick={() => setModoTerminarRuta(true)} className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-gray-900/20 active:scale-95 transition-all"><MdCheckCircle className="text-xl"/> Terminar Ruta</button>
+                        
+                        {/* NUEVO BOTÓN: Cargar Combustible */}
+                        <button onClick={() => setModoGasolina(true)} className="bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100 px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"><MdLocalGasStation className="text-xl"/> Cargar Combustible</button>
+                        
                         <button onClick={() => setModoPercance(true)} className="bg-white border border-red-200 text-red-500 hover:bg-red-50 px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"><MdWarning className="text-xl"/> Reportar un Percance</button>
                     </div>
                 </div>
@@ -161,7 +165,6 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     // VISTA DEL ADMINISTRADOR
     // =====================================================================
 
-    // Si el admin pulsó el botón, mostramos la pantalla de Auditoría Global
     if (mostrarAuditoriaGlobal) {
         return <BitacoraGlobal onClose={() => setMostrarAuditoriaGlobal(false)} />;
     }
@@ -199,7 +202,6 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                         <button onClick={() => setFiltroEstado('TALLER')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TALLER' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-orange-600'}`}>Taller ({stats.taller})</button>
                     </div>
                     
-                    {/* BOTÓN MAGISTRAL: Auditoría Global */}
                     <button onClick={() => setMostrarAuditoriaGlobal(true)} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95">
                         <MdHistory className="text-lg"/> Auditoría Global
                     </button>
