@@ -13,6 +13,11 @@ import { FaCarSide, FaTruckPickup, FaMotorcycle, FaUserCircle } from 'react-icon
 import { useVehiculos } from '../../hooks/useVehiculos';
 import ModalVehiculo from './ModalVehiculo';
 import ChecklistDiario from './ChecklistDiario';
+// NUEVOS IMPORT:
+import TerminarRuta from './TerminarRuta';
+import ReportarPercance from './ReportarPercance';
+
+
 
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     // Agregamos 'refetch' para actualizar la vista en tiempo real
