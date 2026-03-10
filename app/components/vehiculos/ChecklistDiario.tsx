@@ -14,7 +14,7 @@ import { supabase } from '../../lib/supabase';
 
 const PLACEHOLDER_CAR = 'https://xtfuxscqymvunbppknyr.supabase.co/storage/v1/object/public/vehiculos-fotos/vehiculos/placeholder-car-diag.png';
 
-// --- MOTOR DE COMPRESIÓN DE IMÁGENES EN NAVEGADOR ---
+// --- MOTOR 1: COMPRESIÓN NORMAL PARA GUARDAR EN BASE DE DATOS ---
 const comprimirImagen = (file) => {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -25,7 +25,6 @@ const comprimirImagen = (file) => {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                // Redimensionar a un máximo de 800px para mantener legibilidad pesando casi nada
                 const maxWidth = 800;
                 const scaleSize = img.width > maxWidth ? (maxWidth / img.width) : 1;
                 canvas.width = img.width * scaleSize;
@@ -33,7 +32,35 @@ const comprimirImagen = (file) => {
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 canvas.toBlob((blob) => {
                     resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-                }, 'image/jpeg', 0.7); // 70% de calidad
+                }, 'image/jpeg', 0.7);
+            };
+        };
+    });
+};
+
+// --- MOTOR 2: FILTRO BLANCO/NEGRO Y ALTO CONTRASTE (EXCLUSIVO PARA LA IA) ---
+const preprocesarImagenOCR = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const maxWidth = 800;
+                const scaleSize = img.width > maxWidth ? (maxWidth / img.width) : 1;
+                canvas.width = img.width * scaleSize;
+                canvas.height = img.height * scaleSize;
+                
+                // Magia: Aplicamos filtro CSS nativo en el Canvas para resaltar los números
+                ctx.filter = 'grayscale(100%) contrast(150%) brightness(110%)';
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, 'image/jpeg', 0.8);
             };
         };
     });
@@ -49,12 +76,11 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
     
     const [evidenciaFile, setEvidenciaFile] = useState(null);
     const [evidenciaPreview, setEvidenciaPreview] = useState(null);
-    const [odometroFile, setOdometroFile] = useState(null); // NUEVO: Archivo de evidencia del odómetro
+    const [odometroFile, setOdometroFile] = useState(null); 
 
     const [checklist, setChecklist] = useState({ llantas: null, aceite: null, anticongelante: null, frenos: null });
     const [pasoActivo, setPasoActivo] = useState('cenital'); 
 
-    // --- ESTADOS DEL MODAL OCR ---
     const [showOcrModal, setShowOcrModal] = useState(false);
     const [isOcrProcessing, setIsOcrProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
@@ -67,8 +93,7 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
     const evidenciaInputRef = useRef(null);
 
     const todoRevisado = Object.values(checklist).every(val => val !== null);
-    const hayFallas = Object.values(checklist).includes(false);
-
+    
     useEffect(() => {
         const fetchVehiculo = async () => {
             const { data } = await supabase.from('vehiculos').select('*').eq('id', vehiculoId).single();
@@ -77,18 +102,16 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
         fetchVehiculo();
     }, [vehiculoId]);
 
-    // --- LÓGICA OPTIMIZADA DEL ODÓMETRO ---
     const handleOCR = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // 1. Mostrar modal y generar preview inmediato
         setShowOcrModal(true);
         setIsOcrProcessing(true);
         setOcrProgress(0);
-        setOcrStatus('Comprimiendo imagen...');
+        setOcrStatus('Preparando imagen...');
 
-        // 2. Comprimir la imagen drásticamente
+        // 1. Comprimimos normal para guardar en BD
         const compressedFile = await comprimirImagen(file);
         setTempOcrFile(compressedFile);
         
@@ -96,12 +119,16 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
         reader.onloadend = () => setTempOcrPreview(reader.result);
         reader.readAsDataURL(compressedFile);
 
-        // 3. Mandar a la IA a leer la imagen ya comprimida
+        // 2. Preprocesamos en Blanco/Negro y Alto Contraste para ayudar a la IA
+        setOcrStatus('Aplicando filtros...');
+        const bwBlob = await preprocesarImagenOCR(file);
+
+        // 3. Mandamos la foto optimizada al cerebro de Tesseract
         try {
-            const { data: { text } } = await Tesseract.recognize(compressedFile, 'eng', { 
+            const { data: { text } } = await Tesseract.recognize(bwBlob, 'eng', { 
                 logger: (m) => { 
                     if (m.status === 'recognizing text') { 
-                        setOcrStatus('Detectando números...'); 
+                        setOcrStatus('Leyendo tablero...'); 
                         setOcrProgress(Math.round(m.progress * 100)); 
                     } else if (m.status === 'loading tesseract core') {
                         setOcrStatus('Iniciando IA...');
@@ -121,7 +148,6 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
     const handleEvidencia = async (e) => {
         const file = e.target.files[0];
         if (file) { 
-            // También comprimimos la foto del daño para ahorrar datos
             const compressedFile = await comprimirImagen(file);
             setEvidenciaFile(compressedFile); 
             const reader = new FileReader(); 
@@ -132,7 +158,6 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
 
     const marcarPaso = (campo, estado) => {
         setChecklist({ ...checklist, [campo]: estado });
-        if (!estado && incidencia === '') setIncidencia('');
     };
 
     const handleGuardar = async () => {
@@ -147,7 +172,6 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
             detalles_incidencia: incidencia
         };
 
-        // Pasamos ambos archivos (daños y odómetro) al cerebro
         const res = await guardarBitacora(datos, evidenciaFile, odometroFile);
         if (res.success) onCompletado();
     };
@@ -162,11 +186,11 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
     const vista = getVistaActiva();
     const coordenadas = vehiculo?.coordenadas_hotspots || {};
     const imgStyle = "absolute inset-0 w-full h-full object-contain transition-all duration-700 ease-in-out drop-shadow-2xl";
+    const hayFallas = Object.values(checklist).includes(false);
 
     return (
         <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col pb-24 font-sans animate-fade-in overflow-y-auto overflow-x-hidden custom-scrollbar">
             
-            {/* ENCABEZADO IMERSIVO */}
             <div className="bg-white pt-10 pb-4 px-6 rounded-b-[2rem] shadow-sm relative z-20 flex justify-between items-center border-b border-gray-100 shrink-0">
                 <div>
                     <h1 className="text-xl font-black text-blue-600 leading-tight flex items-center gap-2">
@@ -181,33 +205,26 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    {/* MODIFICADO 1: Miniatura limpia sin sombra */}
                     {vehiculo?.imagen_url && (
                         <div className="w-20 h-12 relative flex-shrink-0 bg-white rounded-xl">
                             <img src={vehiculo.imagen_url} alt="Miniatura" className="w-full h-full object-contain" />
                         </div>
                     )}
-                    {/* MODIFICADO 5: Botón de menú devuelto */}
                     <button className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors border border-gray-100">
                         <MdMenu className="text-xl" />
                     </button>
                 </div>
             </div>
 
-            {/* VISOR VEHICULAR */}
             <div className="relative w-full h-64 mt-4 flex items-center justify-center overflow-hidden shrink-0">
                 <img src={vehiculo?.img_cenital || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'cenital' ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} alt="Cenital" />
                 <img src={vehiculo?.img_lateral || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'lateral' ? 'opacity-100 scale-110 translate-x-3' : 'opacity-0 translate-x-10 scale-95'}`} alt="Lateral" />
                 <img src={vehiculo?.img_diagonal || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'diagonal' ? 'opacity-100 scale-110' : 'opacity-0 -translate-x-10 scale-95'}`} alt="Diagonal" />
-                
-                {/* MODIFICADO 3: Cofre sin zoom extremo, escala unificada */}
                 <img src={vehiculo?.img_cofre || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'cofre' ? 'opacity-100 scale-110' : 'opacity-0 translate-y-0 scale-95'}`} alt="Cofre" />
 
-                {/* HOTSPOTS DINÁMICOS */}
                 {vista === 'lateral' && coordenadas.llantas && coordenadas.llantas.map((punto, i) => (
                     <Hotspot key={`llanta-${i}`} top={punto.top} left={punto.left} status={checklist.llantas} />
                 ))}
-                
                 {vista === 'cofre' && (
                     <>
                         {pasoActivo === 'aceite' && coordenadas.aceite && <Hotspot top={coordenadas.aceite.top} left={coordenadas.aceite.left} status={checklist.aceite} />}
@@ -229,7 +246,6 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
 
             <div className="p-5 space-y-5 relative z-10 -mt-2">
                 
-                {/* ACORDEÓN DE CHECKLIST */}
                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100">
                     <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-widest text-center mb-5">Inspección de Puntos Críticos</h3>
                     <div className="space-y-3">
@@ -240,23 +256,26 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
                     </div>
                 </div>
 
-                {hayFallas && (
-                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-red-100 animate-slide-up">
-                        <h3 className="text-[11px] font-black text-gray-800 uppercase tracking-widest text-center mb-4">Reporte de Daños</h3>
-                        <textarea value={incidencia} onChange={(e) => setIncidencia(e.target.value)} placeholder="Describe la falla encontrada..." className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm font-bold text-gray-800 outline-none focus:border-red-500 transition-colors h-24 resize-none mb-3"></textarea>
-                        {evidenciaPreview ? (
-                            <div className="relative w-full h-32 rounded-2xl overflow-hidden border border-gray-200">
-                                <img src={evidenciaPreview} alt="Evidencia" className="w-full h-full object-cover"/>
-                                <button onClick={() => {setEvidenciaFile(null); setEvidenciaPreview(null);}} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-lg"><MdClose/></button>
-                            </div>
-                        ) : (
-                            <button onClick={() => evidenciaInputRef.current.click()} className="w-full py-3.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border border-red-100"><MdCameraAlt className="text-base"/> Subir foto de evidencia (Opcional)</button>
-                        )}
-                        <input type="file" accept="image/*" capture="environment" ref={evidenciaInputRef} onChange={handleEvidencia} className="hidden" />
-                    </div>
-                )}
+                {/* MODIFICADO: SECCIÓN DE OBSERVACIONES GENERALES (SIEMPRE VISIBLE) */}
+                <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100">
+                    <h3 className="text-[11px] font-black text-gray-800 uppercase tracking-widest text-center mb-4">Observaciones y Evidencia</h3>
+                    <textarea 
+                        value={incidencia} 
+                        onChange={(e) => setIncidencia(e.target.value)} 
+                        placeholder="Ej. El auto está sucio, tiene un rayón en la puerta, falta un tapete..." 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 transition-colors h-24 resize-none mb-3"
+                    ></textarea>
+                    {evidenciaPreview ? (
+                        <div className="relative w-full h-32 rounded-2xl overflow-hidden border border-gray-200">
+                            <img src={evidenciaPreview} alt="Evidencia" className="w-full h-full object-cover"/>
+                            <button onClick={() => {setEvidenciaFile(null); setEvidenciaPreview(null);}} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-lg"><MdClose/></button>
+                        </div>
+                    ) : (
+                        <button onClick={() => evidenciaInputRef.current.click()} className="w-full py-3.5 bg-gray-50 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border border-gray-200 hover:bg-gray-100"><MdCameraAlt className="text-base"/> Subir foto (Opcional)</button>
+                    )}
+                    <input type="file" accept="image/*" capture="environment" ref={evidenciaInputRef} onChange={handleEvidencia} className="hidden" />
+                </div>
 
-                {/* ODÓMETRO RE-DISEÑADO */}
                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100">
                     <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-widest text-center mb-4">Kilometraje Actual</h3>
                     {kilometraje ? (
