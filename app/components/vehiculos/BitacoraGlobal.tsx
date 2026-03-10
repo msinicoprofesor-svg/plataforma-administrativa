@@ -8,23 +8,24 @@ import {
     MdSpeed, MdOutlineDateRange, MdImage, MdClose, MdTimeline
 } from 'react-icons/md';
 import { useHistorialGlobal } from '../../hooks/useHistorialGlobal';
-import ModalBitacoras from './ModalBitacoras'; // Importamos el expediente individual
+import ModalBitacoras from './ModalBitacoras'; 
+import VisorImagen from './VisorImagen'; // <--- IMPORT DEL VISOR
 
 export default function BitacoraGlobal({ onClose }) {
     const { historial, loading } = useHistorialGlobal();
     
     // Filtros
-    const [filtroTiempo, setFiltroTiempo] = useState('todos'); // hoy, semana, mes, personalizado, todos
+    const [filtroTiempo, setFiltroTiempo] = useState('todos'); 
     const [fechaDesde, setFechaDesde] = useState('');
     const [fechaHasta, setFechaHasta] = useState('');
     const [vehiculoFiltro, setVehiculoFiltro] = useState('TODOS');
     const [busqueda, setBusqueda] = useState('');
     
-    // Modales
-    const [viajeSeleccionado, setViajeSeleccionado] = useState(null); // Modal de Detalles
-    const [vehiculoTimeline, setVehiculoTimeline] = useState(null);   // Modal Expediente Individual
+    // Modales y Visor
+    const [viajeSeleccionado, setViajeSeleccionado] = useState(null); 
+    const [vehiculoTimeline, setVehiculoTimeline] = useState(null);   
+    const [imagenAmpliada, setImagenAmpliada] = useState(null); // <--- ESTADO DEL VISOR
 
-    // --- EXTRAER VEHÍCULOS ÚNICOS PARA EL SELECTOR ---
     const vehiculosUnicos = useMemo(() => {
         const map = new Map();
         historial.forEach(h => {
@@ -35,7 +36,6 @@ export default function BitacoraGlobal({ onClose }) {
         return Array.from(map.values());
     }, [historial]);
 
-    // --- MOTOR DE FILTRADO AVANZADO ---
     const historialFiltrado = useMemo(() => {
         let filtrado = historial;
 
@@ -76,7 +76,6 @@ export default function BitacoraGlobal({ onClose }) {
         return filtrado;
     }, [historial, busqueda, filtroTiempo, fechaDesde, fechaHasta, vehiculoFiltro]);
 
-    // --- MOTOR DE EMPAREJAMIENTO DE VIAJES ---
     const viajes = useMemo(() => {
         const registrosCronologicos = [...historialFiltrado].reverse();
         const vehiculosEnRuta = {};
@@ -237,7 +236,6 @@ export default function BitacoraGlobal({ onClose }) {
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        {/* BOTÓN MAGISTRAL: Abre el expediente de la unidad */}
                                                         <button onClick={() => setVehiculoTimeline({ id: viaje.vehiculo_id, ...viaje.vehiculo })} className="text-[10px] font-black bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1">
                                                             <MdTimeline className="text-base" /> Expediente
                                                         </button>
@@ -256,7 +254,7 @@ export default function BitacoraGlobal({ onClose }) {
                 )}
             </div>
 
-            {/* MODAL DE EXPEDIENTE INDIVIDUAL (Se abre con el botón "Expediente" de la tabla) */}
+            {/* MODAL DE EXPEDIENTE INDIVIDUAL */}
             <ModalBitacoras 
                 isOpen={!!vehiculoTimeline} 
                 onClose={() => setVehiculoTimeline(null)} 
@@ -285,10 +283,14 @@ export default function BitacoraGlobal({ onClose }) {
                                         <div><p className="text-[9px] text-gray-400 uppercase font-bold">Odómetro Inicial</p><p className="text-xs font-black text-gray-800">{viajeSeleccionado.salida.kilometraje} km</p></div>
                                     </div>
                                     {viajeSeleccionado.salida.detalles_incidencia && <p className="text-xs text-gray-600 bg-white p-3 rounded-xl border border-gray-200"><strong className="text-gray-800">Nota:</strong> {viajeSeleccionado.salida.detalles_incidencia}</p>}
+                                    
+                                    {/* BOTÓN MÁGICO PARA LA FOTO DE SALIDA */}
                                     {viajeSeleccionado.salida.evidencia_url && (
-                                        <div className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200">
-                                            <a href={viajeSeleccionado.salida.evidencia_url} target="_blank" rel="noreferrer"><img src={viajeSeleccionado.salida.evidencia_url} alt="Evidencia Salida" className="w-full h-full object-cover hover:scale-105 transition-transform"/></a>
-                                        </div>
+                                        <button type="button" onClick={() => setImagenAmpliada(viajeSeleccionado.salida.evidencia_url)} className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative block text-left group/img cursor-zoom-in">
+                                            <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-20 font-black uppercase">Foto de Salida</div>
+                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                            <img src={viajeSeleccionado.salida.evidencia_url} alt="Evidencia Salida" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                        </button>
                                     )}
                                 </div>
                             )}
@@ -299,10 +301,13 @@ export default function BitacoraGlobal({ onClose }) {
                                     <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2 flex items-center gap-1"><MdWarning/> Percance Reportado</h4>
                                     <p className="text-[9px] text-gray-500 font-bold mb-2">{formatearFecha(perc.created_at)} {formatearHora(perc.created_at)} • Gravedad: {perc.gravedad_percance}</p>
                                     <p className="text-xs text-gray-800 font-medium mb-3 bg-white p-3 rounded-xl border border-orange-100">{perc.detalles_incidencia}</p>
+                                    
+                                    {/* BOTÓN MÁGICO PARA LA FOTO DEL PERCANCE */}
                                     {perc.evidencia_url && (
-                                        <div className="w-full h-32 rounded-xl overflow-hidden border border-gray-200">
-                                            <a href={perc.evidencia_url} target="_blank" rel="noreferrer"><img src={perc.evidencia_url} alt="Evidencia Percance" className="w-full h-full object-cover hover:scale-105 transition-transform"/></a>
-                                        </div>
+                                        <button type="button" onClick={() => setImagenAmpliada(perc.evidencia_url)} className="w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative block text-left group/img cursor-zoom-in">
+                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                            <img src={perc.evidencia_url} alt="Evidencia Percance" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                        </button>
                                     )}
                                 </div>
                             ))}
@@ -319,11 +324,14 @@ export default function BitacoraGlobal({ onClose }) {
                                     {viajeSeleccionado.llegada.detalles_incidencia && viajeSeleccionado.llegada.detalles_incidencia !== 'Sin incidentes' && (
                                         <p className="text-xs text-red-600 bg-white p-3 rounded-xl border border-red-100 mt-2"><strong>Nota Cierre:</strong> {viajeSeleccionado.llegada.detalles_incidencia}</p>
                                     )}
+                                    
+                                    {/* BOTÓN MÁGICO PARA LA FOTO DEL ODÓMETRO FINAL */}
                                     {viajeSeleccionado.llegada.odometro_url && (
-                                        <div className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative">
-                                            <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-10 font-black uppercase">Foto Odómetro Final</div>
-                                            <a href={viajeSeleccionado.llegada.odometro_url} target="_blank" rel="noreferrer"><img src={viajeSeleccionado.llegada.odometro_url} alt="Odómetro Final" className="w-full h-full object-cover hover:scale-105 transition-transform"/></a>
-                                        </div>
+                                        <button type="button" onClick={() => setImagenAmpliada(viajeSeleccionado.llegada.odometro_url)} className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative block text-left group/img cursor-zoom-in">
+                                            <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-20 font-black uppercase">Foto Odómetro Final</div>
+                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                            <img src={viajeSeleccionado.llegada.odometro_url} alt="Odómetro Final" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                        </button>
                                     )}
                                 </div>
                             ) : (
@@ -336,6 +344,15 @@ export default function BitacoraGlobal({ onClose }) {
                     </div>
                 </div>
             )}
+
+            {/* LIGHTBOX MAGISTRAL: Aparece encima de todo */}
+            {imagenAmpliada && (
+                <VisorImagen 
+                    imageUrl={imagenAmpliada} 
+                    onClose={() => setImagenAmpliada(null)} 
+                />
+            )}
+
         </div>
     );
 }
