@@ -5,51 +5,71 @@
 import { useState } from 'react';
 import { 
     MdBuild, MdInventory, MdAdd, MdClose, MdCheckCircle, 
-    MdSchedule, MdWarning, MdDirectionsCar, MdAttachMoney, MdSpeed 
+    MdSchedule, MdWarning, MdDirectionsCar, MdAttachMoney, MdSpeed,
+    MdLocalGasStation, MdImage
 } from 'react-icons/md';
 import { useMantenimiento } from '../../hooks/useMantenimiento';
+import VisorImagen from './VisorImagen'; // <--- IMPORTAMOS TU VISOR ELEGANTE
 
 export default function PanelMantenimiento({ onClose, vehiculos }) {
     const { 
-        mantenimientos, inventario, loading, 
+        mantenimientos, inventario, gasolina, loading, 
         registrarMantenimiento, agregarArticuloInventario, actualizarCantidadInventario 
     } = useMantenimiento();
 
-    const [vistaActiva, setVistaActiva] = useState('servicios'); // 'servicios' o 'inventario'
+    const [vistaActiva, setVistaActiva] = useState('servicios'); // 'servicios', 'inventario', 'combustible'
     
     // Estados Modales
     const [mostrarModalServicio, setMostrarModalServicio] = useState(false);
     const [mostrarModalInventario, setMostrarModalInventario] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [ticketAmpliado, setTicketAmpliado] = useState(null); // Para el visor
 
     // Formularios
     const [formServicio, setFormServicio] = useState({
         vehiculo_id: '', tipo: 'PREVENTIVO', estado: 'COMPLETADO', 
-        descripcion: '', kilometraje: '', costo: '', fecha_programada: ''
+        descripcion: '', kilometraje: '', costo: '', 
+        tipo_programacion: 'FECHA', // 'FECHA' o 'KILOMETRAJE'
+        fecha_programada: '', kilometraje_programado: ''
     });
 
     const [formInventario, setFormInventario] = useState({
         nombre: '', categoria: 'GENERAL', cantidad: 0, unidad_medida: 'Piezas'
     });
 
-    // --- HANDLERS DE SERVICIOS ---
+    // --- HANDLERS ---
     const handleGuardarServicio = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
-        const res = await registrarMantenimiento({
-            ...formServicio,
+        
+        // Construimos el payload exacto
+        const payload = {
+            vehiculo_id: formServicio.vehiculo_id,
+            tipo: formServicio.tipo,
+            estado: formServicio.estado,
+            descripcion: formServicio.descripcion,
             kilometraje: parseInt(formServicio.kilometraje),
             costo: formServicio.costo ? parseFloat(formServicio.costo) : 0,
-            fecha_programada: formServicio.estado === 'PROGRAMADO' ? formServicio.fecha_programada : null
-        });
+        };
+
+        if (formServicio.estado === 'PROGRAMADO') {
+            if (formServicio.tipo_programacion === 'FECHA') {
+                payload.fecha_programada = formServicio.fecha_programada;
+            } else {
+                payload.kilometraje_programado = parseInt(formServicio.kilometraje_programado);
+            }
+        }
+
+        const res = await registrarMantenimiento(payload);
         setIsSubmitting(false);
         if (res.success) {
             setMostrarModalServicio(false);
-            setFormServicio({ vehiculo_id: '', tipo: 'PREVENTIVO', estado: 'COMPLETADO', descripcion: '', kilometraje: '', costo: '', fecha_programada: '' });
+            setFormServicio({ vehiculo_id: '', tipo: 'PREVENTIVO', estado: 'COMPLETADO', descripcion: '', kilometraje: '', costo: '', tipo_programacion: 'FECHA', fecha_programada: '', kilometraje_programado: '' });
+        } else {
+            alert("Error al guardar: Asegúrate de tener conexión y los permisos correctos.");
         }
     };
 
-    // --- HANDLERS DE INVENTARIO ---
     const handleGuardarArticulo = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -82,26 +102,27 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                 <div className="flex justify-between items-start">
                     <div>
                         <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2"><MdBuild className="text-blue-600"/> Taller y Mantenimiento</h2>
-                        <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">Gestión de servicios y refacciones</p>
+                        <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">Gestión de servicios, inventario y consumos</p>
                     </div>
                     <button onClick={onClose} className="bg-gray-100 text-gray-500 hover:bg-gray-200 p-2 rounded-xl transition-colors"><MdClose className="text-2xl" /></button>
                 </div>
 
                 <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
-                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 w-full md:w-auto">
-                        <button onClick={() => setVistaActiva('servicios')} className={`flex-1 md:flex-none px-5 py-2 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-2 transition-all ${vistaActiva === 'servicios' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                    {/* TRES PESTAÑAS */}
+                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 w-full md:w-auto overflow-x-auto custom-scrollbar">
+                        <button onClick={() => setVistaActiva('servicios')} className={`px-5 py-2 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-2 transition-all shrink-0 ${vistaActiva === 'servicios' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                             <MdBuild className="text-lg"/> Servicios
                         </button>
-                        <button onClick={() => setVistaActiva('inventario')} className={`flex-1 md:flex-none px-5 py-2 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-2 transition-all ${vistaActiva === 'inventario' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                        <button onClick={() => setVistaActiva('inventario')} className={`px-5 py-2 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-2 transition-all shrink-0 ${vistaActiva === 'inventario' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                             <MdInventory className="text-lg"/> Inventario
+                        </button>
+                        <button onClick={() => setVistaActiva('combustible')} className={`px-5 py-2 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-2 transition-all shrink-0 ${vistaActiva === 'combustible' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                            <MdLocalGasStation className="text-lg"/> Combustible
                         </button>
                     </div>
 
-                    {vistaActiva === 'servicios' ? (
-                        <button onClick={() => setMostrarModalServicio(true)} className="w-full md:w-auto bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 flex justify-center items-center gap-2"><MdAdd className="text-lg"/> Registrar Servicio</button>
-                    ) : (
-                        <button onClick={() => setMostrarModalInventario(true)} className="w-full md:w-auto bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 flex justify-center items-center gap-2"><MdAdd className="text-lg"/> Nuevo Artículo</button>
-                    )}
+                    {vistaActiva === 'servicios' && <button onClick={() => setMostrarModalServicio(true)} className="w-full md:w-auto bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 flex justify-center items-center gap-2"><MdAdd className="text-lg"/> Registrar Servicio</button>}
+                    {vistaActiva === 'inventario' && <button onClick={() => setMostrarModalInventario(true)} className="w-full md:w-auto bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95 flex justify-center items-center gap-2"><MdAdd className="text-lg"/> Nuevo Artículo</button>}
                 </div>
             </div>
 
@@ -122,7 +143,7 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                                             <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Descripción</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Kilometraje</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Costo</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right rounded-tr-2xl">Estado / Fecha</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right rounded-tr-2xl">Estado / Programación</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
@@ -147,7 +168,14 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                                                         {mant.estado === 'COMPLETADO' ? (
                                                             <div><span className="inline-flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded"><MdCheckCircle/> Completado</span><p className="text-[9px] text-gray-400 mt-1">{formatearFecha(mant.created_at)}</p></div>
                                                         ) : (
-                                                            <div><span className="inline-flex items-center gap-1 text-[10px] font-black text-orange-600 bg-orange-50 px-2 py-1 rounded"><MdSchedule/> Programado</span><p className="text-[9px] font-bold text-orange-400 mt-1">Para: {formatearFecha(mant.fecha_programada)}</p></div>
+                                                            <div>
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-black text-orange-600 bg-orange-50 px-2 py-1 rounded"><MdSchedule/> Programado</span>
+                                                                {mant.fecha_programada ? (
+                                                                    <p className="text-[9px] font-bold text-orange-500 mt-1">Fecha: {formatearFecha(mant.fecha_programada)}</p>
+                                                                ) : mant.kilometraje_programado ? (
+                                                                    <p className="text-[9px] font-bold text-orange-500 mt-1">A los: {mant.kilometraje_programado} km</p>
+                                                                ) : null}
+                                                            </div>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -185,6 +213,56 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                                 )}
                             </div>
                         )}
+
+                        {/* ===================== VISTA COMBUSTIBLE ===================== */}
+                        {vistaActiva === 'combustible' && (
+                            <div className="flex-1 overflow-auto custom-scrollbar p-2">
+                                <table className="w-full text-left border-collapse min-w-[800px]">
+                                    <thead className="bg-gray-50/80 sticky top-0 z-10">
+                                        <tr>
+                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest rounded-tl-2xl">Unidad</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Conductor</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Fecha</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Odómetro</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Litros / Monto</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right rounded-tr-2xl">Evidencia</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {gasolina.length === 0 ? (
+                                            <tr><td colSpan="6" className="text-center py-10 text-gray-400 font-bold">No hay registros de carga de combustible.</td></tr>
+                                        ) : (
+                                            gasolina.map(gas => (
+                                                <tr key={gas.id} className="hover:bg-gray-50/50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <p className="text-sm font-black text-gray-800">{gas.vehiculo?.marca} {gas.vehiculo?.modelo}</p>
+                                                        <p className="text-[10px] font-bold text-gray-500 uppercase">{gas.vehiculo?.placas}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-blue-50 text-blue-700 text-[10px] font-black uppercase px-2 py-1 rounded">{gas.usuario_id}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <p className="text-xs font-bold text-gray-600">{formatearFecha(gas.created_at)}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-600 bg-gray-100 px-2 py-1 rounded"><MdSpeed/> {gas.kilometraje_carga} km</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <p className="text-xs font-black text-gray-800">${gas.monto}</p>
+                                                        {gas.litros && <p className="text-[9px] font-bold text-gray-400 uppercase">{gas.litros} Litros</p>}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => setTicketAmpliado(gas.foto_ticket_url)} className="text-[10px] font-black bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white px-3 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1 ml-auto">
+                                                            <MdImage className="text-base" /> Ver Ticket
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -207,7 +285,7 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Tipo de Servicio</label>
+                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Tipo</label>
                                     <select value={formServicio.tipo} onChange={e => setFormServicio({...formServicio, tipo: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500">
                                         <option value="PREVENTIVO">Preventivo</option><option value="CORRECTIVO">Correctivo (Falla)</option>
                                     </select>
@@ -215,17 +293,34 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Estado</label>
                                     <select value={formServicio.estado} onChange={e => setFormServicio({...formServicio, estado: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500">
-                                        <option value="COMPLETADO">Completado</option><option value="PROGRAMADO">Programado (A futuro)</option>
+                                        <option value="COMPLETADO">Completado hoy</option><option value="PROGRAMADO">Programar a futuro</option>
                                     </select>
                                 </div>
                             </div>
+                            
+                            {/* DUALIDAD DE PROGRAMACIÓN */}
                             {formServicio.estado === 'PROGRAMADO' && (
-                                <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Fecha Programada</label><input type="date" required value={formServicio.fecha_programada} onChange={e => setFormServicio({...formServicio, fecha_programada: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" /></div>
+                                <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl space-y-4">
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer">
+                                            <input type="radio" name="tipoProg" value="FECHA" checked={formServicio.tipo_programacion === 'FECHA'} onChange={() => setFormServicio({...formServicio, tipo_programacion: 'FECHA'})} /> Por Fecha
+                                        </label>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer">
+                                            <input type="radio" name="tipoProg" value="KILOMETRAJE" checked={formServicio.tipo_programacion === 'KILOMETRAJE'} onChange={() => setFormServicio({...formServicio, tipo_programacion: 'KILOMETRAJE'})} /> Por Kilometraje
+                                        </label>
+                                    </div>
+                                    {formServicio.tipo_programacion === 'FECHA' ? (
+                                        <div><label className="block text-[10px] font-black text-orange-600 uppercase mb-2">¿En qué fecha se debe realizar?</label><input type="date" required value={formServicio.fecha_programada} onChange={e => setFormServicio({...formServicio, fecha_programada: e.target.value})} className="w-full bg-white border border-orange-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-orange-500" /></div>
+                                    ) : (
+                                        <div><label className="block text-[10px] font-black text-orange-600 uppercase mb-2">¿A los cuántos KM se debe realizar?</label><input type="number" required value={formServicio.kilometraje_programado} onChange={e => setFormServicio({...formServicio, kilometraje_programado: e.target.value})} placeholder="Ej. 150000" className="w-full bg-white border border-orange-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-orange-500" /></div>
+                                    )}
+                                </div>
                             )}
-                            <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Descripción de los Trabajos</label><textarea required value={formServicio.descripcion} onChange={e => setFormServicio({...formServicio, descripcion: e.target.value})} placeholder="Cambio de aceite, ajuste de frenos..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 h-24 resize-none"></textarea></div>
+
+                            <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Descripción</label><textarea required value={formServicio.descripcion} onChange={e => setFormServicio({...formServicio, descripcion: e.target.value})} placeholder="Cambio de balatas, revisión de niveles..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 h-20 resize-none"></textarea></div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Kilometraje del Servicio</label><input type="number" required value={formServicio.kilometraje} onChange={e => setFormServicio({...formServicio, kilometraje: e.target.value})} placeholder="Ej. 125000" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" /></div>
-                                <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Costo ($)</label><input type="number" value={formServicio.costo} onChange={e => setFormServicio({...formServicio, costo: e.target.value})} placeholder="0.00" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" /></div>
+                                <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Odómetro Actual (Obligatorio)</label><input type="number" required value={formServicio.kilometraje} onChange={e => setFormServicio({...formServicio, kilometraje: e.target.value})} placeholder="Ej. 125000" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" /></div>
+                                <div><label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Costo Total ($)</label><input type="number" value={formServicio.costo} onChange={e => setFormServicio({...formServicio, costo: e.target.value})} placeholder="0.00" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" /></div>
                             </div>
                         </div>
                         <div className="p-6 border-t border-gray-100 bg-white">
@@ -235,7 +330,7 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                 </div>
             )}
 
-            {/* MODAL: NUEVO ARTÍCULO INVENTARIO */}
+            {/* MODAL: NUEVO ARTÍCULO INVENTARIO (Se mantiene igual por ahora) */}
             {mostrarModalInventario && (
                 <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                     <form onSubmit={handleGuardarArticulo} className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-slide-up">
@@ -266,6 +361,14 @@ export default function PanelMantenimiento({ onClose, vehiculos }) {
                         </div>
                     </form>
                 </div>
+            )}
+
+            {/* LIGHTBOX DEL TICKET DE COMBUSTIBLE */}
+            {ticketAmpliado && (
+                <VisorImagen 
+                    imageUrl={ticketAmpliado} 
+                    onClose={() => setTicketAmpliado(null)} 
+                />
             )}
         </div>
     );
