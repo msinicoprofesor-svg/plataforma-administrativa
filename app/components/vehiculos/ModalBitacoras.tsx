@@ -9,17 +9,21 @@ import {
     MdViewList, MdTimeline
 } from 'react-icons/md';
 import { supabase } from '../../lib/supabase';
+import VisorImagen from './VisorImagen'; // <--- NUEVO IMPORT DEL VISOR
 
 export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
     const [bitacoras, setBitacoras] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [vistaActiva, setVistaActiva] = useState('lista'); // 'lista' o 'timeline'
-    const [viajeSeleccionado, setViajeSeleccionado] = useState(null); // Para el modal de detalles
+    const [vistaActiva, setVistaActiva] = useState('lista'); 
+    const [viajeSeleccionado, setViajeSeleccionado] = useState(null); 
+    
+    // NUEVO ESTADO PARA EL VISOR DE IMÁGENES
+    const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
     useEffect(() => {
         if (isOpen && vehiculo) {
             cargarHistorial();
-            setVistaActiva('lista'); // Resetear a lista por defecto
+            setVistaActiva('lista'); 
         } else {
             setBitacoras([]);
         }
@@ -41,7 +45,6 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
         setLoading(false);
     };
 
-    // --- MOTOR DE EMPAREJAMIENTO DE VIAJES (Para una sola unidad) ---
     const viajes = useMemo(() => {
         const registrosCronologicos = [...bitacoras].reverse();
         let viajeActivo = null;
@@ -49,7 +52,7 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
 
         registrosCronologicos.forEach(reg => {
             if (reg.tipo_registro === 'SALIDA') {
-                if (viajeActivo) viajesArmados.push(viajeActivo); // Si había uno abierto sin cerrar, lo guardamos
+                if (viajeActivo) viajesArmados.push(viajeActivo); 
                 viajeActivo = { id: reg.id, salida: reg, llegada: null, percances: [] };
             } else if (reg.tipo_registro === 'LLEGADA') {
                 if (viajeActivo) {
@@ -67,7 +70,7 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                 }
             }
         });
-        if (viajeActivo) viajesArmados.push(viajeActivo); // Guardar si quedó en ruta
+        if (viajeActivo) viajesArmados.push(viajeActivo); 
 
         return viajesArmados.reverse();
     }, [bitacoras]);
@@ -98,7 +101,6 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                     </div>
                     
                     <div className="flex items-center gap-3">
-                        {/* PESTAÑAS DE VISTA */}
                         <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50">
                             <button onClick={() => setVistaActiva('lista')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all ${vistaActiva === 'lista' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                                 <MdViewList className="text-base"/> Rutas
@@ -122,9 +124,7 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                         </div>
                     ) : (
                         <>
-                            {/* ========================================================= */}
-                            {/* VISTA DE LISTA (TABLA DE VIAJES DEL VEHÍCULO) */}
-                            {/* ========================================================= */}
+                            {/* VISTA DE LISTA */}
                             {vistaActiva === 'lista' && (
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                                     <div className="overflow-x-auto custom-scrollbar">
@@ -189,9 +189,7 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                                 </div>
                             )}
 
-                            {/* ========================================================= */}
-                            {/* VISTA DE TIMELINE (EVENTOS CRUDOS) */}
-                            {/* ========================================================= */}
+                            {/* VISTA DE TIMELINE */}
                             {vistaActiva === 'timeline' && (
                                 <div className="space-y-6 relative before:absolute before:inset-0 before:ml-6 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
                                     {bitacoras.map((bita) => {
@@ -219,9 +217,10 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                                                             <div className="flex gap-2 text-xs font-bold text-gray-700 bg-gray-50 p-2 rounded-xl border border-gray-100"><MdSpeed className="text-gray-400 text-base"/> Odómetro: {bita.kilometraje} km</div>
                                                             {bita.detalles_incidencia && <p className="text-xs text-gray-600 bg-orange-50 p-3 rounded-xl border border-orange-100"><strong className="text-orange-800">Nota:</strong> {bita.detalles_incidencia}</p>}
                                                             {bita.evidencia_url && (
-                                                                <div className="mt-2 w-full h-32 rounded-xl overflow-hidden border border-gray-200">
-                                                                    <a href={bita.evidencia_url} target="_blank" rel="noreferrer"><img src={bita.evidencia_url} alt="Evidencia Daño" className="w-full h-full object-cover hover:scale-105 transition-transform"/></a>
-                                                                </div>
+                                                                <button type="button" onClick={() => setImagenAmpliada(bita.evidencia_url)} className="mt-2 w-full h-32 rounded-xl overflow-hidden border border-gray-200 block text-left group/img relative cursor-zoom-in">
+                                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                                                    <img src={bita.evidencia_url} alt="Evidencia Daño" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                                                </button>
                                                             )}
                                                         </div>
                                                     )}
@@ -232,10 +231,11 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                                                             <p className="text-[10px] font-bold text-gray-500 uppercase">Vehículo dejado en: <strong className="text-gray-800">{bita.ubicacion_final}</strong></p>
                                                             {bita.detalles_incidencia && bita.detalles_incidencia !== 'Sin incidentes' && <p className="text-xs text-red-600 bg-red-50 p-3 rounded-xl border border-red-100"><strong className="text-red-800">Incidente:</strong> {bita.detalles_incidencia}</p>}
                                                             {bita.odometro_url && (
-                                                                <div className="mt-2 w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative group/img">
-                                                                    <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-10 font-black uppercase">Foto Odómetro</div>
-                                                                    <a href={bita.odometro_url} target="_blank" rel="noreferrer"><img src={bita.odometro_url} alt="Odómetro" className="w-full h-full object-cover hover:scale-105 transition-transform"/></a>
-                                                                </div>
+                                                                <button type="button" onClick={() => setImagenAmpliada(bita.odometro_url)} className="mt-2 w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative block text-left group/img cursor-zoom-in">
+                                                                    <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-20 font-black uppercase">Foto Odómetro</div>
+                                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                                                    <img src={bita.odometro_url} alt="Odómetro" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                                                </button>
                                                             )}
                                                         </div>
                                                     )}
@@ -245,9 +245,10 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                                                             <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${bita.gravedad_percance === 'grave' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>Gravedad: {bita.gravedad_percance}</span>
                                                             <p className="text-sm font-medium text-gray-700 bg-gray-50 p-3 rounded-xl border border-gray-100">{bita.detalles_incidencia}</p>
                                                             {bita.evidencia_url && (
-                                                                <div className="w-full h-32 rounded-xl overflow-hidden border border-gray-200">
-                                                                    <a href={bita.evidencia_url} target="_blank" rel="noreferrer"><img src={bita.evidencia_url} alt="Evidencia Percance" className="w-full h-full object-cover hover:scale-105 transition-transform"/></a>
-                                                                </div>
+                                                                <button type="button" onClick={() => setImagenAmpliada(bita.evidencia_url)} className="w-full h-32 rounded-xl overflow-hidden border border-gray-200 block text-left group/img relative cursor-zoom-in">
+                                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                                                    <img src={bita.evidencia_url} alt="Evidencia Percance" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                                                </button>
                                                             )}
                                                         </div>
                                                     )}
@@ -262,11 +263,11 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                 </div>
             </div>
 
-            {/* MODAL HIJO: DETALLES DE VIAJE (MUESTRA FOTOS) */}
+            {/* MODAL HIJO: DETALLES DE VIAJE */}
             {viajeSeleccionado && (
                 <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-[2rem] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50 shrink-0">
                             <div>
                                 <h3 className="text-lg font-black text-gray-800">Expediente del Viaje</h3>
                                 <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">Conductor: {viajeSeleccionado.salida?.usuario_id || viajeSeleccionado.llegada?.usuario_id}</p>
@@ -290,11 +291,13 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                                         <div className={`p-2 rounded-lg border ${viajeSeleccionado.salida.frenos_ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>Frenos: {viajeSeleccionado.salida.frenos_ok ? 'OK' : 'Falla'}</div>
                                     </div>
                                     {viajeSeleccionado.salida.detalles_incidencia && <p className="text-xs text-gray-600 bg-white p-3 rounded-xl border border-gray-200"><strong className="text-gray-800">Nota:</strong> {viajeSeleccionado.salida.detalles_incidencia}</p>}
-                                    {/* FOTO DE SALIDA */}
+                                    
                                     {viajeSeleccionado.salida.evidencia_url && (
-                                        <div className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200">
-                                            <a href={viajeSeleccionado.salida.evidencia_url} target="_blank" rel="noreferrer"><img src={viajeSeleccionado.salida.evidencia_url} alt="Evidencia Salida" className="w-full h-full object-cover"/></a>
-                                        </div>
+                                        <button type="button" onClick={() => setImagenAmpliada(viajeSeleccionado.salida.evidencia_url)} className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200 block text-left group/img relative cursor-zoom-in">
+                                            <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-20 font-black uppercase">Foto de Salida</div>
+                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                            <img src={viajeSeleccionado.salida.evidencia_url} alt="Evidencia Salida" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                        </button>
                                     )}
                                 </div>
                             )}
@@ -306,9 +309,10 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                                     <p className="text-[9px] text-gray-500 font-bold mb-2">{formatearFecha(perc.created_at)} {formatearHora(perc.created_at)} • Gravedad: {perc.gravedad_percance}</p>
                                     <p className="text-xs text-gray-800 font-medium mb-3 bg-white p-3 rounded-xl border border-orange-100">{perc.detalles_incidencia}</p>
                                     {perc.evidencia_url && (
-                                        <div className="w-full h-32 rounded-xl overflow-hidden border border-gray-200">
-                                            <a href={perc.evidencia_url} target="_blank" rel="noreferrer"><img src={perc.evidencia_url} alt="Evidencia Percance" className="w-full h-full object-cover"/></a>
-                                        </div>
+                                        <button type="button" onClick={() => setImagenAmpliada(perc.evidencia_url)} className="w-full h-32 rounded-xl overflow-hidden border border-gray-200 block text-left group/img relative cursor-zoom-in">
+                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                            <img src={perc.evidencia_url} alt="Evidencia Percance" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                        </button>
                                     )}
                                 </div>
                             ))}
@@ -325,12 +329,12 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                                     {viajeSeleccionado.llegada.detalles_incidencia && viajeSeleccionado.llegada.detalles_incidencia !== 'Sin incidentes' && (
                                         <p className="text-xs text-red-600 bg-white p-3 rounded-xl border border-red-100 mt-2"><strong>Nota Cierre:</strong> {viajeSeleccionado.llegada.detalles_incidencia}</p>
                                     )}
-                                    {/* FOTO DE ODÓMETRO FINAL */}
                                     {viajeSeleccionado.llegada.odometro_url && (
-                                        <div className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative">
-                                            <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-10 font-black uppercase">Foto Odómetro Final</div>
-                                            <a href={viajeSeleccionado.llegada.odometro_url} target="_blank" rel="noreferrer"><img src={viajeSeleccionado.llegada.odometro_url} alt="Odómetro Final" className="w-full h-full object-cover"/></a>
-                                        </div>
+                                        <button type="button" onClick={() => setImagenAmpliada(viajeSeleccionado.llegada.odometro_url)} className="mt-3 w-full h-32 rounded-xl overflow-hidden border border-gray-200 relative block text-left group/img cursor-zoom-in">
+                                            <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded backdrop-blur-sm z-20 font-black uppercase">Foto Odómetro Final</div>
+                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors z-10 flex items-center justify-center"><MdImage className="text-white text-3xl opacity-0 group-hover/img:opacity-100 transition-opacity" /></div>
+                                            <img src={viajeSeleccionado.llegada.odometro_url} alt="Odómetro Final" className="w-full h-full object-cover transition-transform group-hover/img:scale-105"/>
+                                        </button>
                                     )}
                                 </div>
                             ) : (
@@ -342,6 +346,14 @@ export default function ModalBitacoras({ isOpen, onClose, vehiculo }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* LIGHTBOX MAGISTRAL: Aparece encima de todo */}
+            {imagenAmpliada && (
+                <VisorImagen 
+                    imageUrl={imagenAmpliada} 
+                    onClose={() => setImagenAmpliada(null)} 
+                />
             )}
 
         </div>
