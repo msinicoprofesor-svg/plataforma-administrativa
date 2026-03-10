@@ -48,11 +48,9 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
         img_cenital: null, img_lateral: null, img_diagonal: null, img_cofre: null
     });
 
-    // NUEVO: Estado para almacenar las coordenadas X, Y
     const [coordenadas, setCoordenadas] = useState({
         llantas: [], aceite: null, anticongelante: null, frenos: null
     });
-    // NUEVO: Estado para saber qué punto estamos colocando
     const [hotspotActivo, setHotspotActivo] = useState(null);
 
     const fileInputRef = useRef(null);
@@ -71,7 +69,6 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
                 tipo_vehiculo: vehiculoAEditar.tipo_vehiculo || 'camioneta'
             });
             setImagenRecortadaURL(vehiculoAEditar.imagen_url || null);
-            // Cargamos las coordenadas si ya existían en la base de datos
             setCoordenadas(vehiculoAEditar.coordenadas_hotspots || { llantas: [], aceite: null, anticongelante: null, frenos: null });
         } else if (!vehiculoAEditar && isOpen) {
             setFormData({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff', placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta' });
@@ -126,25 +123,22 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Inyectamos las coordenadas matemáticas al formulario antes de guardarlo
         onSave({ ...formData, coordenadas_hotspots: coordenadas }, archivoFinal, renders);
     };
 
-    // FUNCIÓN MAGISTRAL: Calcula el porcentaje exacto (X, Y) del clic sobre la imagen
     const handleImageClick = (e, vista) => {
         if (!hotspotActivo || isViewOnly) return;
         
-        // Protecciones lógicas
         if (vista === 'lateral' && hotspotActivo !== 'llanta') return alert("Selecciona 'Llantas' para marcar puntos en la vista lateral.");
         if (vista === 'cofre' && hotspotActivo === 'llanta') return alert("Selecciona un componente del motor para marcar en el cofre.");
 
+        // MAGIA DE PRECISIÓN: Se calcula sobre el contenedor exacto de la imagen
         const rect = e.currentTarget.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
         const nuevoPunto = { top: `${y.toFixed(2)}%`, left: `${x.toFixed(2)}%` };
 
         if (hotspotActivo === 'llanta') {
-            // Si ya hay 2 llantas marcadas, al dar un tercer clic se reinicia
             const nuevasLlantas = coordenadas.llantas.length >= 2 ? [nuevoPunto] : [...coordenadas.llantas, nuevoPunto];
             setCoordenadas({ ...coordenadas, llantas: nuevasLlantas });
         } else {
@@ -152,7 +146,6 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
         }
     };
 
-    // Funciones de utilidad para mostrar la imagen recién subida o la de la BD
     const getRenderUrl = (key) => {
         if (renders[key]) return URL.createObjectURL(renders[key]);
         if (vehiculoAEditar && vehiculoAEditar[key]) return vehiculoAEditar[key];
@@ -279,22 +272,28 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, v
                                     {renderLateralUrl && (
                                         <div className="space-y-2">
                                             <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Lateral (Llantas)</span>
-                                            <div className={`relative w-full h-40 bg-white rounded-xl border-2 overflow-hidden select-none transition-colors ${hotspotActivo === 'llanta' && !isViewOnly ? 'border-orange-400 cursor-crosshair' : 'border-gray-200'}`} onClick={(e) => handleImageClick(e, 'lateral')}>
-                                                <img src={renderLateralUrl} alt="Lateral" className="w-full h-full object-contain pointer-events-none" />
-                                                {coordenadas.llantas.map((punto, i) => (
-                                                    <div key={i} className="absolute w-4 h-4 rounded-full bg-blue-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg" style={{ top: punto.top, left: punto.left }}></div>
-                                                ))}
+                                            {/* CONTENEDOR MODIFICADO PARA PRECISIÓN */}
+                                            <div className={`w-full h-48 bg-white rounded-xl border-2 flex items-center justify-center overflow-hidden transition-colors ${hotspotActivo === 'llanta' && !isViewOnly ? 'border-orange-400' : 'border-gray-200'}`}>
+                                                <div className={`relative h-full inline-block ${hotspotActivo === 'llanta' && !isViewOnly ? 'cursor-crosshair' : ''}`} onClick={(e) => handleImageClick(e, 'lateral')}>
+                                                    <img src={renderLateralUrl} alt="Lateral" className="h-full w-auto object-contain pointer-events-none" />
+                                                    {coordenadas.llantas.map((punto, i) => (
+                                                        <div key={i} className="absolute w-4 h-4 rounded-full bg-blue-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg" style={{ top: punto.top, left: punto.left }}></div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
                                     {renderCofreUrl && (
                                         <div className="space-y-2">
                                             <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Cofre (Motor)</span>
-                                            <div className={`relative w-full h-40 bg-white rounded-xl border-2 overflow-hidden select-none transition-colors ${['aceite', 'anticongelante', 'frenos'].includes(hotspotActivo) && !isViewOnly ? 'border-orange-400 cursor-crosshair' : 'border-gray-200'}`} onClick={(e) => handleImageClick(e, 'cofre')}>
-                                                <img src={renderCofreUrl} alt="Cofre" className="w-full h-full object-contain pointer-events-none" />
-                                                {coordenadas.aceite && <div className="absolute w-4 h-4 rounded-full bg-yellow-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg flex items-center justify-center text-[8px] text-white font-black" style={{ top: coordenadas.aceite.top, left: coordenadas.aceite.left }}>A</div>}
-                                                {coordenadas.anticongelante && <div className="absolute w-4 h-4 rounded-full bg-green-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg flex items-center justify-center text-[8px] text-white font-black" style={{ top: coordenadas.anticongelante.top, left: coordenadas.anticongelante.left }}>N</div>}
-                                                {coordenadas.frenos && <div className="absolute w-4 h-4 rounded-full bg-red-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg flex items-center justify-center text-[8px] text-white font-black" style={{ top: coordenadas.frenos.top, left: coordenadas.frenos.left }}>F</div>}
+                                            {/* CONTENEDOR MODIFICADO PARA PRECISIÓN */}
+                                            <div className={`w-full h-48 bg-white rounded-xl border-2 flex items-center justify-center overflow-hidden transition-colors ${['aceite', 'anticongelante', 'frenos'].includes(hotspotActivo) && !isViewOnly ? 'border-orange-400' : 'border-gray-200'}`}>
+                                                <div className={`relative h-full inline-block ${['aceite', 'anticongelante', 'frenos'].includes(hotspotActivo) && !isViewOnly ? 'cursor-crosshair' : ''}`} onClick={(e) => handleImageClick(e, 'cofre')}>
+                                                    <img src={renderCofreUrl} alt="Cofre" className="h-full w-auto object-contain pointer-events-none" />
+                                                    {coordenadas.aceite && <div className="absolute w-4 h-4 rounded-full bg-yellow-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg flex items-center justify-center text-[8px] text-white font-black" style={{ top: coordenadas.aceite.top, left: coordenadas.aceite.left }}>A</div>}
+                                                    {coordenadas.anticongelante && <div className="absolute w-4 h-4 rounded-full bg-green-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg flex items-center justify-center text-[8px] text-white font-black" style={{ top: coordenadas.anticongelante.top, left: coordenadas.anticongelante.left }}>N</div>}
+                                                    {coordenadas.frenos && <div className="absolute w-4 h-4 rounded-full bg-red-500 border-2 border-white transform -translate-x-1/2 -translate-y-1/2 shadow-lg flex items-center justify-center text-[8px] text-white font-black" style={{ top: coordenadas.frenos.top, left: coordenadas.frenos.left }}>F</div>}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
