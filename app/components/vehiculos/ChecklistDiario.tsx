@@ -5,7 +5,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
     MdCameraAlt, MdCheckCircle, MdWarning, MdLocalGasStation, 
-    MdSpeed, MdClose
+    MdSpeed, MdClose, MdMenu
 } from 'react-icons/md';
 import Tesseract from 'tesseract.js';
 
@@ -14,6 +14,31 @@ import { supabase } from '../../lib/supabase';
 
 const PLACEHOLDER_CAR = 'https://xtfuxscqymvunbppknyr.supabase.co/storage/v1/object/public/vehiculos-fotos/vehiculos/placeholder-car-diag.png';
 
+// --- MOTOR DE COMPRESIÓN DE IMÁGENES EN NAVEGADOR ---
+const comprimirImagen = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                // Redimensionar a un máximo de 800px para mantener legibilidad pesando casi nada
+                const maxWidth = 800;
+                const scaleSize = img.width > maxWidth ? (maxWidth / img.width) : 1;
+                canvas.width = img.width * scaleSize;
+                canvas.height = img.height * scaleSize;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => {
+                    resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                }, 'image/jpeg', 0.7); // 70% de calidad
+            };
+        };
+    });
+};
+
 export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado }) {
     const { guardarBitacora, loading } = useBitacora();
 
@@ -21,15 +46,22 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
     const [kilometraje, setKilometraje] = useState('');
     const [gasolina, setGasolina] = useState('');
     const [incidencia, setIncidencia] = useState('');
+    
     const [evidenciaFile, setEvidenciaFile] = useState(null);
     const [evidenciaPreview, setEvidenciaPreview] = useState(null);
+    const [odometroFile, setOdometroFile] = useState(null); // NUEVO: Archivo de evidencia del odómetro
 
     const [checklist, setChecklist] = useState({ llantas: null, aceite: null, anticongelante: null, frenos: null });
     const [pasoActivo, setPasoActivo] = useState('cenital'); 
 
+    // --- ESTADOS DEL MODAL OCR ---
+    const [showOcrModal, setShowOcrModal] = useState(false);
     const [isOcrProcessing, setIsOcrProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
     const [ocrStatus, setOcrStatus] = useState('');
+    const [tempOcrFile, setTempOcrFile] = useState(null);
+    const [tempOcrPreview, setTempOcrPreview] = useState(null);
+    const [tempOcrValue, setTempOcrValue] = useState('');
     
     const ocrInputRef = useRef(null);
     const evidenciaInputRef = useRef(null);
@@ -45,22 +77,57 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
         fetchVehiculo();
     }, [vehiculoId]);
 
+    // --- LÓGICA OPTIMIZADA DEL ODÓMETRO ---
     const handleOCR = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        setIsOcrProcessing(true); setOcrProgress(0); setOcrStatus('Iniciando IA...');
+
+        // 1. Mostrar modal y generar preview inmediato
+        setShowOcrModal(true);
+        setIsOcrProcessing(true);
+        setOcrProgress(0);
+        setOcrStatus('Comprimiendo imagen...');
+
+        // 2. Comprimir la imagen drásticamente
+        const compressedFile = await comprimirImagen(file);
+        setTempOcrFile(compressedFile);
+        
+        const reader = new FileReader();
+        reader.onloadend = () => setTempOcrPreview(reader.result);
+        reader.readAsDataURL(compressedFile);
+
+        // 3. Mandar a la IA a leer la imagen ya comprimida
         try {
-            const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: (m) => { if (m.status === 'recognizing text') { setOcrStatus('Escaneando Tablero...'); setOcrProgress(Math.round(m.progress * 100)); } } });
+            const { data: { text } } = await Tesseract.recognize(compressedFile, 'eng', { 
+                logger: (m) => { 
+                    if (m.status === 'recognizing text') { 
+                        setOcrStatus('Detectando números...'); 
+                        setOcrProgress(Math.round(m.progress * 100)); 
+                    } else if (m.status === 'loading tesseract core') {
+                        setOcrStatus('Iniciando IA...');
+                    }
+                } 
+            });
             const soloNumeros = text.replace(/[^0-9]/g, '');
-            if (soloNumeros) setKilometraje(soloNumeros);
-            else alert("No se detectaron números claramente.");
-        } catch (error) { alert("Error al procesar la imagen."); }
-        setIsOcrProcessing(false); setOcrStatus('');
+            if (soloNumeros) setTempOcrValue(soloNumeros);
+        } catch (error) { 
+            console.error("Error OCR:", error); 
+        }
+        
+        setIsOcrProcessing(false); 
+        setOcrStatus('');
     };
 
-    const handleEvidencia = (e) => {
+    const handleEvidencia = async (e) => {
         const file = e.target.files[0];
-        if (file) { setEvidenciaFile(file); const reader = new FileReader(); reader.onloadend = () => setEvidenciaPreview(reader.result); reader.readAsDataURL(file); }
+        if (file) { 
+            // También comprimimos la foto del daño para ahorrar datos
+            const compressedFile = await comprimirImagen(file);
+            setEvidenciaFile(compressedFile); 
+            const reader = new FileReader(); 
+            reader.onloadend = () => setEvidenciaPreview(reader.result); 
+            reader.readAsDataURL(compressedFile); 
+        }
     };
 
     const marcarPaso = (campo, estado) => {
@@ -69,7 +136,7 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
     };
 
     const handleGuardar = async () => {
-        if (!kilometraje) { alert("Ingresa el kilometraje actual."); return; }
+        if (!kilometraje || !odometroFile) { alert("Es obligatorio capturar la foto del kilometraje actual."); return; }
         if (!todoRevisado) { alert("Debes revisar todos los puntos físicos."); return; }
 
         const datos = {
@@ -80,7 +147,8 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
             detalles_incidencia: incidencia
         };
 
-        const res = await guardarBitacora(datos, evidenciaFile);
+        // Pasamos ambos archivos (daños y odómetro) al cerebro
+        const res = await guardarBitacora(datos, evidenciaFile, odometroFile);
         if (res.success) onCompletado();
     };
 
@@ -95,11 +163,10 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
     const coordenadas = vehiculo?.coordenadas_hotspots || {};
     const imgStyle = "absolute inset-0 w-full h-full object-contain transition-all duration-700 ease-in-out drop-shadow-2xl";
 
-    // VISTA ABSOLUTA: Para lograr inmersión total y cubrir el "vehiculos panel"
     return (
         <div className="fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col pb-24 font-sans animate-fade-in overflow-y-auto overflow-x-hidden custom-scrollbar">
             
-            {/* ENCABEZADO IMERSIVO ESTILO FIGMA */}
+            {/* ENCABEZADO IMERSIVO */}
             <div className="bg-white pt-10 pb-4 px-6 rounded-b-[2rem] shadow-sm relative z-20 flex justify-between items-center border-b border-gray-100 shrink-0">
                 <div>
                     <h1 className="text-xl font-black text-blue-600 leading-tight flex items-center gap-2">
@@ -113,24 +180,30 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
                     </span>
                 </div>
                 
-                {/* MINIATURA DEL CATÁLOGO */}
-                {vehiculo?.imagen_url && (
-                    <div className="w-24 h-16 relative flex-shrink-0 bg-white rounded-xl">
-                        <img src={vehiculo.imagen_url} alt="Miniatura" className="w-full h-full object-contain drop-shadow-md" />
-                    </div>
-                )}
+                <div className="flex items-center gap-3">
+                    {/* MODIFICADO 1: Miniatura limpia sin sombra */}
+                    {vehiculo?.imagen_url && (
+                        <div className="w-20 h-12 relative flex-shrink-0 bg-white rounded-xl">
+                            <img src={vehiculo.imagen_url} alt="Miniatura" className="w-full h-full object-contain" />
+                        </div>
+                    )}
+                    {/* MODIFICADO 5: Botón de menú devuelto */}
+                    <button className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors border border-gray-100">
+                        <MdMenu className="text-xl" />
+                    </button>
+                </div>
             </div>
 
-            {/* VISOR VEHICULAR CON TRANSICIONES Y ZOOM */}
+            {/* VISOR VEHICULAR */}
             <div className="relative w-full h-64 mt-4 flex items-center justify-center overflow-hidden shrink-0">
                 <img src={vehiculo?.img_cenital || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'cenital' ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} alt="Cenital" />
                 <img src={vehiculo?.img_lateral || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'lateral' ? 'opacity-100 scale-110 translate-x-3' : 'opacity-0 translate-x-10 scale-95'}`} alt="Lateral" />
                 <img src={vehiculo?.img_diagonal || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'diagonal' ? 'opacity-100 scale-110' : 'opacity-0 -translate-x-10 scale-95'}`} alt="Diagonal" />
                 
-                {/* ZOOM EN EL COFRE */}
-                <img src={vehiculo?.img_cofre || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'cofre' ? 'opacity-100 scale-[1.35] translate-y-8' : 'opacity-0 translate-y-0 scale-100'}`} alt="Cofre" />
+                {/* MODIFICADO 3: Cofre sin zoom extremo, escala unificada */}
+                <img src={vehiculo?.img_cofre || PLACEHOLDER_CAR} className={`${imgStyle} ${vista === 'cofre' ? 'opacity-100 scale-110' : 'opacity-0 translate-y-0 scale-95'}`} alt="Cofre" />
 
-                {/* HOTSPOTS DINÁMICOS CONECTADOS A LA BASE DE DATOS */}
+                {/* HOTSPOTS DINÁMICOS */}
                 {vista === 'lateral' && coordenadas.llantas && coordenadas.llantas.map((punto, i) => (
                     <Hotspot key={`llanta-${i}`} top={punto.top} left={punto.left} status={checklist.llantas} />
                 ))}
@@ -183,14 +256,24 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
                     </div>
                 )}
 
+                {/* ODÓMETRO RE-DISEÑADO */}
                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100">
                     <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-widest text-center mb-4">Kilometraje Actual</h3>
-                    <div className="flex items-center gap-3">
-                        <input type="number" value={kilometraje} onChange={(e) => setKilometraje(e.target.value)} placeholder="Ej. 125000" disabled={isOcrProcessing} className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-lg font-black text-center text-gray-800 outline-none focus:border-blue-500 transition-colors" />
-                        <button onClick={() => ocrInputRef.current.click()} disabled={isOcrProcessing} className="w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center shrink-0 active:scale-95 transition-transform"><MdCameraAlt className="text-xl"/></button>
-                        <input type="file" accept="image/*" capture="environment" ref={ocrInputRef} onChange={handleOCR} className="hidden" />
-                    </div>
-                    {isOcrProcessing && <div className="mt-3 animate-fade-in"><div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${ocrProgress}%` }}></div></div><p className="text-[8px] font-black text-blue-500 uppercase text-center mt-1.5 tracking-wider">{ocrStatus}</p></div>}
+                    {kilometraje ? (
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 p-4 rounded-2xl">
+                            <div>
+                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Odómetro Confirmado</p>
+                                <p className="text-xl font-black text-blue-900">{kilometraje} km</p>
+                            </div>
+                            <button onClick={() => ocrInputRef.current.click()} className="text-blue-600 hover:text-blue-800 text-[10px] font-black uppercase underline">Modificar</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => ocrInputRef.current.click()} className="w-full py-5 bg-gray-900 text-white rounded-2xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg shadow-gray-900/20">
+                            <MdCameraAlt className="text-3xl text-blue-400"/>
+                            <span className="text-[10px] font-black uppercase tracking-widest">Tomar Foto del Tablero</span>
+                        </button>
+                    )}
+                    <input type="file" accept="image/*" capture="environment" ref={ocrInputRef} onChange={handleOCR} className="hidden" />
                 </div>
 
                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100">
@@ -205,12 +288,45 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
             <div className="fixed bottom-0 left-0 right-0 p-5 bg-white/80 backdrop-blur-md border-t border-gray-100 pb-safe z-[110]">
                 <button 
                     onClick={handleGuardar} 
-                    disabled={loading || isOcrProcessing || !todoRevisado} 
+                    disabled={loading || !todoRevisado || !kilometraje} 
                     className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 shadow-xl shadow-gray-900/20 disabled:opacity-50 transition-all"
                 >
-                    {loading ? 'Guardando...' : (todoRevisado ? 'Confirmar y Arrancar' : 'Primero revisa los puntos físicos')}
+                    {loading ? 'Sincronizando...' : (todoRevisado && kilometraje ? 'Confirmar y Arrancar' : 'Completa todos los pasos')}
                 </button>
             </div>
+
+            {/* MODAL DE CONFIRMACIÓN OCR */}
+            {showOcrModal && (
+                <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-slide-up">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <h3 className="text-base font-black text-gray-800 flex items-center gap-2"><MdSpeed className="text-blue-600 text-xl"/> Odómetro</h3>
+                            <button onClick={() => setShowOcrModal(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <div className="w-full h-32 bg-gray-100 rounded-2xl overflow-hidden relative border border-gray-200">
+                                {tempOcrPreview && <img src={tempOcrPreview} className="w-full h-full object-cover" alt="Odómetro" />}
+                                {isOcrProcessing && (
+                                    <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-white p-5 animate-fade-in">
+                                        <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden mb-3"><div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${ocrProgress}%` }}></div></div>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-center">{ocrStatus}</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 text-center">Kilometraje Detectado</label>
+                                <input type="number" value={tempOcrValue} onChange={(e) => setTempOcrValue(e.target.value)} disabled={isOcrProcessing} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-2xl font-black text-center text-gray-800 outline-none focus:border-blue-500 transition-colors disabled:opacity-50" placeholder="Ej. 125000" />
+                                {!isOcrProcessing && <p className="text-[9px] font-bold text-orange-500 text-center mt-2 uppercase">Modifica el número si la IA se equivocó.</p>}
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-gray-100 bg-white shrink-0">
+                            <button onClick={() => { setKilometraje(tempOcrValue); setOdometroFile(tempOcrFile); setShowOcrModal(false); }} disabled={isOcrProcessing || !tempOcrValue} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/30 active:scale-95 disabled:opacity-50">
+                                <MdCheckCircle className="text-xl"/> Confirmar Kilometraje
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
