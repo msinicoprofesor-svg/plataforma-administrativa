@@ -3,7 +3,11 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react';
-import { MdDirectionsCar, MdAdd, MdEngineering, MdListAlt, MdCheckCircle, MdPersonAdd, MdPersonOff, MdLockOutline, MdClose, MdSearch } from 'react-icons/md';
+import { 
+    MdDirectionsCar, MdAdd, MdEngineering, MdListAlt, MdCheckCircle, 
+    MdPersonAdd, MdPersonOff, MdLockOutline, MdClose, MdSearch,
+    MdEdit, MdVisibility, MdDelete
+} from 'react-icons/md';
 import { FaCarSide, FaTruckPickup, FaMotorcycle, FaUserCircle } from 'react-icons/fa';
 
 import { useVehiculos } from '../../hooks/useVehiculos';
@@ -11,7 +15,8 @@ import ModalVehiculo from './ModalVehiculo';
 import ChecklistDiario from './ChecklistDiario';
 
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
-    const { vehiculos, loading, agregarVehiculo, asignarVehiculo } = useVehiculos();
+    // Agregamos actualizarVehiculo y eliminarVehiculo del hook
+    const { vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo } = useVehiculos();
     
     const ROLES_ADMIN = ['GERENTE_MKT', 'DIRECTOR', 'GERENTE_GENERAL', 'SOPORTE_GENERAL'];
     const esEncargado = ROLES_ADMIN.includes(usuarioActivo?.rol);
@@ -20,6 +25,10 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const [modalAbierto, setModalAbierto] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
+    // NUEVOS ESTADOS PARA EL MODAL CAMALEÓN
+    const [vehiculoAEditar, setVehiculoAEditar] = useState(null);
+    const [isViewOnly, setIsViewOnly] = useState(false);
+
     // Estados del conductor
     const [modoChecklist, setModoChecklist] = useState(false);
     const [checklistTerminado, setChecklistTerminado] = useState(false);
@@ -28,11 +37,33 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const [vehiculoAAsignar, setVehiculoAAsignar] = useState(null);
     const [busquedaAsignacion, setBusquedaAsignacion] = useState('');
 
+    // Función unificada para abrir el modal en diferentes modos
+    const handleAbrirModal = (vehiculo = null, viewOnly = false) => {
+        setVehiculoAEditar(vehiculo);
+        setIsViewOnly(viewOnly);
+        setModalAbierto(true);
+    };
+
+    // Función inteligente que sabe si está creando o actualizando
     const handleGuardar = async (formData, archivoFinal, rendersFiles) => {
         setIsSubmitting(true);
-        const res = await agregarVehiculo(formData, archivoFinal, rendersFiles);
+        let res;
+        
+        if (vehiculoAEditar) {
+            res = await actualizarVehiculo(vehiculoAEditar.id, formData, archivoFinal, rendersFiles);
+        } else {
+            res = await agregarVehiculo(formData, archivoFinal, rendersFiles);
+        }
+        
         setIsSubmitting(false);
         if (res.success) setModalAbierto(false);
+    };
+
+    // Función para eliminar con confirmación de seguridad
+    const handleEliminar = async (id, marca, modelo) => {
+        if(confirm(`🚨 ADVERTENCIA: ¿Estás seguro de que deseas eliminar permanentemente la unidad ${marca} ${modelo}?\n\nEsta acción no se puede deshacer y borrará su historial.`)){
+            await eliminarVehiculo(id);
+        }
     };
 
     const confirmarAsignacion = async (vehiculoId, colaboradorId) => {
@@ -111,14 +142,12 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
         taller: vehiculos.filter(v => v.estado === 'TALLER').length,
     };
 
-    // Filtramos los colaboradores para el buscador del modal
     const colaboradoresBusqueda = colaboradores.filter(c => 
         c.nombre.toLowerCase().includes(busquedaAsignacion.toLowerCase()) || 
         c.puesto?.toLowerCase().includes(busquedaAsignacion.toLowerCase()) ||
         c.id?.toLowerCase().includes(busquedaAsignacion.toLowerCase())
-    ).slice(0, 15); // Mostramos máximo 15 para no saturar la vista
+    ).slice(0, 15);
 
-    // Función para obtener el nombre del responsable actual
     const getNombreResponsable = (id) => {
         const col = colaboradores.find(c => c.id === id);
         return col ? col.nombre : 'Usuario Desconocido';
@@ -138,7 +167,8 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                         <button onClick={() => setFiltroEstado('EN_RUTA')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'EN_RUTA' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-blue-600'}`}>En Ruta ({stats.ruta})</button>
                         <button onClick={() => setFiltroEstado('TALLER')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TALLER' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-orange-600'}`}>Taller ({stats.taller})</button>
                     </div>
-                    <button onClick={() => setModalAbierto(true)} className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95"><MdAdd className="text-lg"/> Nuevo Vehículo</button>
+                    {/* Al crear uno nuevo, pasamos null (sin auto) y false (no es solo lectura) */}
+                    <button onClick={() => handleAbrirModal(null, false)} className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95"><MdAdd className="text-lg"/> Nuevo Vehículo</button>
                 </div>
             </div>
 
@@ -166,12 +196,25 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                                     <div className="flex justify-between items-start mb-1">
                                         <h3 className="text-lg font-black text-gray-900 leading-tight">{v.marca} {v.modelo}</h3>
                                         {v.responsable_id ? (
-                                            <span className="bg-blue-100 text-blue-700 text-[8px] px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1"><MdPersonAdd/> Asignado</span>
+                                            <span className="bg-blue-100 text-blue-700 text-[8px] px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1 shrink-0"><MdPersonAdd/> Asignado</span>
                                         ) : (
-                                            <span className="bg-gray-100 text-gray-500 text-[8px] px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1"><MdPersonOff/> Libre</span>
+                                            <span className="bg-gray-100 text-gray-500 text-[8px] px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1 shrink-0"><MdPersonOff/> Libre</span>
                                         )}
                                     </div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Año {v.anio}</p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Año {v.anio}</p>
+                                    
+                                    {/* BOTONES DE ACCIÓN CRUD SUTILES */}
+                                    <div className="flex items-center gap-1.5 mb-4 pb-3 border-b border-gray-100">
+                                        <button onClick={() => handleAbrirModal(v, true)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1" title="Ver Detalles">
+                                            <MdVisibility size={16}/> <span className="text-[9px] font-bold uppercase tracking-widest">Ver</span>
+                                        </button>
+                                        <button onClick={() => handleAbrirModal(v, false)} className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors flex items-center gap-1" title="Editar">
+                                            <MdEdit size={16}/> <span className="text-[9px] font-bold uppercase tracking-widest">Editar</span>
+                                        </button>
+                                        <button onClick={() => handleEliminar(v.id, v.marca, v.modelo)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 ml-auto" title="Eliminar">
+                                            <MdDelete size={16}/>
+                                        </button>
+                                    </div>
                                     
                                     <div className="bg-gray-50 rounded-2xl p-3 mb-4 flex-1 border border-gray-100">
                                         {v.responsable_id ? (
@@ -208,7 +251,14 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                 )}
             </div>
             
-            <ModalVehiculo isOpen={modalAbierto} onClose={() => setModalAbierto(false)} onSave={handleGuardar} isSubmitting={isSubmitting} />
+            <ModalVehiculo 
+                isOpen={modalAbierto} 
+                onClose={() => setModalAbierto(false)} 
+                onSave={handleGuardar} 
+                isSubmitting={isSubmitting} 
+                vehiculoAEditar={vehiculoAEditar} // Pasamos los nuevos props al modal
+                isViewOnly={isViewOnly}
+            />
 
             {/* MODAL DE ASIGNACIÓN CORPORATIVA */}
             {vehiculoAAsignar && (

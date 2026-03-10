@@ -23,11 +23,9 @@ export function useVehiculos() {
         setLoading(false);
     };
 
-    // MODIFICADO: Ahora recibe los renders interactivos como tercer parámetro
     const agregarVehiculo = async (nuevoVehiculo, imagenFile, archivosRenders = {}) => {
         let imagen_url = null;
 
-        // 1. Subir la miniatura principal
         if (imagenFile) {
             const fileExt = imagenFile.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -42,7 +40,6 @@ export function useVehiculos() {
             }
         }
 
-        // 2. Subir los renders interactivos (si existen)
         const urlsRenders = {};
         for (const [key, file] of Object.entries(archivosRenders)) {
             if (file) {
@@ -60,7 +57,6 @@ export function useVehiculos() {
             }
         }
 
-        // 3. Empaquetar todo
         const payload = { ...nuevoVehiculo, ...urlsRenders };
         if (imagen_url) payload.imagen_url = imagen_url;
 
@@ -72,6 +68,67 @@ export function useVehiculos() {
         } else {
             console.error("Error al agregar vehículo:", error);
             alert(`Error al registrar: ${error.message}`);
+            return { success: false, error };
+        }
+    };
+
+    // NUEVO: Función para actualizar un vehículo existente
+    const actualizarVehiculo = async (id, datosActualizados, imagenFile = null, archivosRenders = {}) => {
+        let imagen_url = datosActualizados.imagen_url;
+
+        // Si hay foto principal nueva, la subimos
+        if (imagenFile) {
+            const fileExt = imagenFile.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = `vehiculos/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage.from('vehiculos-fotos').upload(filePath, imagenFile);
+            if (!uploadError) {
+                const { data } = supabase.storage.from('vehiculos-fotos').getPublicUrl(filePath);
+                imagen_url = data.publicUrl;
+            }
+        }
+
+        // Si hay renders nuevos, los subimos
+        const urlsRenders = {};
+        for (const [key, file] of Object.entries(archivosRenders)) {
+            if (file) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `render-${key}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+                const filePath = `vehiculos/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage.from('vehiculos-fotos').upload(filePath, file);
+                if (!uploadError) {
+                    const { data } = supabase.storage.from('vehiculos-fotos').getPublicUrl(filePath);
+                    urlsRenders[key] = data.publicUrl;
+                }
+            }
+        }
+
+        const payload = { ...datosActualizados, ...urlsRenders };
+        if (imagen_url) payload.imagen_url = imagen_url;
+
+        const { error } = await supabase.from('vehiculos').update(payload).eq('id', id);
+        
+        if (!error) {
+            await fetchVehiculos();
+            return { success: true };
+        } else {
+            console.error("Error al actualizar vehículo:", error);
+            alert(`Error al actualizar: ${error.message}`);
+            return { success: false, error };
+        }
+    };
+
+    // NUEVO: Función para eliminar un vehículo por completo
+    const eliminarVehiculo = async (id) => {
+        const { error } = await supabase.from('vehiculos').delete().eq('id', id);
+        if (!error) {
+            await fetchVehiculos();
+            return { success: true };
+        } else {
+            console.error("Error al eliminar vehículo:", error);
+            alert(`Error al eliminar: ${error.message}`);
             return { success: false, error };
         }
     };
@@ -90,5 +147,7 @@ export function useVehiculos() {
 
     useEffect(() => { fetchVehiculos(); }, []);
 
-    return { vehiculos, loading, agregarVehiculo, asignarVehiculo, refetch: fetchVehiculos };
+    return { 
+        vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo, refetch: fetchVehiculos 
+    };
 }

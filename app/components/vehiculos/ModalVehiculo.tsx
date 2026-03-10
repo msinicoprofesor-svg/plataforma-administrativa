@@ -2,7 +2,7 @@
 /* ARCHIVO: app/components/vehiculos/ModalVehiculo.tsx                        */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { MdClose, MdCheckCircle, MdPhotoCamera, MdOutlineFormatColorFill, MdConfirmationNumber, MdShield, MdCrop, MdImage } from 'react-icons/md';
 import Cropper from 'react-easy-crop';
 
@@ -31,7 +31,8 @@ async function getCroppedImg(imageSrc, pixelCrop) {
   });
 }
 
-export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting }) {
+// MODIFICADO: Agregamos vehiculoAEditar e isViewOnly a los props
+export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting, vehiculoAEditar, isViewOnly }) {
     const [formData, setFormData] = useState({
         marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff',
         placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta'
@@ -44,12 +45,32 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting })
     const [imagenRecortadaURL, setImagenRecortadaURL] = useState(null); 
     const [archivoFinal, setArchivoFinal] = useState(null); 
     
-    // NUEVO: Estado para almacenar los 5 renders
     const [renders, setRenders] = useState({
         img_base: null, img_llantas_ok: null, img_llantas_error: null, img_motor_ok: null, img_motor_error: null
     });
 
     const fileInputRef = useRef(null);
+
+    // NUEVO: Efecto Camaleón para precargar datos cuando entra a modo Edición o Lectura
+    useEffect(() => {
+        if (vehiculoAEditar && isOpen) {
+            setFormData({
+                id: vehiculoAEditar.id,
+                marca: vehiculoAEditar.marca || '',
+                modelo: vehiculoAEditar.modelo || '',
+                anio: vehiculoAEditar.anio || new Date().getFullYear(),
+                color: vehiculoAEditar.color || '#ffffff',
+                placas: vehiculoAEditar.placas || '',
+                serie: vehiculoAEditar.serie || '',
+                poliza: vehiculoAEditar.poliza || '',
+                tipo_vehiculo: vehiculoAEditar.tipo_vehiculo || 'camioneta'
+            });
+            setImagenRecortadaURL(vehiculoAEditar.imagen_url || null);
+        } else if (!vehiculoAEditar && isOpen) {
+            setFormData({ marca: '', modelo: '', anio: new Date().getFullYear(), color: '#ffffff', placas: '', serie: '', poliza: '', tipo_vehiculo: 'camioneta' });
+            setImagenRecortadaURL(null);
+        }
+    }, [vehiculoAEditar, isOpen]);
 
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -96,34 +117,40 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting })
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Enviamos la data, la miniatura recortada y los renders
         onSave(formData, archivoFinal, renders);
     };
 
     if (!isOpen) return null;
 
-    // Subcomponente para renderizar las cajas de subida de renders
-    const RenderInput = ({ title, renderKey }) => (
-        <div className="flex flex-col gap-1">
-            <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{title}</label>
-            <div className={`relative flex items-center justify-center border-2 border-dashed rounded-xl p-2 transition-colors ${renders[renderKey] ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
-                <input type="file" accept="image/png" onChange={(e) => handleRenderChange(e, renderKey)} disabled={isSubmitting} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                <div className="flex flex-col items-center pointer-events-none text-center">
-                    <MdImage className={`text-xl ${renders[renderKey] ? 'text-green-500' : 'text-gray-400'}`} />
-                    <span className={`text-[8px] font-bold uppercase mt-1 ${renders[renderKey] ? 'text-green-600' : 'text-gray-400'}`}>
-                        {renders[renderKey] ? renders[renderKey].name : 'Cargar PNG'}
-                    </span>
+    const RenderInput = ({ title, renderKey }) => {
+        // Si estamos editando y ya hay foto previa en la base de datos, mostramos un indicador visual
+        const tieneRenderPrevio = vehiculoAEditar && vehiculoAEditar[renderKey];
+        
+        return (
+            <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{title}</label>
+                <div className={`relative flex items-center justify-center border-2 border-dashed rounded-xl p-2 transition-colors ${renders[renderKey] || tieneRenderPrevio ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
+                    <input type="file" accept="image/png" onChange={(e) => handleRenderChange(e, renderKey)} disabled={isSubmitting || isViewOnly} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                    <div className="flex flex-col items-center pointer-events-none text-center">
+                        <MdImage className={`text-xl ${renders[renderKey] || tieneRenderPrevio ? 'text-green-500' : 'text-gray-400'}`} />
+                        <span className={`text-[8px] font-bold uppercase mt-1 ${renders[renderKey] || tieneRenderPrevio ? 'text-green-600' : 'text-gray-400'}`}>
+                            {renders[renderKey] ? renders[renderKey].name : (tieneRenderPrevio ? 'Render Guardado' : 'Cargar PNG')}
+                        </span>
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
+
+    // Título dinámico
+    const tituloModal = isViewOnly ? 'Detalles de Vehículo' : (vehiculoAEditar ? 'Editar Vehículo' : 'Alta de Vehículo');
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
             <div className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
                 
                 <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
-                    <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdPhotoCamera className="text-blue-600"/> Alta de Vehículo</h3>
+                    <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdPhotoCamera className="text-blue-600"/> {tituloModal}</h3>
                     <button onClick={handleClose} disabled={isSubmitting} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
                 </div>
 
@@ -140,11 +167,13 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting })
                                 </div>
                             </div>
                         ) : (
-                            <div onClick={() => !isSubmitting && fileInputRef.current.click()} className={`w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center transition-colors relative overflow-hidden group ${!isSubmitting && 'cursor-pointer hover:bg-gray-100'}`}>
+                            <div onClick={() => !isSubmitting && !isViewOnly && fileInputRef.current.click()} className={`w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center transition-colors relative overflow-hidden group ${!isSubmitting && !isViewOnly && 'cursor-pointer hover:bg-gray-100'}`}>
                                 {imagenRecortadaURL ? (
                                     <>
                                         <img src={imagenRecortadaURL} alt="Preview Final" className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-white text-xs font-black uppercase tracking-widest bg-black/50 px-4 py-2 rounded-xl">Cambiar Foto</span></div>
+                                        {!isViewOnly && (
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-white text-xs font-black uppercase tracking-widest bg-black/50 px-4 py-2 rounded-xl">Cambiar Foto</span></div>
+                                        )}
                                     </>
                                 ) : (
                                     <>
@@ -154,32 +183,32 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting })
                                 )}
                             </div>
                         )}
-                        <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={onFileChange} disabled={isSubmitting}/>
+                        <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={onFileChange} disabled={isSubmitting || isViewOnly}/>
                     </div>
 
                     <form id="formVehiculo" onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Marca</label><input required name="marca" value={formData.marca} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" disabled={isSubmitting}/></div>
-                            <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Modelo</label><input required name="modelo" value={formData.modelo} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" disabled={isSubmitting}/></div>
+                            <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Marca</label><input required name="marca" value={formData.marca} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
+                            <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Modelo</label><input required name="modelo" value={formData.modelo} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                            <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Año</label><input required type="number" name="anio" value={formData.anio} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" disabled={isSubmitting}/></div>
+                            <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Año</label><input required type="number" name="anio" value={formData.anio} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
                             <div>
                                 <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Tipo</label>
-                                <select name="tipo_vehiculo" value={formData.tipo_vehiculo} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 cursor-pointer" disabled={isSubmitting}>
+                                <select name="tipo_vehiculo" value={formData.tipo_vehiculo} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 cursor-pointer disabled:opacity-70" disabled={isSubmitting || isViewOnly}>
                                     <option value="camioneta">Camioneta</option><option value="auto">Auto Sedán</option><option value="hatchback">Hatchback</option><option value="van">Van / Furgoneta</option><option value="moto">Motocicleta</option>
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Color Básico</label>
-                                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 focus-within:border-blue-500"><MdOutlineFormatColorFill className="text-gray-400 text-lg ml-2"/><input type="color" name="color" value={formData.color} onChange={handleChange} className="w-full h-8 cursor-pointer bg-transparent border-none outline-none rounded" disabled={isSubmitting}/></div>
+                                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 focus-within:border-blue-500 opacity-100 disabled:opacity-70"><MdOutlineFormatColorFill className="text-gray-400 text-lg ml-2"/><input type="color" name="color" value={formData.color} onChange={handleChange} className="w-full h-8 cursor-pointer bg-transparent border-none outline-none rounded disabled:cursor-not-allowed" disabled={isSubmitting || isViewOnly}/></div>
                             </div>
                         </div>
 
-                        {/* SECCIÓN NUEVA: RENDERS DE LA BITÁCORA */}
+                        {/* SECCIÓN RENDERS */}
                         <div className="p-5 bg-purple-50/50 rounded-2xl border border-purple-100 space-y-4">
                             <h4 className="text-xs font-black text-purple-900 uppercase tracking-widest mb-1">Renders Interactivos (Bitácora Móvil)</h4>
-                            <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-4">Sube las imágenes PNG sin fondo proporcionadas por diseño.</p>
+                            {!isViewOnly && <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-4">Sube nuevas imágenes para reemplazar las actuales, o déjalo vacío para conservarlas.</p>}
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                                 <RenderInput title="Auto Base" renderKey="img_base" />
                                 <RenderInput title="Llantas OK" renderKey="img_llantas_ok" />
@@ -192,19 +221,21 @@ export default function ModalVehiculo({ isOpen, onClose, onSave, isSubmitting })
                         <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-5">
                             <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-2">Datos Legales</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdConfirmationNumber/> Placas</label><input required name="placas" value={formData.placas} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-gray-800 uppercase outline-none focus:border-blue-500" disabled={isSubmitting}/></div>
-                                <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Niv. / Serie</label><input required name="serie" value={formData.serie} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 uppercase outline-none focus:border-blue-500" disabled={isSubmitting}/></div>
-                                <div className="md:col-span-2"><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdShield/> Número Póliza Seguro</label><input name="poliza" value={formData.poliza} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" disabled={isSubmitting}/></div>
+                                <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdConfirmationNumber/> Placas</label><input required name="placas" value={formData.placas} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-black text-gray-800 uppercase outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
+                                <div><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Niv. / Serie</label><input required name="serie" value={formData.serie} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 uppercase outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
+                                <div className="md:col-span-2"><label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><MdShield/> Número Póliza Seguro</label><input name="poliza" value={formData.poliza} onChange={handleChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 disabled:opacity-70" disabled={isSubmitting || isViewOnly}/></div>
                             </div>
                         </div>
                     </form>
                 </div>
 
-                <div className="p-6 border-t border-gray-100 bg-white shrink-0">
-                    <button form="formVehiculo" type="submit" disabled={isSubmitting || imageSrc !== null} className="w-full bg-green-500 hover:bg-green-600 text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/30 active:scale-95 disabled:opacity-50">
-                        {isSubmitting ? 'Subiendo Archivos...' : <><MdCheckCircle className="text-xl"/> Registrar Vehículo</>}
-                    </button>
-                </div>
+                {!isViewOnly && (
+                    <div className="p-6 border-t border-gray-100 bg-white shrink-0">
+                        <button form="formVehiculo" type="submit" disabled={isSubmitting || (imageSrc !== null)} className="w-full bg-green-500 hover:bg-green-600 text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/30 active:scale-95 disabled:opacity-50">
+                            {isSubmitting ? 'Guardando en BD...' : <><MdCheckCircle className="text-xl"/> {vehiculoAEditar ? 'Guardar Cambios' : 'Registrar Vehículo'}</>}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
