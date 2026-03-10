@@ -7,11 +7,10 @@ import { supabase } from '../lib/supabase';
 export function useBitacora() {
     const [loading, setLoading] = useState(false);
 
-    // MODIFICADO: Ahora recibe odometroFile como tercer parámetro
     const guardarBitacora = async (datosBitacora, evidenciaFile = null, odometroFile = null) => {
         setLoading(true);
         let evidencia_url = null;
-        let odometro_url = null; // NUEVA VARIABLE
+        let odometro_url = null;
 
         try {
             // 1. Subir foto de evidencia de daños (si existe)
@@ -27,11 +26,11 @@ export function useBitacora() {
                 evidencia_url = publicUrlData.publicUrl;
             }
 
-            // 2. Subir foto del odómetro (NUEVO)
+            // 2. Subir foto del odómetro
             if (odometroFile) {
                 const fileExt = odometroFile.name.split('.').pop();
                 const fileName = `odometro-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-                const filePath = `odometros/${fileName}`; // Subcarpeta ordenada para odómetros
+                const filePath = `odometros/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage.from('vehiculos-fotos').upload(filePath, odometroFile);
                 if (uploadError) throw uploadError;
@@ -43,10 +42,18 @@ export function useBitacora() {
             // 3. Preparamos el paquete de datos y lo enviamos a la BD
             const payload = { ...datosBitacora };
             if (evidencia_url) payload.evidencia_url = evidencia_url;
-            if (odometro_url) payload.odometro_url = odometro_url; // Inyectamos la URL del odómetro
+            if (odometro_url) payload.odometro_url = odometro_url;
 
-            const { error } = await supabase.from('vehiculos_bitacora').insert([payload]);
-            if (error) throw error;
+            const { error: insertError } = await supabase.from('vehiculos_bitacora').insert([payload]);
+            if (insertError) throw insertError;
+
+            // 4. NUEVO: Actualizar el estado del vehículo a "EN_RUTA"
+            const { error: updateError } = await supabase
+                .from('vehiculos')
+                .update({ estado: 'EN_RUTA' })
+                .eq('id', datosBitacora.vehiculo_id);
+            
+            if (updateError) throw updateError;
 
             setLoading(false);
             return { success: true };

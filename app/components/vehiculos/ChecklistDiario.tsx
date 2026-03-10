@@ -38,34 +38,6 @@ const comprimirImagen = (file) => {
     });
 };
 
-// --- MOTOR 2: FILTRO BLANCO/NEGRO Y ALTO CONTRASTE (EXCLUSIVO PARA LA IA) ---
-const preprocesarImagenOCR = (file) => {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const maxWidth = 800;
-                const scaleSize = img.width > maxWidth ? (maxWidth / img.width) : 1;
-                canvas.width = img.width * scaleSize;
-                canvas.height = img.height * scaleSize;
-                
-                // Magia: Aplicamos filtro CSS nativo en el Canvas para resaltar los números
-                ctx.filter = 'grayscale(100%) contrast(150%) brightness(110%)';
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                canvas.toBlob((blob) => {
-                    resolve(blob);
-                }, 'image/jpeg', 0.8);
-            };
-        };
-    });
-};
-
 export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado }) {
     const { guardarBitacora, loading } = useBitacora();
 
@@ -119,13 +91,9 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
         reader.onloadend = () => setTempOcrPreview(reader.result);
         reader.readAsDataURL(compressedFile);
 
-        // 2. Preprocesamos en Blanco/Negro y Alto Contraste para ayudar a la IA
-        setOcrStatus('Aplicando filtros...');
-        const bwBlob = await preprocesarImagenOCR(file);
-
-        // 3. Mandamos la foto optimizada al cerebro de Tesseract
+        // 2. Mandamos la foto optimizada al cerebro de Tesseract (Velocidad Restaurada)
         try {
-            const { data: { text } } = await Tesseract.recognize(bwBlob, 'eng', { 
+            const { data: { text } } = await Tesseract.recognize(compressedFile, 'eng', { 
                 logger: (m) => { 
                     if (m.status === 'recognizing text') { 
                         setOcrStatus('Leyendo tablero...'); 
@@ -256,7 +224,6 @@ export default function ChecklistDiario({ vehiculoId, usuarioId, onCompletado })
                     </div>
                 </div>
 
-                {/* MODIFICADO: SECCIÓN DE OBSERVACIONES GENERALES (SIEMPRE VISIBLE) */}
                 <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100">
                     <h3 className="text-[11px] font-black text-gray-800 uppercase tracking-widest text-center mb-4">Observaciones y Evidencia</h3>
                     <textarea 
