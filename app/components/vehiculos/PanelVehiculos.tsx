@@ -4,9 +4,9 @@
 'use client';
 import { useState } from 'react';
 import { 
-    MdDirectionsCar, MdAdd, MdEngineering, MdListAlt, MdCheckCircle, 
+    MdDirectionsCar, MdAdd, MdListAlt, MdCheckCircle, 
     MdPersonAdd, MdPersonOff, MdLockOutline, MdClose, MdSearch,
-    MdEdit, MdVisibility, MdDelete
+    MdEdit, MdVisibility, MdDelete, MdWarning
 } from 'react-icons/md';
 import { FaCarSide, FaTruckPickup, FaMotorcycle, FaUserCircle } from 'react-icons/fa';
 
@@ -15,8 +15,8 @@ import ModalVehiculo from './ModalVehiculo';
 import ChecklistDiario from './ChecklistDiario';
 
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
-    // Agregamos actualizarVehiculo y eliminarVehiculo del hook
-    const { vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo } = useVehiculos();
+    // Agregamos 'refetch' para actualizar la vista en tiempo real
+    const { vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo, refetch } = useVehiculos();
     
     const ROLES_ADMIN = ['GERENTE_MKT', 'DIRECTOR', 'GERENTE_GENERAL', 'SOPORTE_GENERAL'];
     const esEncargado = ROLES_ADMIN.includes(usuarioActivo?.rol);
@@ -25,41 +25,36 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const [modalAbierto, setModalAbierto] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // NUEVOS ESTADOS PARA EL MODAL CAMALEÓN
     const [vehiculoAEditar, setVehiculoAEditar] = useState(null);
     const [isViewOnly, setIsViewOnly] = useState(false);
 
-    // Estados del conductor
     const [modoChecklist, setModoChecklist] = useState(false);
-    const [checklistTerminado, setChecklistTerminado] = useState(false);
+    
+    // Estados para los nuevos flujos del conductor
+    const [modoTerminarRuta, setModoTerminarRuta] = useState(false);
+    const [modoPercance, setModoPercance] = useState(false);
 
-    // Estados para la asignación corporativa
     const [vehiculoAAsignar, setVehiculoAAsignar] = useState(null);
     const [busquedaAsignacion, setBusquedaAsignacion] = useState('');
 
-    // Función unificada para abrir el modal en diferentes modos
     const handleAbrirModal = (vehiculo = null, viewOnly = false) => {
         setVehiculoAEditar(vehiculo);
         setIsViewOnly(viewOnly);
         setModalAbierto(true);
     };
 
-    // Función inteligente que sabe si está creando o actualizando
     const handleGuardar = async (formData, archivoFinal, rendersFiles) => {
         setIsSubmitting(true);
         let res;
-        
         if (vehiculoAEditar) {
             res = await actualizarVehiculo(vehiculoAEditar.id, formData, archivoFinal, rendersFiles);
         } else {
             res = await agregarVehiculo(formData, archivoFinal, rendersFiles);
         }
-        
         setIsSubmitting(false);
         if (res.success) setModalAbierto(false);
     };
 
-    // Función para eliminar con confirmación de seguridad
     const handleEliminar = async (id, marca, modelo) => {
         if(confirm(`🚨 ADVERTENCIA: ¿Estás seguro de que deseas eliminar permanentemente la unidad ${marca} ${modelo}?\n\nEsta acción no se puede deshacer y borrará su historial.`)){
             await eliminarVehiculo(id);
@@ -98,43 +93,66 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
         );
     };
 
+    // =====================================================================
+    // VISTA DEL CONDUCTOR (ENRUTADOR INTELIGENTE)
+    // =====================================================================
     if (!esEncargado) {
         const miVehiculo = vehiculos.find(v => v.responsable_id === usuarioActivo?.id);
 
-        if (modoChecklist && miVehiculo) {
-            return <ChecklistDiario vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onCompletado={() => { setModoChecklist(false); setChecklistTerminado(true); }} />;
+        // 1. SI NO TIENE VEHÍCULO
+        if (!miVehiculo) {
+            return (
+                <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
+                    <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner"><MdLockOutline /></div>
+                    <h2 className="text-2xl font-black text-gray-800 mb-2">Sin Vehículo Asignado</h2>
+                    <p className="text-sm font-medium text-gray-500 max-w-md mb-8">No tienes ninguna unidad asignada para la ruta de hoy. Por favor, solicita a tu encargado de flotilla que te asigne un vehículo en el sistema.</p>
+                </div>
+            );
+        }
+
+        // 2. SI ESTÁ EN RUTA (NUEVO DASHBOARD CORPORATIVO)
+        if (miVehiculo.estado === 'EN_RUTA') {
+            
+            // FASE 3: Aquí cargaremos los componentes <TerminarRuta /> y <ReportarPercance />
+            if (modoTerminarRuta) return <div className="p-10 text-center"><h1 className="text-2xl font-black">Módulo Terminar Ruta</h1><p>En construcción (Fase 3)</p><button onClick={() => setModoTerminarRuta(false)} className="mt-5 text-blue-500 underline">Volver</button></div>;
+            if (modoPercance) return <div className="p-10 text-center"><h1 className="text-2xl font-black">Módulo Percances</h1><p>En construcción (Fase 3)</p><button onClick={() => setModoPercance(false)} className="mt-5 text-blue-500 underline">Volver</button></div>;
+
+            return (
+                <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-green-400 rounded-full animate-ping opacity-20"></div>
+                        <div className="w-24 h-24 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner relative z-10"><MdDirectionsCar /></div>
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-800 mb-2">Unidad en Ruta</h2>
+                    <p className="text-sm font-medium text-gray-500 max-w-md mb-8">Conduce con precaución. Tienes activa la unidad <strong className="text-gray-800">{miVehiculo.marca} {miVehiculo.modelo} ({miVehiculo.placas})</strong>.</p>
+                    
+                    <div className="flex flex-col gap-4 w-full max-w-xs">
+                        <button onClick={() => setModoTerminarRuta(true)} className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-gray-900/20 active:scale-95 transition-all"><MdCheckCircle className="text-xl"/> Terminar Ruta</button>
+                        <button onClick={() => setModoPercance(true)} className="bg-white border border-red-200 text-red-500 hover:bg-red-50 px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"><MdWarning className="text-xl"/> Reportar un Percance</button>
+                    </div>
+                </div>
+            );
+        }
+
+        // 3. SI ESTÁ DISPONIBLE (ESPERANDO CHECKLIST)
+        if (modoChecklist) {
+            // Al completarse, refetch() actualizará la BD y miVehiculo.estado cambiará a EN_RUTA automáticamente
+            return <ChecklistDiario vehiculoId={miVehiculo.id} usuarioId={usuarioActivo?.id} onCompletado={() => { setModoChecklist(false); refetch(); }} />;
         }
 
         return (
             <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
-                {!miVehiculo ? (
-                    <>
-                        <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner"><MdLockOutline /></div>
-                        <h2 className="text-2xl font-black text-gray-800 mb-2">Sin Vehículo Asignado</h2>
-                        <p className="text-sm font-medium text-gray-500 max-w-md mb-8">No tienes ninguna unidad asignada para la ruta de hoy. Por favor, solicita a tu encargado de flotilla que te asigne un vehículo en el sistema.</p>
-                    </>
-                ) : (
-                    <>
-                        <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner"><MdDirectionsCar /></div>
-                        <h2 className="text-2xl font-black text-gray-800 mb-2">Tu Unidad: {miVehiculo.marca} {miVehiculo.modelo}</h2>
-                        {checklistTerminado ? (
-                            <div className="bg-green-50 text-green-700 p-8 rounded-[2rem] max-w-md border border-green-200 mt-4 shadow-sm animate-slide-up">
-                                <MdCheckCircle className="text-6xl mx-auto mb-4 text-green-500" />
-                                <h3 className="font-black text-xl mb-2">¡Todo listo para arrancar!</h3>
-                                <p className="text-sm font-medium">Tu bitácora de salida ha sido registrada en el sistema. Conduce con precaución.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <p className="text-sm font-medium text-gray-500 max-w-md mb-8">Antes de arrancar la ruta con la unidad <strong className="text-gray-800">{miVehiculo.placas}</strong>, por políticas de la empresa es obligatorio llenar la bitácora de revisión diaria.</p>
-                                <button onClick={() => setModoChecklist(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-blue-500/30 active:scale-95 transition-all"><MdListAlt className="text-xl"/> Iniciar Checklist Diario</button>
-                            </>
-                        )}
-                    </>
-                )}
+                <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner"><MdDirectionsCar /></div>
+                <h2 className="text-2xl font-black text-gray-800 mb-2">Tu Unidad: {miVehiculo.marca} {miVehiculo.modelo}</h2>
+                <p className="text-sm font-medium text-gray-500 max-w-md mb-8">Antes de arrancar la ruta con la unidad <strong className="text-gray-800">{miVehiculo.placas}</strong>, por políticas de la empresa es obligatorio llenar la bitácora de revisión diaria.</p>
+                <button onClick={() => setModoChecklist(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-blue-500/30 active:scale-95 transition-all"><MdListAlt className="text-xl"/> Iniciar Checklist Diario</button>
             </div>
         );
     }
 
+    // =====================================================================
+    // VISTA DEL ADMINISTRADOR
+    // =====================================================================
     const vehiculosFiltrados = filtroEstado === 'TODOS' ? vehiculos : vehiculos.filter(v => v.estado === filtroEstado);
     const stats = {
         disponibles: vehiculos.filter(v => v.estado === 'DISPONIBLE').length,
@@ -167,7 +185,6 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                         <button onClick={() => setFiltroEstado('EN_RUTA')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'EN_RUTA' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-blue-600'}`}>En Ruta ({stats.ruta})</button>
                         <button onClick={() => setFiltroEstado('TALLER')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TALLER' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-orange-600'}`}>Taller ({stats.taller})</button>
                     </div>
-                    {/* Al crear uno nuevo, pasamos null (sin auto) y false (no es solo lectura) */}
                     <button onClick={() => handleAbrirModal(null, false)} className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95"><MdAdd className="text-lg"/> Nuevo Vehículo</button>
                 </div>
             </div>
@@ -203,7 +220,6 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                                     </div>
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Año {v.anio}</p>
                                     
-                                    {/* BOTONES DE ACCIÓN CRUD SUTILES */}
                                     <div className="flex items-center gap-1.5 mb-4 pb-3 border-b border-gray-100">
                                         <button onClick={() => handleAbrirModal(v, true)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1" title="Ver Detalles">
                                             <MdVisibility size={16}/> <span className="text-[9px] font-bold uppercase tracking-widest">Ver</span>
@@ -240,7 +256,8 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                                                 Asignar Auto
                                             </button>
                                         )}
-                                        <button className="py-2.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 border border-gray-200">
+                                        {/* MODIFICADO: Conectado temporalmente a Fase 3 */}
+                                        <button onClick={() => alert("Módulo de Historial de Bitácoras en construcción (Fase 3)")} className="py-2.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 border border-gray-200">
                                             <MdListAlt className="text-sm"/> Bitácora
                                         </button>
                                     </div>
@@ -251,16 +268,8 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                 )}
             </div>
             
-            <ModalVehiculo 
-                isOpen={modalAbierto} 
-                onClose={() => setModalAbierto(false)} 
-                onSave={handleGuardar} 
-                isSubmitting={isSubmitting} 
-                vehiculoAEditar={vehiculoAEditar} // Pasamos los nuevos props al modal
-                isViewOnly={isViewOnly}
-            />
+            <ModalVehiculo isOpen={modalAbierto} onClose={() => setModalAbierto(false)} onSave={handleGuardar} isSubmitting={isSubmitting} vehiculoAEditar={vehiculoAEditar} isViewOnly={isViewOnly} />
 
-            {/* MODAL DE ASIGNACIÓN CORPORATIVA */}
             {vehiculoAAsignar && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-[2rem] w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
@@ -271,29 +280,16 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                             </div>
                             <button onClick={() => setVehiculoAAsignar(null)} disabled={isSubmitting} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
                         </div>
-
                         <div className="p-4 border-b border-gray-100 bg-white">
                             <div className="relative">
                                 <MdSearch className="absolute left-4 top-3.5 text-gray-400 text-lg" />
-                                <input 
-                                    type="text" 
-                                    value={busquedaAsignacion}
-                                    onChange={(e) => setBusquedaAsignacion(e.target.value)}
-                                    placeholder="Buscar por nombre, puesto o ID..."
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 transition-colors"
-                                />
+                                <input type="text" value={busquedaAsignacion} onChange={(e) => setBusquedaAsignacion(e.target.value)} placeholder="Buscar por nombre, puesto o ID..." className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 transition-colors" />
                             </div>
                         </div>
-
                         <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-gray-50">
                             {colaboradoresBusqueda.length > 0 ? (
                                 colaboradoresBusqueda.map(col => (
-                                    <button 
-                                        key={col.id}
-                                        onClick={() => confirmarAsignacion(vehiculoAAsignar.id, col.id)}
-                                        disabled={isSubmitting}
-                                        className="w-full flex items-center gap-4 p-4 hover:bg-white rounded-2xl transition-all active:scale-95 text-left border border-transparent hover:border-gray-200 mb-1 disabled:opacity-50"
-                                    >
+                                    <button key={col.id} onClick={() => confirmarAsignacion(vehiculoAAsignar.id, col.id)} disabled={isSubmitting} className="w-full flex items-center gap-4 p-4 hover:bg-white rounded-2xl transition-all active:scale-95 text-left border border-transparent hover:border-gray-200 mb-1 disabled:opacity-50">
                                         <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center overflow-hidden shrink-0">
                                             {col.foto ? <img src={col.foto} alt="Foto" className="w-full h-full object-cover"/> : <FaUserCircle className="text-2xl" />}
                                         </div>
@@ -305,9 +301,7 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                                     </button>
                                 ))
                             ) : (
-                                <div className="text-center py-10">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No se encontraron colaboradores</p>
-                                </div>
+                                <div className="text-center py-10"><p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No se encontraron colaboradores</p></div>
                             )}
                         </div>
                     </div>
