@@ -7,37 +7,34 @@ import { supabase } from '../lib/supabase';
 export function useMantenimiento() {
     const [mantenimientos, setMantenimientos] = useState([]);
     const [inventario, setInventario] = useState([]);
-    const [gasolina, setGasolina] = useState([]); // <--- NUEVO ESTADO PARA TICKETS
+    const [gasolina, setGasolina] = useState([]);
+    const [historialUso, setHistorialUso] = useState([]); // Historial de trazabilidad
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            // 1. Traer historial de mantenimientos
-            const { data: mantData, error: mantError } = await supabase
-                .from('vehiculos_mantenimiento')
-                .select('*, vehiculo:vehiculo_id (marca, modelo, placas)')
-                .order('created_at', { ascending: false });
-            if (mantError) throw mantError;
+            const { data: mantData } = await supabase.from('vehiculos_mantenimiento').select('*, vehiculo:vehiculo_id (marca, modelo, placas)').order('created_at', { ascending: false });
+            
+            // Traemos el inventario CON sus respectivos lotes de compra
+            const { data: invData } = await supabase.from('vehiculos_inventario').select(`
+                *,
+                lotes:vehiculos_inventario_lotes(*)
+            `).order('categoria', { ascending: true }).order('nombre', { ascending: true });
 
-            // 2. Traer el inventario del taller
-            const { data: invData, error: invError } = await supabase
-                .from('vehiculos_inventario')
-                .select('*')
-                .order('categoria', { ascending: true })
-                .order('nombre', { ascending: true });
-            if (invError) throw invError;
+            const { data: gasData } = await supabase.from('vehiculos_gasolina').select('*, vehiculo:vehiculo_id (marca, modelo, placas)').order('created_at', { ascending: false });
 
-            // 3. Traer el historial de tickets de combustible
-            const { data: gasData, error: gasError } = await supabase
-                .from('vehiculos_gasolina')
-                .select('*, vehiculo:vehiculo_id (marca, modelo, placas)')
-                .order('created_at', { ascending: false });
-            if (gasError) throw gasError;
+            // Traemos el registro exacto de en qué auto se usó cada refacción
+            const { data: usoData } = await supabase.from('vehiculos_inventario_uso').select(`
+                *,
+                lote:lote_id (marca, articulo:articulo_id(nombre, categoria)),
+                vehiculo:vehiculo_id (marca, modelo, placas)
+            `).order('fecha_uso', { ascending: false });
 
             setMantenimientos(mantData || []);
             setInventario(invData || []);
             setGasolina(gasData || []);
+            setHistorialUso(usoData || []);
         } catch (error) {
             console.error("Error al cargar datos del taller:", error);
             alert("No se pudo cargar la información del taller.");
@@ -46,9 +43,7 @@ export function useMantenimiento() {
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    useEffect(() => { fetchData(); }, []);
 
     const registrarMantenimiento = async (payload) => {
         const { error } = await supabase.from('vehiculos_mantenimiento').insert([payload]);
@@ -62,20 +57,40 @@ export function useMantenimiento() {
         return { success: !error, error };
     };
 
-    const actualizarCantidadInventario = async (id, nuevaCantidad) => {
-        const { error } = await supabase.from('vehiculos_inventario').update({ cantidad: nuevaCantidad }).eq('id', id);
-        if (!error) fetchData();
+    // NUEVO: AGREGAR LOTE (Entrada de Almacén)
+    const agregarLote = async (payload) => {
+        const { error } = await supabase.from('vehiculos_inventario_lotes').insert([payload]);
+        if (!error) {
+            const { data: art } = await supabase.from('vehiculos_inventario').select('cantidad').eq('id', payload.articulo_id).single();
+            await supabase.from('vehiculos_inventario').update({ cantidad: art.cantidad + parseInt(payload.cantidad_comprada) }).eq('id', payload.articulo_id);
+            fetchData();
+        }
+        return { success: !error, error };
+    };
+
+    // NUEVO: REGISTRAR USO DE PIEZA (Salida de Almacén)
+    const registrarUsoPieza = async (payload) => {
+        const { error } = await supabase.from('vehiculos_inventario_uso').insert([{
+            lote_id: payload.lote_id,
+            vehiculo_id: payload.vehiculo_id,
+            cantidad_usada: payload.cantidad_usada
+        }]);
+        
+        if (!error) {
+            const { data: lote } = await supabase.from('vehiculos_inventario_lotes').select('cantidad_disponible, articulo_id').eq('id', payload.lote_id).single();
+            await supabase.from('vehiculos_inventario_lotes').update({ cantidad_disponible: lote.cantidad_disponible - payload.cantidad_usada }).eq('id', payload.lote_id);
+            
+            const { data: art } = await supabase.from('vehiculos_inventario').select('cantidad').eq('id', lote.articulo_id).single();
+            await supabase.from('vehiculos_inventario').update({ cantidad: art.cantidad - payload.cantidad_usada }).eq('id', lote.articulo_id);
+            
+            fetchData();
+        }
         return { success: !error, error };
     };
 
     return { 
-        mantenimientos, 
-        inventario, 
-        gasolina, // <--- EXPORTAMOS LA GASOLINA
-        loading, 
-        refetch: fetchData, 
-        registrarMantenimiento, 
-        agregarArticuloInventario, 
-        actualizarCantidadInventario 
+        mantenimientos, inventario, gasolina, historialUso, loading, 
+        refetch: fetchData, registrarMantenimiento, agregarArticuloInventario, 
+        agregarLote, registrarUsoPieza 
     };
 }
