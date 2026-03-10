@@ -17,6 +17,7 @@ import ChecklistDiario from './ChecklistDiario';
 // IMPORTS DE LA FASE 3
 import TerminarRuta from './TerminarRuta';
 import ReportarPercance from './ReportarPercance';
+import ModalBitacoras from './ModalBitacoras'; // <--- NUEVO IMPORT
 
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const { vehiculos, loading, agregarVehiculo, actualizarVehiculo, eliminarVehiculo, asignarVehiculo, refetch } = useVehiculos();
@@ -37,6 +38,9 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
 
     const [vehiculoAAsignar, setVehiculoAAsignar] = useState(null);
     const [busquedaAsignacion, setBusquedaAsignacion] = useState('');
+    // NUEVOS ESTADOS PARA EL HISTORIAL
+    const [vehiculoHistorial, setVehiculoHistorial] = useState(null);
+    const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
 
     const handleAbrirModal = (vehiculo = null, viewOnly = false) => {
         setVehiculoAEditar(vehiculo);
@@ -186,7 +190,9 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                         <button onClick={() => setFiltroEstado('EN_RUTA')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'EN_RUTA' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-blue-600'}`}>En Ruta ({stats.ruta})</button>
                         <button onClick={() => setFiltroEstado('TALLER')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TALLER' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-orange-600'}`}>Taller ({stats.taller})</button>
                     </div>
-                    <button onClick={() => handleAbrirModal(null, false)} className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95"><MdAdd className="text-lg"/> Nuevo Vehículo</button>
+                    <button onClick={() => { setVehiculoHistorial(v); setModalHistorialAbierto(true); }} className="py-2.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 border border-gray-200 shadow-sm active:scale-95">
+    <MdListAlt className="text-sm"/> Bitácora
+</button>
                 </div>
             </div>
 
@@ -307,6 +313,15 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
                     </div>
                 </div>
             )}
+
+
+{/* MODAL DE HISTORIAL */}
+            <ModalBitacoras 
+                isOpen={modalHistorialAbierto} 
+                onClose={() => setModalHistorialAbierto(false)} 
+                vehiculo={vehiculoHistorial} 
+            />
+
         </div>
     );
 }
