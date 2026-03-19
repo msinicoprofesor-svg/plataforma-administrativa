@@ -13,6 +13,7 @@ import { useUsuarios } from './hooks/useUsuarios';
 import { useInventarioOperativo } from './hooks/useInventarioOperativo';
 import { useLikeStore } from './hooks/useLikeStore'; 
 import { useSolicitudesContenido } from './hooks/useSolicitudesContenido';
+import { useVehiculos } from './hooks/useVehiculos'; // <--- IMPORTAMOS HOOK DE VEHICULOS
 
 import { tienePermiso } from './config/permisos'; 
 
@@ -39,25 +40,25 @@ import Cobertura from './components/tecnica/Cobertura';
 import MesaControl from './components/tecnica/MesaControl'; 
 import PanelVentas from './components/ventas/PanelVentas'; 
 
+// IMPORTS DE LA FLOTILLA INDEPENDIZADOS
 import PanelVehiculos from './components/vehiculos/PanelVehiculos';
+import BitacoraGlobal from './components/vehiculos/BitacoraGlobal';
+import PanelMantenimiento from './components/vehiculos/PanelMantenimiento';
 
 
 export default function Home() {
   const auth = useUsuarios(); 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // --- MAGIA 1: MEMORIA PERSISTENTE PARA EL MÓDULO ACTIVO ---
   const [activeModuleState, setActiveModuleState] = useState('dashboard'); 
 
   useEffect(() => {
-    // Al cargar la página, leemos si había un módulo guardado en la memoria del navegador
     const moduloGuardado = localStorage.getItem('javak_modulo_activo');
     if (moduloGuardado) {
         setActiveModuleState(moduloGuardado);
     }
   }, []);
 
-  // Función interceptora que actualiza la RAM y el Disco Duro del navegador al mismo tiempo
   const setActiveModule = (modulo) => {
       setActiveModuleState(modulo);
       localStorage.setItem('javak_modulo_activo', modulo);
@@ -85,6 +86,7 @@ export default function Home() {
   const inventarioOps = useInventarioOperativo(); 
   const likeStoreData = useLikeStore();           
   const solicitudesData = useSolicitudesContenido(); 
+  const vehiculosData = useVehiculos(); // <--- CARGAMOS LOS AUTOS GLOBALMENTE
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [colaboradorEditar, setColaboradorEditar] = useState(null);
@@ -123,7 +125,6 @@ export default function Home() {
   const esMarketingFull = u && ROLES_TIENDA_FULL.includes(u.rol);
 
   useEffect(() => {
-    // Si acaba de iniciar sesión por primera vez y no hay nada en localStorage
     if (u && !localStorage.getItem('javak_modulo_activo')) {
         if (tienePermiso(u, 'marketing_ventas') && !tienePermiso(u, 'marketing_dashboard')) {
             setActiveModule('marketing_ventas');
@@ -136,20 +137,15 @@ export default function Home() {
   const handleLogin = async (e) => {
       e.preventDefault();
       setErrorLogin(''); 
-      
       const exito = await auth.login(emailInput, passInput); 
-      
-      if (exito) {
-          setPassInput('');
-      } else {
-          setErrorLogin('Credenciales incorrectas o problema de conexión');
-      }
+      if (exito) setPassInput('');
+      else setErrorLogin('Credenciales incorrectas o problema de conexión');
   };
 
   const handleLogout = () => {
     auth.logout();
     setActiveModule('dashboard');
-    localStorage.removeItem('javak_modulo_activo'); // Limpiamos la memoria al salir
+    localStorage.removeItem('javak_modulo_activo'); 
   };
 
   const descontarPuntos = (idColaborador, puntos) => {
@@ -186,14 +182,7 @@ export default function Home() {
                     <label className="text-[10px] font-bold text-gray-400 ml-4 uppercase mb-1 block">Correo</label>
                     <div className="relative">
                         <MdEmail className="absolute left-4 top-3.5 text-gray-400 text-lg" />
-                        <input 
-                            name="email" 
-                            type="text" 
-                            value={emailInput}
-                            onChange={(e) => setEmailInput(e.target.value)}
-                            className="w-full pl-12 pr-6 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-bold text-gray-700 focus:ring-2 focus:ring-red-100 transition-all" 
-                            required 
-                        />
+                        <input name="email" type="text" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full pl-12 pr-6 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-bold text-gray-700 focus:ring-2 focus:ring-red-100 transition-all" required />
                     </div>
                 </div>
 
@@ -201,14 +190,7 @@ export default function Home() {
                     <label className="text-[10px] font-bold text-gray-400 ml-4 uppercase mb-1 block">Contraseña</label>
                     <div className="relative">
                         <MdLock className="absolute left-4 top-3.5 text-gray-400 text-lg" />
-                        <input 
-                            name="password" 
-                            type="password" 
-                            value={passInput}
-                            onChange={(e) => setPassInput(e.target.value)}
-                            className="w-full pl-12 pr-6 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-bold text-gray-700 focus:ring-2 focus:ring-red-100 transition-all" 
-                            required 
-                        />
+                        <input name="password" type="password" value={passInput} onChange={(e) => setPassInput(e.target.value)} className="w-full pl-12 pr-6 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-bold text-gray-700 focus:ring-2 focus:ring-red-100 transition-all" required />
                     </div>
                 </div>
 
@@ -221,11 +203,9 @@ export default function Home() {
     );
   }
 
-  // --- MAGIA 2: ARREGLO DE SCROLL PARA APP MÓVIL ---
   const isLikeStore = activeModule === 'likestore';
   const isTecnicoMovil = activeModule === 'tecnico_movil';
   
-  // Separamos las clases: LikeStore es oculta (hidden), Tecnico permite scroll libre (auto)
   const mainContainerClasses = isLikeStore 
     ? "flex-1 overflow-hidden w-full h-full relative p-0 bg-gray-100" 
     : isTecnicoMovil 
@@ -241,7 +221,7 @@ export default function Home() {
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
-         {!isLikeStore && !isTecnicoMovil && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
+         {!isLikeStore && !isTecnicoMovil && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('vehiculos_', 'Flotilla: ').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
          
          <main className={mainContainerClasses}>
             {activeModule === 'marketing_dashboard' && (
@@ -252,67 +232,29 @@ export default function Home() {
                 </div>
             )}
 
-            {activeModule === 'atencion_cliente' && verAtencionCliente && (
-                <div className="animate-slide-up h-full pb-10">
-                    <PanelAtencionCliente />
-                </div>
-            )}
-            
-            {activeModule === 'atencion_directorio' && verAtencionCliente && (
-                <div className="animate-slide-up h-full pb-10 pt-4 md:pt-6">
-                    <DirectorioClientes />
-                </div>
-            )}
-
-            {/* --- SECCIÓN: APP TÉCNICO MÓVIL --- */}
-            {activeModule === 'tecnico_movil' && verAtencionCliente && (
-                <div className="animate-fade-in h-full w-full">
-                    {/* LE PASAMOS LA LLAVE PARA ABRIR EL SIDEBAR: onOpenMenu */}
-                    <DashboardTecnico 
-                        tecnicoId={u?.id || "1"} 
-                        onOpenMenu={() => setSidebarOpen(true)} 
-                    />
-                </div>
-            )}
+            {activeModule === 'atencion_cliente' && verAtencionCliente && <div className="animate-slide-up h-full pb-10"><PanelAtencionCliente /></div>}
+            {activeModule === 'atencion_directorio' && verAtencionCliente && <div className="animate-slide-up h-full pb-10 pt-4 md:pt-6"><DirectorioClientes /></div>}
+            {activeModule === 'tecnico_movil' && verAtencionCliente && <div className="animate-fade-in h-full w-full"><DashboardTecnico tecnicoId={u?.id || "1"} onOpenMenu={() => setSidebarOpen(true)} /></div>}
 
             {activeModule === 'marketing_ventas' && verVentas && <div className="animate-slide-up h-full pb-10"><PanelVentas ventas={ventasData.ventas} cobertura={ventasData.cobertura} cupones={ventasData.cupones} validarCupon={ventasData.validarCupon} onRegistrarVenta={ventasData.registrarVenta} vendedorActual={u} /></div>}
             {activeModule === 'marketing_cobertura' && verCobertura && <div className="animate-slide-up h-full pb-10"><Cobertura cobertura={ventasData.cobertura} onAgregarZona={ventasData.agregarZona} onActualizarZona={ventasData.actualizarZona} usuarioActual={u} /></div>}
             {activeModule === 'marketing_mesa' && verMesa && <div className="animate-slide-up h-full pb-10"><MesaControl ventas={ventasData.ventas} cobertura={ventasData.cobertura} onActualizarEstado={ventasData.actualizarEstadoVenta} usuarioActual={u} /></div>}
 
-            {activeModule === 'marketing_solicitudes' && verSolicitudesDiseno && (
-                <div className="animate-slide-up h-full pb-10">
-                    <PanelSolicitudes solicitudes={solicitudesData.solicitudes} onCrear={solicitudesData.crearSolicitud} onActualizar={solicitudesData.actualizarSolicitud} onEliminar={solicitudesData.eliminarSolicitud} onCancelar={solicitudesData.cancelarSolicitud} usuarioActual={u} />
-                </div>
-            )}
-            
-            {activeModule === 'marketing_estudios' && verEstudios && (
-                <div className="animate-slide-up h-full pb-10"><PanelEstudios usuario={u} /></div>
-            )}
-
-            {activeModule === 'marketing_social' && verSocial && (
-                <div className="animate-slide-up h-full pb-10"><PanelSocial usuario={u} /></div>
-            )}
-
+            {activeModule === 'marketing_solicitudes' && verSolicitudesDiseno && <div className="animate-slide-up h-full pb-10"><PanelSolicitudes solicitudes={solicitudesData.solicitudes} onCrear={solicitudesData.crearSolicitud} onActualizar={solicitudesData.actualizarSolicitud} onEliminar={solicitudesData.eliminarSolicitud} onCancelar={solicitudesData.cancelarSolicitud} usuarioActual={u} /></div>}
+            {activeModule === 'marketing_estudios' && verEstudios && <div className="animate-slide-up h-full pb-10"><PanelEstudios usuario={u} /></div>}
+            {activeModule === 'marketing_social' && verSocial && <div className="animate-slide-up h-full pb-10"><PanelSocial usuario={u} /></div>}
             {activeModule === 'marketing_promociones' && verPromociones && <div className="animate-slide-up h-full pb-10"><PanelMarketing cupones={ventasData.cupones} cobertura={ventasData.cobertura} onAgregarCupon={ventasData.agregarCupon} onEliminarCupon={ventasData.eliminarCupon} /></div>}
             {activeModule === 'marketing_importar' && verImportar && <div className="animate-slide-up h-full"><ImportarInteracciones colaboradores={colaboradoresReales} historial={historial} onProcesar={registrarPuntosMasivos} onEliminarHistorial={eliminarImportacion} /></div>}
             
             {activeModule === 'likestore' && verLikeStore && (
                 <div className="animate-slide-up w-full h-full">
-                    {esMarketingFull ? (
-                        <LikeStore useData={likeStoreData} colaboradores={colaboradoresReales} onCanjear={descontarPuntos} />
-                    ) : (
-                        <CatalogoLikeStore useData={likeStoreData} />
-                    )}
+                    {esMarketingFull ? <LikeStore useData={likeStoreData} colaboradores={colaboradoresReales} onCanjear={descontarPuntos} /> : <CatalogoLikeStore useData={likeStoreData} />}
                 </div>
             )}
             
             {activeModule === 'almacen_operativo' && verLogistica && <div className="animate-slide-up h-full pb-10"><InventarioOperativo useData={inventarioOps} /></div>}
 
-            {activeModule.startsWith('rrhh_') && verRRHH && (
-                <div className="animate-slide-up h-full pb-10">
-                    <PanelRRHH usuario={u} colaboradores={colaboradoresReales} moduloActivo={activeModule} />
-                </div>
-            )}
+            {activeModule.startsWith('rrhh_') && verRRHH && <div className="animate-slide-up h-full pb-10"><PanelRRHH usuario={u} colaboradores={colaboradoresReales} moduloActivo={activeModule} /></div>}
 
             {activeModule === 'marketing_colaboradores' && verColaboradores && (
                 <div className="animate-slide-up pb-10">
@@ -320,13 +262,30 @@ export default function Home() {
                 </div>
             )}
 
-           {/* --- SECCIÓN: FLOTILLA VEHICULAR --- */}
+           {/* --- SECCIÓN DE NAVEGACIÓN: FLOTILLA VEHICULAR --- */}
             {activeModule === 'vehiculos_panel' && (
                 <div className="animate-slide-up h-full pb-10">
-                    <PanelVehiculos 
-                        usuarioActivo={u} 
-                        colaboradores={colaboradoresReales} 
-                    />
+                    <PanelVehiculos usuarioActivo={u} colaboradores={colaboradoresReales} />
+                </div>
+            )}
+            
+            {activeModule === 'vehiculos_auditoria' && (
+                <div className="animate-slide-up h-full pb-10">
+                    <BitacoraGlobal onClose={() => setActiveModule('vehiculos_panel')} />
+                </div>
+            )}
+
+            {activeModule === 'vehiculos_taller' && (
+                <div className="animate-slide-up h-full pb-10">
+                    <PanelMantenimiento onClose={() => setActiveModule('vehiculos_panel')} vehiculos={vehiculosData.vehiculos} />
+                </div>
+            )}
+
+            {activeModule === 'vehiculos_solicitudes' && (
+                <div className="animate-slide-up h-full pb-10 flex flex-col items-center justify-center text-center">
+                    <div className="w-24 h-24 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner animate-pulse"><MdAssignment /></div>
+                    <h2 className="text-2xl font-black text-gray-800 mb-2">Módulo de Solicitudes</h2>
+                    <p className="text-sm font-medium text-gray-500 max-w-md mb-8">Estamos construyendo la bandeja de solicitudes y asignaciones. Configurando en el Paso 2.</p>
                 </div>
             )}
 

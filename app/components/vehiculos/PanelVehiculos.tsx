@@ -7,7 +7,7 @@ import {
     MdDirectionsCar, MdAdd, MdListAlt, MdCheckCircle, 
     MdPersonAdd, MdPersonOff, MdLockOutline, MdClose, MdSearch,
     MdEdit, MdVisibility, MdDelete, MdWarning, MdHistory, MdLocalGasStation,
-    MdBuild, MdNotifications, MdAssignment // <--- NUEVO ICONO PARA SOLICITUDES
+    MdBuild, MdNotifications, MdAssignment
 } from 'react-icons/md';
 import { FaCarSide, FaTruckPickup, FaMotorcycle, FaUserCircle } from 'react-icons/fa';
 
@@ -15,13 +15,10 @@ import { useVehiculos } from '../../hooks/useVehiculos';
 import ModalVehiculo from './ModalVehiculo';
 import ChecklistDiario from './ChecklistDiario';
 
-// IMPORTS DE MÓDULOS Y AUDITORÍA
 import TerminarRuta from './TerminarRuta';
 import ReportarPercance from './ReportarPercance';
 import ModalBitacoras from './ModalBitacoras';
-import BitacoraGlobal from './BitacoraGlobal'; 
 import CargarGasolina from './CargarGasolina'; 
-import PanelMantenimiento from './PanelMantenimiento';
 import CentroNotificaciones from './CentroNotificaciones';
 
 export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
@@ -49,11 +46,8 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
     const [vehiculoHistorial, setVehiculoHistorial] = useState(null);
     const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
     
-    // ESTADOS DEL ADMINISTRADOR (INTERRUPTORES DE VISTA)
-    const [mostrarAuditoriaGlobal, setMostrarAuditoriaGlobal] = useState(false);
-    const [mostrarMantenimiento, setMostrarMantenimiento] = useState(false); 
+    // RADAR DE NOTIFICACIONES
     const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
-    const [mostrarSolicitudes, setMostrarSolicitudes] = useState(false); // <--- NUEVO ESTADO SOLICITUDES
 
     const handleAbrirModal = (vehiculo = null, viewOnly = false) => {
         setVehiculoAEditar(vehiculo);
@@ -111,34 +105,15 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
         );
     };
 
-    // =====================================================================
-    // VISTA DEL CONDUCTOR
-    // =====================================================================
     if (!esEncargado) {
         const miVehiculo = vehiculos.find(v => v.responsable_id === usuarioActivo?.id);
 
         if (!miVehiculo) {
-            // INTERCEPTOR PARA EL FORMULARIO DE SOLICITUD
-            if (mostrarSolicitudes) {
-                return (
-                    <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
-                        <h2 className="text-2xl font-black text-gray-800 mb-2">Formulario de Solicitud en Construcción</h2>
-                        <p className="text-sm text-gray-500 mb-6">Pronto podrás pedir un vehículo desde aquí.</p>
-                        <button onClick={() => setMostrarSolicitudes(false)} className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold">Volver</button>
-                    </div>
-                );
-            }
-
             return (
                 <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
                     <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner"><MdLockOutline /></div>
                     <h2 className="text-2xl font-black text-gray-800 mb-2">Sin Vehículo Asignado</h2>
-                    <p className="text-sm font-medium text-gray-500 max-w-md mb-8">No tienes ninguna unidad asignada para la ruta de hoy.</p>
-                    
-                    {/* BOTÓN PARA COLABORADORES */}
-                    <button onClick={() => setMostrarSolicitudes(true)} className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-gray-900/20 active:scale-95 transition-all">
-                        <MdAssignment className="text-xl"/> Solicitar Vehículo
-                    </button>
+                    <p className="text-sm font-medium text-gray-500 max-w-md mb-8">No tienes ninguna unidad asignada. Utiliza el módulo "Solicitudes" en tu menú lateral para pedir un auto al administrador.</p>
                 </div>
             );
         }
@@ -180,25 +155,6 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
         );
     }
 
-    // =====================================================================
-    // VISTA DEL ADMINISTRADOR
-    // =====================================================================
-
-    // Enrutadores de vistas del administrador
-    if (mostrarAuditoriaGlobal) return <BitacoraGlobal onClose={() => setMostrarAuditoriaGlobal(false)} />;
-    if (mostrarMantenimiento) return <PanelMantenimiento onClose={() => setMostrarMantenimiento(false)} vehiculos={vehiculos} />;
-    
-    // INTERCEPTOR PARA EL GESTOR DE SOLICITUDES DEL ADMIN
-    if (mostrarSolicitudes) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center animate-fade-in pb-10 px-4 text-center">
-                <h2 className="text-2xl font-black text-gray-800 mb-2">Gestor de Solicitudes en Construcción</h2>
-                <p className="text-sm text-gray-500 mb-6">Aquí aprobarás o rechazarás los autos.</p>
-                <button onClick={() => setMostrarSolicitudes(false)} className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-bold">Volver</button>
-            </div>
-        );
-    }
-
     const vehiculosFiltrados = filtroEstado === 'TODOS' ? vehiculos : vehiculos.filter(v => v.estado === filtroEstado);
     const stats = {
         disponibles: vehiculos.filter(v => v.estado === 'DISPONIBLE').length,
@@ -219,50 +175,28 @@ export default function PanelVehiculos({ usuarioActivo, colaboradores = [] }) {
 
     return (
         <div className="h-full flex flex-col space-y-6 animate-fade-in pb-10">
-            {/* NUEVA CABECERA REORGANIZADA */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-6 shrink-0 z-10 relative">
-                
-                {/* FILA 1: Título y Acciones Principales */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h2 className="text-xl font-black text-gray-800 flex items-center gap-2 uppercase tracking-wide"><MdDirectionsCar className="text-blue-600 text-2xl" /> Control Vehicular</h2>
-                        <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">Panel de Administración de Flotilla</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setMostrarNotificaciones(true)} className="relative flex items-center justify-center w-10 h-10 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-2xl transition-all shadow-sm active:scale-95">
-                            <MdNotifications className="text-xl"/>
-                            <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
-                        </button>
-
-                        <button onClick={() => handleAbrirModal(null, false)} className="flex items-center gap-1.5 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95">
-                            <MdAdd className="text-lg"/> Nuevo Vehículo
-                        </button>
-                    </div>
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shrink-0 z-10 relative">
+                <div>
+                    <h2 className="text-xl font-black text-gray-800 flex items-center gap-2 uppercase tracking-wide"><MdDirectionsCar className="text-blue-600 text-2xl" /> Control Vehicular</h2>
+                    <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">Panel Principal de Asignaciones</p>
                 </div>
-
-                {/* FILA 2: Submódulos alineados a la izquierda y Filtros */}
-                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 pt-5 border-t border-gray-100">
-                    <div className="flex flex-wrap gap-2">
-                        <button onClick={() => setMostrarAuditoriaGlobal(true)} className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm">
-                            <MdHistory className="text-base"/> Auditoría
-                        </button>
-
-                        <button onClick={() => setMostrarMantenimiento(true)} className="flex items-center gap-1.5 bg-orange-50 border border-orange-100 text-orange-700 hover:bg-orange-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm">
-                            <MdBuild className="text-base"/> Taller
-                        </button>
-
-                        <button onClick={() => setMostrarSolicitudes(true)} className="flex items-center gap-1.5 bg-purple-50 border border-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm">
-                            <MdAssignment className="text-base"/> Solicitudes
-                        </button>
-                    </div>
-
-                    <div className="flex bg-gray-50 p-1.5 rounded-2xl border border-gray-200/50 hidden md:flex">
+                
+                <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 hidden lg:flex">
                         <button onClick={() => setFiltroEstado('TODOS')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TODOS' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Todos ({vehiculos.length})</button>
                         <button onClick={() => setFiltroEstado('DISPONIBLE')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'DISPONIBLE' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-green-600'}`}>Disponibles ({stats.disponibles})</button>
                         <button onClick={() => setFiltroEstado('EN_RUTA')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'EN_RUTA' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-blue-600'}`}>En Ruta ({stats.ruta})</button>
                         <button onClick={() => setFiltroEstado('TALLER')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filtroEstado === 'TALLER' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-orange-600'}`}>Taller ({stats.taller})</button>
                     </div>
+
+                    <button onClick={() => setMostrarNotificaciones(true)} className="relative flex items-center justify-center w-10 h-10 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-2xl transition-all shadow-sm active:scale-95">
+                        <MdNotifications className="text-xl"/>
+                        <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+                    </button>
+
+                    <button onClick={() => handleAbrirModal(null, false)} className="flex items-center gap-1.5 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-2xl text-[11px] font-black transition-all shadow-sm active:scale-95">
+                        <MdAdd className="text-lg"/> Nuevo Vehículo
+                    </button>
                 </div>
             </div>
 

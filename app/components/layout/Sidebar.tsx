@@ -7,7 +7,7 @@ import {
   MdFactCheck, MdInventory2, MdCardGiftcard, MdBusiness, MdEngineering, 
   MdWork, MdLocalOffer, MdClose, MdFormatPaint, MdPoll, MdShare, 
   MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent, MdPeopleAlt,
-  MdPhoneIphone, MdDirectionsCar // <-- NUEVO ICONO DE COCHE
+  MdPhoneIphone, MdDirectionsCar, MdHistory, MdBuild, MdAssignment // <-- ÍCONOS NUEVOS
 } from "react-icons/md";
 import { FaStoreAlt, FaUserCircle } from "react-icons/fa";
 
@@ -24,8 +24,7 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
 
   const verAlmacen = tienePermiso(usuario, 'almacen_operativo');
 
-  // --- NUEVOS PERMISOS VEHICULARES ---
-  // Por ahora lo dejamos en true para que puedas visualizar y desarrollar el módulo
+  // --- PERMISOS VEHICULARES ---
   const verFlotilla = true; 
 
   const verCentroDiseno = tienePermiso(usuario, 'marketing_solicitudes');
@@ -73,7 +72,7 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
                 <SectionTitle label="Atención al Cliente" isOpen={isOpen} />
                 <MenuButton icon={<MdSupportAgent />} label="Reportes y Rutas" active={activeModule === 'atencion_cliente'} onClick={() => setActiveModule('atencion_cliente')} isOpen={isOpen} />
                 <MenuButton icon={<MdPeopleAlt />} label="Directorio Clientes" active={activeModule === 'atencion_directorio'} onClick={() => setActiveModule('atencion_directorio')} isOpen={isOpen} />
-                <MenuButton icon={<MdPhoneIphone />} label="App Técnico (Móvil)" active={activeModule === 'tecnico_movil'} onClick={() => setActiveModule('tecnico_movil')} isOpen={isOpen} />
+                <MenuButton icon={<MdPhoneIphone />} label="App Técnico" active={activeModule === 'tecnico_movil'} onClick={() => setActiveModule('tecnico_movil')} isOpen={isOpen} />
             </>
           )}
 
@@ -92,12 +91,15 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             </>
           )}
 
-          {/* --- NUEVA SECCIÓN: FLOTILLA --- */}
+          {/* --- SECCIÓN EXPANDIDA: FLOTILLA --- */}
           {verFlotilla && (
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
                 <SectionTitle label="Flotilla" isOpen={isOpen} />
                 <MenuButton icon={<MdDirectionsCar />} label="Control Vehicular" active={activeModule === 'vehiculos_panel'} onClick={() => setActiveModule('vehiculos_panel')} isOpen={isOpen} />
+                <MenuButton icon={<MdHistory />} label="Auditoría Global" active={activeModule === 'vehiculos_auditoria'} onClick={() => setActiveModule('vehiculos_auditoria')} isOpen={isOpen} />
+                <MenuButton icon={<MdBuild />} label="Mantenimiento" active={activeModule === 'vehiculos_taller'} onClick={() => setActiveModule('vehiculos_taller')} isOpen={isOpen} />
+                <MenuButton icon={<MdAssignment />} label="Solicitudes" active={activeModule === 'vehiculos_solicitudes'} onClick={() => setActiveModule('vehiculos_solicitudes')} isOpen={isOpen} />
             </>
           )}
 
