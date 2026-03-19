@@ -13,7 +13,7 @@ import { useUsuarios } from './hooks/useUsuarios';
 import { useInventarioOperativo } from './hooks/useInventarioOperativo';
 import { useLikeStore } from './hooks/useLikeStore'; 
 import { useSolicitudesContenido } from './hooks/useSolicitudesContenido';
-import { useVehiculos } from './hooks/useVehiculos'; // <--- IMPORTAMOS HOOK DE VEHICULOS
+import { useVehiculos } from './hooks/useVehiculos'; 
 
 import { tienePermiso } from './config/permisos'; 
 
@@ -44,6 +44,7 @@ import PanelVentas from './components/ventas/PanelVentas';
 import PanelVehiculos from './components/vehiculos/PanelVehiculos';
 import BitacoraGlobal from './components/vehiculos/BitacoraGlobal';
 import PanelMantenimiento from './components/vehiculos/PanelMantenimiento';
+import ModuloSolicitudesVehiculos from './components/vehiculos/ModuloSolicitudesVehiculos'; // <--- NUEVO IMPORT
 
 
 export default function Home() {
@@ -86,7 +87,7 @@ export default function Home() {
   const inventarioOps = useInventarioOperativo(); 
   const likeStoreData = useLikeStore();           
   const solicitudesData = useSolicitudesContenido(); 
-  const vehiculosData = useVehiculos(); // <--- CARGAMOS LOS AUTOS GLOBALMENTE
+  const vehiculosData = useVehiculos(); 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [colaboradorEditar, setColaboradorEditar] = useState(null);
@@ -123,6 +124,10 @@ export default function Home() {
 
   const ROLES_TIENDA_FULL = ['GERENTE_MKT', 'CREADOR_CONTENIDO', 'COMMUNITY_MANAGER', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL'];
   const esMarketingFull = u && ROLES_TIENDA_FULL.includes(u.rol);
+
+  // --- LÓGICA PARA PERMISOS DE FLOTILLA ---
+  const ROLES_ADMIN_FLOTILLA = ['GERENTE_MKT', 'DIRECTOR', 'GERENTE_GENERAL', 'SOPORTE_GENERAL'];
+  const esEncargadoFlotilla = u && ROLES_ADMIN_FLOTILLA.includes(u.rol);
 
   useEffect(() => {
     if (u && !localStorage.getItem('javak_modulo_activo')) {
@@ -262,10 +267,13 @@ export default function Home() {
                 </div>
             )}
 
-           {/* --- SECCIÓN DE NAVEGACIÓN: FLOTILLA VEHICULAR --- */}
+           {/* --- SECCIÓN: FLOTILLA VEHICULAR --- */}
             {activeModule === 'vehiculos_panel' && (
                 <div className="animate-slide-up h-full pb-10">
-                    <PanelVehiculos usuarioActivo={u} colaboradores={colaboradoresReales} />
+                    <PanelVehiculos 
+                        usuarioActivo={u} 
+                        colaboradores={colaboradoresReales} 
+                    />
                 </div>
             )}
             
@@ -281,11 +289,15 @@ export default function Home() {
                 </div>
             )}
 
+            {/* AHORA SÍ, CARGAMOS EL MÓDULO REAL DE SOLICITUDES */}
             {activeModule === 'vehiculos_solicitudes' && (
-                <div className="animate-slide-up h-full pb-10 flex flex-col items-center justify-center text-center">
-                    <div className="w-24 h-24 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner animate-pulse"><MdAssignment /></div>
-                    <h2 className="text-2xl font-black text-gray-800 mb-2">Módulo de Solicitudes</h2>
-                    <p className="text-sm font-medium text-gray-500 max-w-md mb-8">Estamos construyendo la bandeja de solicitudes y asignaciones. Configurando en el Paso 2.</p>
+                <div className="animate-slide-up h-full pb-10">
+                    <ModuloSolicitudesVehiculos 
+                        usuarioActivo={u}
+                        esEncargado={esEncargadoFlotilla}
+                        colaboradores={colaboradoresReales}
+                        vehiculos={vehiculosData.vehiculos}
+                    />
                 </div>
             )}
 
