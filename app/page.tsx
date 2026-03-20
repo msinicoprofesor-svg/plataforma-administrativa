@@ -126,7 +126,8 @@ export default function Home() {
   const esMarketingFull = u && ROLES_TIENDA_FULL.includes(u.rol);
 
   // --- LÓGICA PARA PERMISOS DE FLOTILLA ---
-  const ROLES_ADMIN_FLOTILLA = ['GERENTE_MKT', 'DIRECTOR', 'GERENTE_GENERAL', 'SOPORTE_GENERAL'];
+  // Ahora limitamos la administración pesada a Gerencia y Encargado de Flotilla
+  const ROLES_ADMIN_FLOTILLA = ['ENCARGADO_FLOTILLA', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL', 'GERENTE_MKT'];
   const esEncargadoFlotilla = u && ROLES_ADMIN_FLOTILLA.includes(u.rol);
 
   useEffect(() => {
