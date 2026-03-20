@@ -258,8 +258,15 @@ export default function Home() {
                 </div>
             )}
             
-            {activeModule === 'almacen_operativo' && verLogistica && <div className="animate-slide-up h-full pb-10"><InventarioOperativo useData={inventarioOps} /></div>}
-
+           {activeModule === 'almacen_operativo' && verLogistica && (
+                <div className="animate-slide-up h-full pb-10">
+                    <InventarioOperativo 
+                        useData={inventarioOps} 
+                        usuarioActivo={u} 
+                        colaboradores={colaboradoresReales} 
+                    />
+                </div>
+            )}
             {activeModule.startsWith('rrhh_') && verRRHH && <div className="animate-slide-up h-full pb-10"><PanelRRHH usuario={u} colaboradores={colaboradoresReales} moduloActivo={activeModule} /></div>}
 
             {activeModule === 'marketing_colaboradores' && verColaboradores && (
