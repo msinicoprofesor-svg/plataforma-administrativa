@@ -14,10 +14,10 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
     
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // Vista Colaborador (FORMULARIO INTELIGENTE)
+    // Vista Colaborador (CORREGIDO PARA USAR fecha_solicitud)
     const [formSolicitud, setFormSolicitud] = useState({ 
-        tipo_duracion: 'DIAS', // 'HORAS', 'DIA', 'DIAS'
-        fecha_inicio: '', 
+        tipo_duracion: 'DIAS',
+        fecha_solicitud: '', 
         fecha_fin: '',
         hora_inicio: '',
         hora_fin: '',
@@ -25,7 +25,6 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
         motivo: '' 
     });
     
-    // Vista Admin
     const [solicitudAProcesar, setSolicitudAProcesar] = useState(null); 
     const [vehiculoSeleccionado, setVehiculoSeleccionado] = useState('');
     const [comentariosAdmin, setComentariosAdmin] = useState('');
@@ -42,9 +41,9 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
         return new Date(fechaISO).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
     };
 
-    // Renderizador Inteligente de Periodo
     const renderizarPeriodo = (sol) => {
-        const inicio = formatearFecha(sol.fecha_inicio);
+        // CORRECCIÓN: Usar fecha_solicitud
+        const inicio = formatearFecha(sol.fecha_solicitud);
         if (sol.tipo_duracion === 'HORAS') return `${inicio} • ${sol.hora_inicio} a ${sol.hora_fin}`;
         if (sol.tipo_duracion === 'DIA') return `${inicio} (Todo el día)`;
         return `${inicio} al ${formatearFecha(sol.fecha_fin)}`;
@@ -54,11 +53,11 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
         e.preventDefault();
         setIsSubmitting(true);
         
-        // Construimos el Payload dependiendo de lo que eligió el usuario
+        // CORRECCIÓN: Payload alineado EXACTAMENTE con los nombres de tu BD
         const payload = {
-            usuario_id: usuarioActivo.id,
+            usuario_solicitante_id: usuarioActivo.id,
             tipo_duracion: formSolicitud.tipo_duracion,
-            fecha_inicio: formSolicitud.fecha_inicio,
+            fecha_solicitud: formSolicitud.fecha_solicitud,
             fecha_fin: formSolicitud.tipo_duracion === 'DIAS' ? formSolicitud.fecha_fin : null,
             hora_inicio: formSolicitud.tipo_duracion === 'HORAS' ? formSolicitud.hora_inicio : null,
             hora_fin: formSolicitud.tipo_duracion === 'HORAS' ? formSolicitud.hora_fin : null,
@@ -70,9 +69,7 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
         setIsSubmitting(false);
         if (res.success) {
             alert("✅ Solicitud enviada exitosamente al administrador.");
-            setFormSolicitud({ tipo_duracion: 'DIAS', fecha_inicio: '', fecha_fin: '', hora_inicio: '', hora_fin: '', destino: '', motivo: '' });
-        } else {
-            alert("❌ Hubo un error al enviar la solicitud. Verifica tu conexión.");
+            setFormSolicitud({ tipo_duracion: 'DIAS', fecha_solicitud: '', fecha_fin: '', hora_inicio: '', hora_fin: '', destino: '', motivo: '' });
         }
     };
 
@@ -81,7 +78,8 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
         if (!vehiculoSeleccionado) return alert("Debes seleccionar un vehículo para aprobar la solicitud.");
         
         setIsSubmitting(true);
-        const res = await responderSolicitud(solicitudAProcesar.id, 'APROBADA', vehiculoSeleccionado, comentariosAdmin, solicitudAProcesar.usuario_id);
+        // CORRECCIÓN: Pasar usuario_solicitante_id
+        const res = await responderSolicitud(solicitudAProcesar.id, 'APROBADA', vehiculoSeleccionado, comentariosAdmin, solicitudAProcesar.usuario_solicitante_id);
         setIsSubmitting(false);
         
         if (res.success) {
@@ -95,7 +93,8 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
         if (!comentariosAdmin) return alert("Por favor escribe un motivo de rechazo en los comentarios.");
         
         setIsSubmitting(true);
-        const res = await responderSolicitud(solicitudAProcesar.id, 'RECHAZADA', null, comentariosAdmin, solicitudAProcesar.usuario_id);
+        // CORRECCIÓN: Pasar usuario_solicitante_id
+        const res = await responderSolicitud(solicitudAProcesar.id, 'RECHAZADA', null, comentariosAdmin, solicitudAProcesar.usuario_solicitante_id);
         setIsSubmitting(false);
         
         if (res.success) {
@@ -143,11 +142,11 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
                             <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100 space-y-4">
                                 {formSolicitud.tipo_duracion === 'DIAS' ? (
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-[10px] font-black text-purple-600 uppercase mb-2">Día de Salida</label><input required type="date" value={formSolicitud.fecha_inicio} onChange={e => setFormSolicitud({...formSolicitud, fecha_inicio: e.target.value})} className="w-full bg-white border border-purple-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-purple-500 shadow-sm" /></div>
+                                        <div><label className="block text-[10px] font-black text-purple-600 uppercase mb-2">Día de Salida</label><input required type="date" value={formSolicitud.fecha_solicitud} onChange={e => setFormSolicitud({...formSolicitud, fecha_solicitud: e.target.value})} className="w-full bg-white border border-purple-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-purple-500 shadow-sm" /></div>
                                         <div><label className="block text-[10px] font-black text-purple-600 uppercase mb-2">Día de Regreso</label><input required type="date" value={formSolicitud.fecha_fin} onChange={e => setFormSolicitud({...formSolicitud, fecha_fin: e.target.value})} className="w-full bg-white border border-purple-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-purple-500 shadow-sm" /></div>
                                     </div>
                                 ) : (
-                                    <div><label className="block text-[10px] font-black text-purple-600 uppercase mb-2">¿Qué día la necesitas?</label><input required type="date" value={formSolicitud.fecha_inicio} onChange={e => setFormSolicitud({...formSolicitud, fecha_inicio: e.target.value})} className="w-full bg-white border border-purple-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-purple-500 shadow-sm" /></div>
+                                    <div><label className="block text-[10px] font-black text-purple-600 uppercase mb-2">¿Qué día la necesitas?</label><input required type="date" value={formSolicitud.fecha_solicitud} onChange={e => setFormSolicitud({...formSolicitud, fecha_solicitud: e.target.value})} className="w-full bg-white border border-purple-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-purple-500 shadow-sm" /></div>
                                 )}
 
                                 {formSolicitud.tipo_duracion === 'HORAS' && (
@@ -202,7 +201,8 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
                                                 </span>
                                             </div>
                                             
-                                            {esEncargado && <h4 className="text-sm font-black text-purple-700 uppercase">{getNombreColaborador(sol.usuario_id)}</h4>}
+                                            {/* CORRECCIÓN: Usar usuario_solicitante_id */}
+                                            {esEncargado && <h4 className="text-sm font-black text-purple-700 uppercase">{getNombreColaborador(sol.usuario_solicitante_id)}</h4>}
                                             
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                                                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100"><p className="text-[9px] font-black text-gray-400 uppercase mb-1">Destino</p><p className="text-xs font-bold text-gray-800">{sol.destino}</p></div>
@@ -237,7 +237,7 @@ export default function ModuloSolicitudesVehiculos({ usuarioActivo, esEncargado,
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <div>
                                 <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdAssignment className="text-purple-600"/> Evaluar Solicitud</h3>
-                                <p className="text-[10px] font-bold text-purple-600 uppercase mt-1">De: {getNombreColaborador(solicitudAProcesar.usuario_id)}</p>
+                                <p className="text-[10px] font-bold text-purple-600 uppercase mt-1">De: {getNombreColaborador(solicitudAProcesar.usuario_solicitante_id)}</p>
                             </div>
                             <button type="button" onClick={() => setSolicitudAProcesar(null)} className="text-gray-400 hover:text-red-500"><MdClose className="text-xl"/></button>
                         </div>
