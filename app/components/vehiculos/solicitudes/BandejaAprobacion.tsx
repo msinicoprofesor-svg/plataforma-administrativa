@@ -25,7 +25,6 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
     const sugerenciasAprobado = ["Aprobado. Pasa por las llaves a recepción.", "Unidad autorizada y lista en estacionamiento.", "Aprobado con tanque lleno, favor de reponer."];
     const sugerenciasRechazado = ["Rechazado. Alta demanda de unidades hoy.", "Rechazado. La unidad solicitada está en taller.", "Rechazado. Actividad no requiere vehículo de flotilla."];
 
-    // CORRECCIÓN: Extracción exacta de campos de tu tabla Colaboradores
     const getDatosColaborador = (id) => {
         const col = colaboradores.find(c => c.id === id);
         return col || { nombre: 'Usuario Desconocido', puesto: 'Sin Puesto', region: 'Sin Región', marca: 'Sin Marca', foto: null };
@@ -70,9 +69,9 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
         setComentariosAdmin('');
     };
 
-    // CORRECCIÓN: Miniatura limpia flotante (Sin recuadros feos)
+    // CORRECCIÓN MAGISTRAL DE CSS: Agregamos `mix-blend-multiply` para derretir el fondo blanco de la foto
     const RenderMiniatura = ({ tipo, color, url }) => {
-        if (url) return <img src={url} alt="Auto" className="w-full h-full object-contain drop-shadow-md" />;
+        if (url) return <img src={url} alt="Auto" className="w-full h-full object-contain drop-shadow-md mix-blend-multiply" />;
         const style = { color: color || '#94a3b8' };
         return (
             <div className="h-full flex items-center justify-center opacity-50 scale-75">
@@ -113,7 +112,6 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-sm font-black text-gray-800 truncate">{solicitante.nombre}</h4>
-                                            {/* CORRECCIÓN: Datos exactos de tabla colaboradores */}
                                             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{solicitante.puesto} • {solicitante.region} • {solicitante.marca}</p>
                                         </div>
                                         <RenderEtiquetaEstado estado={sol.estado} />
@@ -178,7 +176,6 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="text-base font-black text-gray-900">{getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).nombre}</h4>
-                                    {/* CORRECCIÓN: Datos exactos de tabla colaboradores */}
                                     <p className="text-[10px] font-bold text-purple-600 uppercase tracking-widest mb-2">
                                         {getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).puesto} • {getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).region} • {getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).marca}
                                     </p>
@@ -204,11 +201,9 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
                                         {vehiculosDisponibles.map(v => (
                                             <div 
                                                 key={v.id} 
-                                                // CORRECCIÓN: Alternar selección de auto
                                                 onClick={() => setVehiculoSeleccionado(prev => prev === v.id ? '' : v.id)}
                                                 className={`w-40 shrink-0 snap-center rounded-2xl border-2 transition-all cursor-pointer flex flex-col overflow-hidden ${vehiculoSeleccionado === v.id ? 'border-green-500 bg-green-50/30 shadow-md transform scale-[1.02]' : 'border-gray-100 bg-white hover:border-gray-300'}`}
                                             >
-                                                {/* CORRECCIÓN: Fondo transparente para miniatura flotante */}
                                                 <div className="h-24 bg-transparent relative flex items-center justify-center p-3">
                                                     {vehiculoSeleccionado === v.id && <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-0.5 z-10 shadow-sm"><MdCheckCircle className="text-sm"/></div>}
                                                     <RenderMiniatura tipo={v.tipo_vehiculo} color={v.color} url={v.imagen_url} />
@@ -227,7 +222,6 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
                             <div>
                                 <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Comentarios para el solicitante</label>
                                 
-                                {/* BOTONERA RÁPIDA */}
                                 <div className="flex flex-wrap gap-2 mb-3">
                                     {vehiculoSeleccionado ? (
                                         sugerenciasAprobado.map((sug, i) => <button key={i} type="button" onClick={() => setComentariosAdmin(sug)} className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-100 rounded-lg text-[9px] font-black tracking-wide transition-colors">{sug}</button>)
