@@ -25,9 +25,10 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
     const sugerenciasAprobado = ["Aprobado. Pasa por las llaves a recepción.", "Unidad autorizada y lista en estacionamiento.", "Aprobado con tanque lleno, favor de reponer."];
     const sugerenciasRechazado = ["Rechazado. Alta demanda de unidades hoy.", "Rechazado. La unidad solicitada está en taller.", "Rechazado. Actividad no requiere vehículo de flotilla."];
 
+    // CORRECCIÓN: Extracción exacta de campos de tu tabla Colaboradores
     const getDatosColaborador = (id) => {
         const col = colaboradores.find(c => c.id === id);
-        return col || { nombre: 'Usuario Desconocido', puesto: 'Sin Puesto', departamento: 'N/A', foto: null };
+        return col || { nombre: 'Usuario Desconocido', puesto: 'Sin Puesto', region: 'Sin Región', marca: 'Sin Marca', foto: null };
     };
 
     const formatearFecha = (fechaISO) => {
@@ -69,8 +70,9 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
         setComentariosAdmin('');
     };
 
+    // CORRECCIÓN: Miniatura limpia flotante (Sin recuadros feos)
     const RenderMiniatura = ({ tipo, color, url }) => {
-        if (url) return <img src={url} alt="Auto" className="w-full h-full object-contain p-2" />;
+        if (url) return <img src={url} alt="Auto" className="w-full h-full object-contain drop-shadow-md" />;
         const style = { color: color || '#94a3b8' };
         return (
             <div className="h-full flex items-center justify-center opacity-50 scale-75">
@@ -111,7 +113,8 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-sm font-black text-gray-800 truncate">{solicitante.nombre}</h4>
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{solicitante.puesto} • {solicitante.departamento || solicitante.region || 'Matriz'}</p>
+                                            {/* CORRECCIÓN: Datos exactos de tabla colaboradores */}
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{solicitante.puesto} • {solicitante.region} • {solicitante.marca}</p>
                                         </div>
                                         <RenderEtiquetaEstado estado={sol.estado} />
                                     </div>
@@ -175,7 +178,10 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="text-base font-black text-gray-900">{getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).nombre}</h4>
-                                    <p className="text-[10px] font-bold text-purple-600 uppercase tracking-widest mb-2">{getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).puesto}</p>
+                                    {/* CORRECCIÓN: Datos exactos de tabla colaboradores */}
+                                    <p className="text-[10px] font-bold text-purple-600 uppercase tracking-widest mb-2">
+                                        {getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).puesto} • {getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).region} • {getDatosColaborador(solicitudAProcesar.usuario_solicitante_id).marca}
+                                    </p>
                                     <div className="text-xs text-gray-600 space-y-0.5">
                                         <p><strong>🕒 Periodo:</strong> {renderizarPeriodo(solicitudAProcesar)}</p>
                                         <p><strong>📍 Destino:</strong> {solicitudAProcesar.destino}</p>
@@ -194,18 +200,20 @@ export default function BandejaAprobacion({ usuarioActivo, colaboradores = [], v
                                 {vehiculosDisponibles.length === 0 ? (
                                     <div className="bg-red-50 text-red-500 p-4 rounded-xl text-center font-bold text-sm border border-red-100">No hay vehículos disponibles. Debes rechazar la solicitud.</div>
                                 ) : (
-                                    <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar snap-x">
+                                    <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar snap-x p-1">
                                         {vehiculosDisponibles.map(v => (
                                             <div 
                                                 key={v.id} 
-                                                onClick={() => setVehiculoSeleccionado(v.id)}
+                                                // CORRECCIÓN: Alternar selección de auto
+                                                onClick={() => setVehiculoSeleccionado(prev => prev === v.id ? '' : v.id)}
                                                 className={`w-40 shrink-0 snap-center rounded-2xl border-2 transition-all cursor-pointer flex flex-col overflow-hidden ${vehiculoSeleccionado === v.id ? 'border-green-500 bg-green-50/30 shadow-md transform scale-[1.02]' : 'border-gray-100 bg-white hover:border-gray-300'}`}
                                             >
-                                                <div className="h-24 bg-gray-50 border-b border-gray-100 relative">
+                                                {/* CORRECCIÓN: Fondo transparente para miniatura flotante */}
+                                                <div className="h-24 bg-transparent relative flex items-center justify-center p-3">
                                                     {vehiculoSeleccionado === v.id && <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-0.5 z-10 shadow-sm"><MdCheckCircle className="text-sm"/></div>}
                                                     <RenderMiniatura tipo={v.tipo_vehiculo} color={v.color} url={v.imagen_url} />
                                                 </div>
-                                                <div className="p-3 text-center">
+                                                <div className="p-3 text-center bg-gray-50 border-t border-gray-100 mt-auto">
                                                     <h4 className="text-[11px] font-black text-gray-800 leading-tight">{v.marca} {v.modelo}</h4>
                                                     <p className="text-[9px] font-bold text-gray-500 uppercase mt-1 tracking-widest">{v.placas}</p>
                                                 </div>
