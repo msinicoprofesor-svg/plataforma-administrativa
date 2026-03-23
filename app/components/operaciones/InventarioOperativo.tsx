@@ -8,7 +8,7 @@ import { MdInventory2, MdDashboard, MdList, MdShoppingCart, MdLocalShipping, MdA
 // IMPORTAMOS LOS 5 SUBMÓDULOS (Los crearemos en el siguiente paso)
 import DashboardAlmacen from './almacen/DashboardAlmacen';
 import CatalogoProductos from './almacen/CatalogoProductos';
-import RegistroCompras from './almacen/RegistroCompras';
+import RegistroCompras from './almacen/RegistroCompras.tsx';
 import MesaLogistica from './almacen/MesaLogistica';
 import PortalSolicitudes from './almacen/PortalSolicitudes';
 
