@@ -12,11 +12,15 @@ import { FaFacebook } from "react-icons/fa";
 
 const MARCAS = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
 const REGIONES = ['Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
-const DEPARTAMENTOS = ['Marketing', 'Sistemas', 'Finanzas', 'Almacén', 'Operaciones', 'Dirección'];
+
+// 1. Agregamos 'Administración' al arreglo
+const DEPARTAMENTOS = ['Marketing', 'Sistemas', 'Finanzas', 'Administración', 'Almacén', 'Operaciones', 'Dirección'];
+
+// 2. Agregamos 'Encargado de almacén' al arreglo
 const PUESTOS = [
   'Gerente General', 'Soporte General', 'Gerente Marketing', 'Gerente Administrativo', 'Gerente Técnico', 'Gerente RRHH',
-  'Administrador', 'Líder Técnico', 'Control Vehicular', 'Community Manager', 'Atención al Cliente', 'Técnico', 'Creador de Contenido', 
-  'Cobranza', 'Vendedor', 'Otro Personal'
+  'Administrador', 'Encargado de almacén', 'Líder Técnico', 'Control Vehicular', 'Community Manager', 'Atención al Cliente', 
+  'Técnico', 'Creador de Contenido', 'Cobranza', 'Vendedor', 'Otro Personal'
 ];
 
 const DEFAULT_HORARIO = {
