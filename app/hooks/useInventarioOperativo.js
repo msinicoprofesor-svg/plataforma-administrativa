@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/hooks/useInventarioOperativo.js (WMS ENTERPRISE)              */
+/* ARCHIVO: app/hooks/useInventarioOperativo.js (WMS MULTI-SUCURSAL)          */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useEffect } from 'react';
@@ -10,9 +10,9 @@ export function useInventarioOperativo() {
   const [movimientos, setMovimientos] = useState([]);
   const [compras, setCompras] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
+  const [activos, setActivos] = useState([]); // NUEVO: Para mobiliario y equipo
   const [cargando, setCargando] = useState(true);
 
-  // --- MAPERS: Traductores Frontend <-> Base de Datos ---
   const mapInvFromDB = (db) => ({
     id: db.id, nombre: db.nombre, almacen: db.almacen, 
     categoria: db.categoria, stock: db.stock, minimo: db.minimo, unidad: db.unidad,
@@ -25,17 +25,6 @@ export function useInventarioOperativo() {
     marca: inv.marca || 'General', region: inv.region || 'N/A'
   });
 
-  const mapMovFromDB = (db) => ({
-    id: db.id, fecha: db.fecha, productoId: db.producto_id, 
-    cantidad: db.cantidad, tipo: db.tipo, motivo: db.motivo, usuario: db.usuario
-  });
-
-  const mapMovToDB = (mov) => ({
-    id: mov.id.toString(), fecha: mov.fecha, producto_id: mov.productoId, 
-    cantidad: mov.cantidad, tipo: mov.tipo, motivo: mov.motivo, usuario: mov.usuario
-  });
-
-  // --- 1. CARGA MAESTRA DESDE SUPABASE ---
   const fetchData = async () => {
     setCargando(true);
     try {
@@ -43,13 +32,20 @@ export function useInventarioOperativo() {
         if (dInv) setInventario(dInv.map(mapInvFromDB));
 
         const { data: dMov } = await supabase.from('inventario_movimientos').select('*').order('created_at', { ascending: false });
-        if (dMov) setMovimientos(dMov.map(mapMovFromDB));
+        if (dMov) setMovimientos(dMov.map(m => ({
+            id: m.id, fecha: m.fecha, productoId: m.producto_id, 
+            cantidad: m.cantidad, tipo: m.tipo, motivo: m.motivo, usuario: m.usuario
+        })));
 
         const { data: dCom } = await supabase.from('inventario_compras').select('*').order('fecha_compra', { ascending: false });
         if (dCom) setCompras(dCom);
 
         const { data: dSol } = await supabase.from('inventario_solicitudes').select('*, detalles:inventario_solicitudes_detalle(*)').order('fecha_solicitud', { ascending: false });
         if (dSol) setSolicitudes(dSol);
+
+        // Cargar los activos fijos (Mobiliario)
+        const { data: dAct } = await supabase.from('inventario_activos').select('*').order('fecha_asignacion', { ascending: false });
+        if (dAct) setActivos(dAct);
 
     } catch (error) {
         console.error("Error cargando WMS:", error);
@@ -63,23 +59,17 @@ export function useInventarioOperativo() {
   const registrarMovimiento = async (productoId, cantidad, tipo, motivo, usuario) => {
     const productoActual = inventario.find(p => p.id === productoId);
     if (!productoActual) return;
-
     const cantNum = parseInt(cantidad, 10);
     const nuevoStock = tipo === 'ENTRADA' ? productoActual.stock + cantNum : productoActual.stock - cantNum;
 
     setInventario(prev => prev.map(p => p.id === productoId ? { ...p, stock: nuevoStock } : p));
-
     const nuevoMovimiento = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), productoId, cantidad: cantNum, tipo, motivo, usuario };
     setMovimientos(prev => [nuevoMovimiento, ...prev]);
 
-    try {
-        await Promise.all([
-            supabase.from('inventario_operativo').update({ stock: nuevoStock }).eq('id', productoId),
-            supabase.from('inventario_movimientos').insert([mapMovToDB(nuevoMovimiento)])
-        ]);
-    } catch (error) {
-        console.error("Error al registrar movimiento en BD:", error);
-    }
+    await Promise.all([
+        supabase.from('inventario_operativo').update({ stock: nuevoStock }).eq('id', productoId),
+        supabase.from('inventario_movimientos').insert([{ id: nuevoMovimiento.id, fecha: nuevoMovimiento.fecha, producto_id: productoId, cantidad: cantNum, tipo, motivo, usuario }])
+    ]);
   };
 
   const agregarProducto = async (nuevoProd) => {
@@ -88,15 +78,42 @@ export function useInventarioOperativo() {
       await supabase.from('inventario_operativo').insert([mapInvToDB(prod)]);
   };
 
+  // ERP MAGIA: Registrar compra y crear clon si no existe en la sucursal
   const registrarCompra = async (compraPayload, productosComprados) => {
-      const { error } = await supabase.from('inventario_compras').insert([compraPayload]).select();
-      if(!error) {
-          for(const p of productosComprados) {
-              await registrarMovimiento(p.productoId, p.cantidad, 'ENTRADA', `Ingreso de Factura/Compra a ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
+      const { data: compraBD, error } = await supabase.from('inventario_compras').insert([compraPayload]).select();
+      if(error) return { success: false, error };
+
+      for(const p of productosComprados) {
+          const baseProd = inventario.find(inv => inv.id === p.productoBaseId);
+          if(!baseProd) continue;
+
+          // ¿Ya existe este producto físicamente en esa marca y región específica?
+          const prodFisico = inventario.find(inv => inv.nombre === baseProd.nombre && inv.marca === p.marca && (inv.almacen === p.region || inv.region === p.region));
+          
+          if(prodFisico) {
+              // Ya existe, solo sumamos stock
+              await registrarMovimiento(prodFisico.id, p.cantidad, 'ENTRADA', `Compra Fac: ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
+          } else {
+              // NO EXISTE en esta sucursal. Lo clonamos del base y le metemos el stock inicial.
+              const nuevoFisico = {
+                  ...baseProd,
+                  id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                  marca: p.marca,
+                  almacen: p.region.toUpperCase(), // Se guarda en el almacén de la región
+                  region: p.region,
+                  stock: parseInt(p.cantidad, 10)
+              };
+              
+              // 1. Crear el producto físico
+              await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
+              
+              // 2. Registrar el movimiento inicial
+              const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: nuevoFisico.stock, tipo: 'ENTRADA', motivo: `Alta por Compra Fac: ${compraPayload.proveedor}`, usuario: compraPayload.usuario_registro_id };
+              await supabase.from('inventario_movimientos').insert([mov]);
           }
-          fetchData();
       }
-      return { success: !error, error };
+      fetchData();
+      return { success: true };
   };
 
   const crearSolicitud = async (solicitudPayload, detalles) => {
@@ -114,15 +131,21 @@ export function useInventarioOperativo() {
   const actualizarEstadoSolicitud = async (id, estado, comentarios_admin) => {
       const updateData = { estado, comentarios_admin };
       if(estado === 'ENTREGADO') updateData.fecha_entrega = new Date().toISOString();
-
       const { error } = await supabase.from('inventario_solicitudes').update(updateData).eq('id', id);
       if(!error) fetchData();
       return { success: !error, error };
   };
 
+  // Funciones preparadas para la Fase 3 (Activos Fijos)
+  const agregarActivoFijo = async (activo) => {
+      const { error } = await supabase.from('inventario_activos').insert([activo]);
+      if(!error) fetchData();
+      return { success: !error };
+  };
+
   return { 
-      inventario, movimientos, compras, solicitudes, cargando, 
-      registrarMovimiento, agregarProducto, registrarCompra, crearSolicitud, actualizarEstadoSolicitud,
+      inventario, movimientos, compras, solicitudes, activos, cargando, 
+      registrarMovimiento, agregarProducto, registrarCompra, crearSolicitud, actualizarEstadoSolicitud, agregarActivoFijo,
       refetch: fetchData
   };
 }
