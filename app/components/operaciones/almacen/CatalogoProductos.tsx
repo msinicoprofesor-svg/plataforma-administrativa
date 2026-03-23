@@ -2,7 +2,7 @@
 /* ARCHIVO: app/components/operaciones/almacen/CatalogoProductos.tsx          */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { MdSearch, MdAdd, MdClose, MdInventory2, MdWarning, MdFilterList } from "react-icons/md";
 
 const MARCAS_DISPONIBLES = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
@@ -22,11 +22,12 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     const [filtroMarca, setFiltroMarca] = useState('');
     const [filtroCategoria, setFiltroCategoria] = useState('');
     
-    // --- ESTADOS DEL CARRUSEL DE CÁPSULAS ---
-    const [capsulaActiva, setCapsulaActiva] = useState(esAdminGeneral ? 'Todos' : 'General');
+    // 1. REGLA: "General" por defecto
+    const [capsulaActiva, setCapsulaActiva] = useState('General'); 
     const [regionesExpandidas, setRegionesExpandidas] = useState(false);
-    const [paginaRegiones, setPaginaRegiones] = useState(0); // Controla la paginación (de 3 en 3)
-    const ITEMS_POR_PAGINA = 3;
+    
+    // 3. REGLA: Ref para el Scroll Suave
+    const scrollRef = useRef(null);
 
     const [modalAbierto, setModalAbierto] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +37,17 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL' 
     });
 
-    const CAPSULAS_MARCAS = ['WIFICEL', 'RK'];
+    // --- GRUPOS DE CÁPSULAS ---
+    const leftGroup = ['Todos', 'General'];
+    const midGroup = REGIONES_DISPONIBLES; 
+    const rightGroup = ['WIFICEL', 'RK'];
+
+    const isLeftActive = leftGroup.includes(capsulaActiva);
+    const isMidActive = midGroup.includes(capsulaActiva);
+    
+    // 2. REGLA: El "Pivote/Cover" es la cápsula activa. Si estoy en WIFICEL, el pivote de la izq es 'General'.
+    const coverCapsule = (isLeftActive || isMidActive) ? capsulaActiva : 'General';
+
     let CAPSULAS_REGIONAL = ['General'];
     if (!esAdminGeneral) {
         if (miRegion !== 'N/A') CAPSULAS_REGIONAL.push(miRegion);
@@ -82,11 +93,24 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         return name;
     };
 
-    // Estilo base para animaciones fluidas (Evita saltos bruscos)
-    const baseTransition = "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap flex items-center justify-center shrink-0 ";
+    const handleCapsuleClick = (cap) => {
+        if (!regionesExpandidas) {
+            setRegionesExpandidas(true);
+        } else {
+            if (capsulaActiva === cap) setRegionesExpandidas(false);
+            else setCapsulaActiva(cap);
+        }
+    };
 
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden relative">
+            
+            {/* CSS para ocultar la barra de scroll y mantener el smooth intacto */}
+            <style>{`
+                .hide-scroll::-webkit-scrollbar { display: none; }
+                .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+
             <div className="p-5 border-b border-gray-100 bg-white shrink-0 flex flex-col gap-5">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-3">
@@ -112,97 +136,106 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 overflow-hidden w-full">
                     <div className="flex overflow-hidden w-full md:w-auto items-center p-1">
                         
-                        {/* MODO ADMIN GENERAL (Cápsulas con Animación CSS Fluida y Carrusel) */}
+                        {/* MODO ADMIN GENERAL */}
                         {esAdminGeneral ? (
                             <div className="flex items-center">
                                 
-                                {/* BOTÓN DE PORTADA (Se encoge y desaparece al expandir) */}
-                                <button 
-                                    onClick={() => { setRegionesExpandidas(true); setPaginaRegiones(0); }}
-                                    className={`${baseTransition} rounded-full text-[11px] font-black ${!regionesExpandidas ? 'max-w-[150px] opacity-100 px-4 py-1.5 mx-0.5 bg-gray-500 text-white shadow-md hover:bg-gray-600' : 'max-w-0 opacity-0 px-0 py-0 mx-0 border-0'}`}
-                                >
-                                    {REGIONES_DISPONIBLES.includes(capsulaActiva) ? getShortName(capsulaActiva) : 'General'} <span className="text-[8px] ml-1.5 opacity-80">◀▶</span>
-                                </button>
-
-                                {/* FIJOS: Todos y General (Aparecen al expandir) */}
-                                {['Todos', 'General'].map(cap => {
+                                {/* GRUPO IZQUIERDO (Todos, General) */}
+                                {leftGroup.map(cap => {
                                     const isActive = capsulaActiva === cap;
+                                    const isCover = !regionesExpandidas && coverCapsule === cap;
+                                    const isVisible = regionesExpandidas || isCover;
+
+                                    let btnClass = "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap rounded-full text-[11px] font-black flex items-center justify-center shrink-0 border ";
+                                    if (!isVisible) {
+                                        btnClass += "max-w-0 opacity-0 px-0 py-0 mx-0 border-transparent ";
+                                    } else {
+                                        btnClass += "max-w-[150px] opacity-100 px-4 py-1.5 mx-0.5 ";
+                                        if (isActive) btnClass += "bg-white text-blue-600 border-blue-200 shadow-sm ";
+                                        else if (isCover) btnClass += "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200 shadow-sm ";
+                                        else btnClass += "bg-transparent text-gray-500 border-transparent hover:bg-gray-100 ";
+                                    }
+
                                     return (
-                                        <button 
-                                            key={cap}
-                                            onClick={() => { if(isActive) setRegionesExpandidas(false); else setCapsulaActiva(cap); }}
-                                            className={`${baseTransition} rounded-full text-[11px] font-black ${regionesExpandidas ? `max-w-[100px] opacity-100 px-4 py-1.5 mx-0.5 ${isActive ? 'bg-white text-blue-600 border border-blue-200 shadow-sm' : 'bg-transparent text-gray-500 hover:bg-gray-100 border border-transparent'}` : 'max-w-0 opacity-0 px-0 py-0 mx-0 border-0'}`}
-                                        >
-                                            {cap}
+                                        <button key={cap} onClick={() => handleCapsuleClick(cap)} className={btnClass}>
+                                            {cap} {isCover && <span className="text-[8px] ml-1.5 opacity-80">◀▶</span>}
                                         </button>
                                     )
                                 })}
 
-                                {/* FLECHA IZQUIERDA DEL CARRUSEL */}
+                                {/* FLECHA IZQUIERDA CARRUSEL */}
                                 <button 
-                                    onClick={() => setPaginaRegiones(prev => Math.max(0, prev - 1))}
-                                    className={`${baseTransition} rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 ${regionesExpandidas && paginaRegiones > 0 ? 'w-7 h-7 max-w-[28px] opacity-100 mx-0.5' : 'max-w-0 opacity-0 h-7 px-0 mx-0 border-0'}`}
+                                    onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+                                    className={`transition-all duration-500 ease-in-out overflow-hidden rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200
+                                        ${regionesExpandidas ? 'w-7 h-7 max-w-[28px] opacity-100 mx-0.5' : 'max-w-0 opacity-0 h-7 px-0 mx-0 border-transparent'}
+                                    `}
                                 >
                                     <span className="text-[10px]">◀</span>
                                 </button>
 
-                                {/* REGIONES DINÁMICAS (Paginadas de 3 en 3) */}
-                                {REGIONES_DISPONIBLES.map((cap, index) => {
-                                    const isVisible = regionesExpandidas && index >= (paginaRegiones * ITEMS_POR_PAGINA) && index < ((paginaRegiones + 1) * ITEMS_POR_PAGINA);
-                                    const isActive = capsulaActiva === cap;
-                                    
-                                    return (
-                                        <button 
-                                            key={cap}
-                                            onClick={() => { if(isActive) setRegionesExpandidas(false); else setCapsulaActiva(cap); }}
-                                            className={`${baseTransition} rounded-full text-[11px] font-black ${isVisible ? `max-w-[150px] opacity-100 px-4 py-1.5 mx-0.5 ${isActive ? 'bg-white text-blue-600 border border-blue-200 shadow-sm' : 'bg-transparent text-gray-500 hover:bg-gray-100 border border-transparent'}` : 'max-w-0 opacity-0 px-0 py-0 mx-0 border-0'}`}
-                                        >
-                                            {getShortName(cap)}
-                                        </button>
-                                    );
-                                })}
+                                {/* GRUPO CENTRAL (Scroll Animado de Regiones) */}
+                                <div className={`transition-all duration-500 ease-in-out flex items-center overflow-hidden ${regionesExpandidas ? 'max-w-[260px] opacity-100' : (isMidActive ? 'max-w-[150px] opacity-100' : 'max-w-0 opacity-0')}`}>
+                                    <div ref={scrollRef} className="flex items-center overflow-x-auto hide-scroll scroll-smooth w-full">
+                                        {midGroup.map(cap => {
+                                            const isActive = capsulaActiva === cap;
+                                            const isCover = !regionesExpandidas && coverCapsule === cap;
+                                            const isVisible = regionesExpandidas || isCover;
 
-                                {/* FLECHA DERECHA DEL CARRUSEL */}
+                                            let btnClass = "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap rounded-full text-[11px] font-black flex items-center justify-center shrink-0 border ";
+                                            if (!isVisible) {
+                                                btnClass += "max-w-0 opacity-0 px-0 py-0 mx-0 border-transparent ";
+                                            } else {
+                                                btnClass += "max-w-[150px] opacity-100 px-4 py-1.5 mx-0.5 ";
+                                                if (isActive) btnClass += "bg-white text-blue-600 border-blue-200 shadow-sm ";
+                                                else btnClass += "bg-transparent text-gray-500 border-transparent hover:bg-gray-100 ";
+                                            }
+
+                                            return (
+                                                <button key={cap} onClick={() => handleCapsuleClick(cap)} className={btnClass}>
+                                                    {getShortName(cap)} {isCover && <span className="text-[8px] ml-1.5 opacity-80">◀▶</span>}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* FLECHA DERECHA CARRUSEL */}
                                 <button 
-                                    onClick={() => setPaginaRegiones(prev => prev + 1)}
-                                    className={`${baseTransition} rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 ${regionesExpandidas && ((paginaRegiones + 1) * ITEMS_POR_PAGINA) < REGIONES_DISPONIBLES.length ? 'w-7 h-7 max-w-[28px] opacity-100 mx-0.5' : 'max-w-0 opacity-0 h-7 px-0 mx-0 border-0'}`}
+                                    onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+                                    className={`transition-all duration-500 ease-in-out overflow-hidden rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200
+                                        ${regionesExpandidas ? 'w-7 h-7 max-w-[28px] opacity-100 mx-0.5' : 'max-w-0 opacity-0 h-7 px-0 mx-0 border-transparent'}
+                                    `}
                                 >
                                     <span className="text-[10px]">▶</span>
                                 </button>
 
                                 {/* SEPARADOR ANIMADO */}
-                                <div className={`transition-all duration-500 ease-in-out bg-gray-200 hidden md:block rounded-full ${regionesExpandidas ? 'w-[2px] h-6 mx-2 opacity-100' : 'w-0 h-6 mx-0 opacity-0'}`}></div>
+                                <div className={`transition-all duration-500 ease-in-out bg-gray-200 hidden md:block rounded-full ${regionesExpandidas ? 'w-[2px] h-6 mx-2 opacity-100' : 'w-0 h-6 mx-0 opacity-0 border-transparent'}`}></div>
 
-                                {/* MARCAS FIJAS AL FINAL */}
-                                {CAPSULAS_MARCAS.map(cap => {
+                                {/* GRUPO DERECHO (Fijos: WIFICEL, RK) */}
+                                {rightGroup.map(cap => {
                                     const isActive = capsulaActiva === cap;
-                                    const baseStyle = `px-4 py-1.5 mx-0.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all duration-300 ${isActive ? 'bg-white text-blue-600 border border-blue-200 shadow-sm' : 'bg-gray-500 text-white hover:bg-gray-600 shadow-sm border border-transparent'}`;
-                                    
+                                    let btnClass = "px-4 py-1.5 mx-0.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all duration-300 border ";
+                                    if (isActive) btnClass += "bg-white text-blue-600 border-blue-200 shadow-sm ";
+                                    else btnClass += "bg-gray-500 text-white border-transparent hover:bg-gray-600 shadow-sm ";
+
                                     return (
-                                        <button key={cap} onClick={() => {
-                                            setCapsulaActiva(cap);
-                                            setRegionesExpandidas(false);
-                                        }} className={baseStyle}>
+                                        <button key={cap} onClick={() => { setCapsulaActiva(cap); setRegionesExpandidas(false); }} className={btnClass}>
                                             {cap}
                                         </button>
-                                    );
+                                    )
                                 })}
                             </div>
                         ) : (
-                            // MODO ADMIN REGIONAL (Fijo)
+                            // MODO ADMIN REGIONAL
                             <div className="flex items-center gap-1">
                                 {CAPSULAS_REGIONAL.map(cap => {
                                     const isDark = cap === 'WIFICEL' || cap === 'RK';
                                     const isActive = capsulaActiva === cap;
-                                    
                                     let baseStyle = `px-4 py-1.5 mx-0.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all duration-300 `;
-                                    if (isActive) {
-                                        baseStyle += 'bg-white text-blue-600 border border-blue-200 shadow-sm';
-                                    } else if (isDark) {
-                                        baseStyle += 'bg-gray-500 text-white hover:bg-gray-600 shadow-sm border border-transparent';
-                                    } else {
-                                        baseStyle += 'bg-transparent text-gray-500 hover:bg-gray-100 border border-transparent';
-                                    }
+                                    if (isActive) baseStyle += 'bg-white text-blue-600 border border-blue-200 shadow-sm';
+                                    else if (isDark) baseStyle += 'bg-gray-500 text-white hover:bg-gray-600 shadow-sm border border-transparent';
+                                    else baseStyle += 'bg-transparent text-gray-500 hover:bg-gray-100 border border-transparent';
 
                                     return (
                                         <button key={cap} onClick={() => setCapsulaActiva(cap)} className={baseStyle}>
