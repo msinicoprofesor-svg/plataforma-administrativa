@@ -5,10 +5,10 @@
 import { useState } from 'react';
 import { MdInventory2, MdDashboard, MdList, MdShoppingCart, MdLocalShipping, MdAddBox } from "react-icons/md";
 
-// IMPORTAMOS LOS 5 SUBMÓDULOS (Los crearemos en el siguiente paso)
+// IMPORTAMOS LOS 5 SUBMÓDULOS (CORREGIDO: Sin extensiones .tsx en los imports)
 import DashboardAlmacen from './almacen/DashboardAlmacen';
 import CatalogoProductos from './almacen/CatalogoProductos';
-import RegistroCompras from './almacen/RegistroCompras.tsx';
+import RegistroCompras from './almacen/RegistroCompras';
 import MesaLogistica from './almacen/MesaLogistica';
 import PortalSolicitudes from './almacen/PortalSolicitudes';
 
@@ -68,7 +68,7 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                 {vistaActiva === 'catalogo' && <CatalogoProductos useData={useData} />}
                 {vistaActiva === 'compras' && <RegistroCompras useData={useData} usuarioActivo={usuarioActivo} />}
                 {vistaActiva === 'logistica' && <MesaLogistica useData={useData} colaboradores={colaboradores} usuarioActivo={usuarioActivo} />}
-                {vistaActiva === 'portal' && <PortalSolicitudes useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} />}
+                {vistaActiva === 'portal' && <PortalSolicitudes />}
             </div>
         </div>
     );
