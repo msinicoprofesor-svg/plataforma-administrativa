@@ -82,19 +82,20 @@ export function useInventarioOperativo() {
       await supabase.from('inventario_operativo').insert([mapInvToDB(prod)]);
   };
 
-  // --- ESCUDO ANTI-CONGELAMIENTO EN COMPRAS ---
   const registrarCompra = async (compraPayload, productosComprados) => {
       try {
-          // 1. Guardar la factura
           const { data: compraBD, error } = await supabase.from('inventario_compras').insert([compraPayload]).select();
           if(error) return { success: false, error: error.message };
 
-          // 2. Procesar los productos
           for(const p of productosComprados) {
               const baseProd = inventario.find(inv => inv.id === p.productoBaseId);
               if(!baseProd) continue;
 
-              const prodFisico = inventario.find(inv => inv.nombre === baseProd.nombre && inv.marca === p.marca && (inv.almacen === p.region || inv.region === p.region));
+              const marcaSegura = p.marca || 'JAVAK (Corporativo)';
+              const regionSegura = p.region || 'Centro';
+              const almacenSeguro = regionSegura.toUpperCase();
+
+              const prodFisico = inventario.find(inv => inv.nombre === baseProd.nombre && inv.marca === marcaSegura && (inv.almacen === almacenSeguro || inv.region === regionSegura));
               
               if(prodFisico) {
                   await registrarMovimiento(prodFisico.id, p.cantidad, 'ENTRADA', `Compra Fac: ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
@@ -102,9 +103,9 @@ export function useInventarioOperativo() {
                   const nuevoFisico = {
                       ...baseProd,
                       id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`,
-                      marca: p.marca,
-                      almacen: p.region.toUpperCase(),
-                      region: p.region,
+                      marca: marcaSegura,
+                      almacen: almacenSeguro,
+                      region: regionSegura,
                       stock: parseInt(p.cantidad, 10)
                   };
                   
@@ -118,7 +119,7 @@ export function useInventarioOperativo() {
           return { success: true };
       } catch (err) {
           console.error("Fallo crítico en registrarCompra:", err);
-          return { success: false, error: err.message || "Error de conexión o archivo muy pesado" };
+          return { success: false, error: err.message || "Error procesando los productos." };
       }
   };
 
@@ -138,7 +139,61 @@ export function useInventarioOperativo() {
       const updateData = { estado, comentarios_admin };
       if(estado === 'ENTREGADO') updateData.fecha_entrega = new Date().toISOString();
       const { error } = await supabase.from('inventario_solicitudes').update(updateData).eq('id', id);
-      if(!error) fetchData();
+      
+      if(!error) {
+          // --- LOGICA DE TRANSFERENCIA DE STOCK (WMS) ---
+          if (estado === 'EN_ENVIO') {
+              const sol = solicitudes.find(s => s.id === id);
+              if (sol && sol.detalles) {
+                  for (const det of sol.detalles) {
+                      // 1. Extraemos el nombre y marca que se guardó en la solicitud
+                      // Ej. "Antena LiteBeam M5 (JAVAK (Corporativo))"
+                      const str = det.producto_id;
+                      const lastParen = str.lastIndexOf(' (');
+                      let pNombre = str;
+                      let pMarca = 'General';
+                      
+                      if(lastParen !== -1) {
+                          pNombre = str.substring(0, lastParen).trim();
+                          pMarca = str.substring(lastParen + 2, str.length - 1).trim();
+                      }
+                      
+                      // 2. Buscamos el producto en el Almacén General (Centro)
+                      const origen = inventario.find(p => p.nombre === pNombre && p.marca === pMarca && (p.region === 'Centro' || p.almacen === 'CENTRO'));
+                      
+                      if (origen) {
+                          // A) Descontamos del General
+                          await registrarMovimiento(origen.id, det.cantidad_solicitada, 'SALIDA', `Despacho a ${sol.destino} (Req: ${sol.id.substring(0,6)})`, 'SISTEMA_LOGISTICA');
+                          
+                          // B) Buscamos / Creamos en el destino
+                          const destinoLimpio = sol.destino.replace(' (Almacén General)', '');
+                          const destino = inventario.find(p => p.nombre === pNombre && p.marca === pMarca && (p.region === destinoLimpio || p.almacen === destinoLimpio.toUpperCase()));
+                          
+                          if (destino) {
+                              // Ya existe la ficha, le sumamos el stock que llegó
+                              await registrarMovimiento(destino.id, det.cantidad_solicitada, 'ENTRADA', `Transferencia de Almacén General (Req: ${sol.id.substring(0,6)})`, 'SISTEMA_LOGISTICA');
+                          } else {
+                              // No existe, clonamos la ficha y le ponemos el stock
+                              const nuevoFisico = {
+                                  ...origen,
+                                  id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                                  almacen: destinoLimpio.toUpperCase(),
+                                  region: destinoLimpio,
+                                  stock: parseInt(det.cantidad_solicitada, 10)
+                              };
+                              
+                              await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
+                              
+                              const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: nuevoFisico.stock, tipo: 'ENTRADA', motivo: `Transferencia Inicial de General (Req: ${sol.id.substring(0,6)})`, usuario: 'SISTEMA_LOGISTICA' };
+                              await supabase.from('inventario_movimientos').insert([mov]);
+                          }
+                      }
+                  }
+              }
+          }
+          // Refrescamos todo para que la tabla muestre el nuevo stock
+          fetchData();
+      }
       return { success: !error, error };
   };
 
