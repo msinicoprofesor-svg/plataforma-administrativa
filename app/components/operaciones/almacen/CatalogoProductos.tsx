@@ -18,53 +18,47 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     const miRegion = usuarioActivo?.region || 'N/A';
     const miMarca = usuarioActivo?.marca || 'N/A';
 
-    // Estados de Filtros
     const [busqueda, setBusqueda] = useState('');
     const [filtroMarca, setFiltroMarca] = useState('');
     const [filtroCategoria, setFiltroCategoria] = useState('');
     
-    // ESTADO DE CÁPSULAS: Si es Admin ve "Todos", si es regional ve "General" o su propia región
+    // ESTADO DE CÁPSULAS Y DESPLIEGUE
     const [capsulaActiva, setCapsulaActiva] = useState(esAdminGeneral ? 'Todos' : 'General');
+    const [regionesExpandidas, setRegionesExpandidas] = useState(false);
 
     const [modalAbierto, setModalAbierto] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Formulario de Alta (SOLO PRODUCTO BASE)
     const [nuevoProd, setNuevoProd] = useState({
         nombre: '', categoria: CATEGORIAS_DISPONIBLES[0], minimo: 10, unidad: 'pza',
         marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL' 
     });
 
-    // --- GENERACIÓN DE CÁPSULAS DINÁMICAS ---
-    let CAPSULAS = [];
-    if (esAdminGeneral) {
-        CAPSULAS = ['Todos', 'General', 'Centro', ...REGIONES_DISPONIBLES.filter(r => r !== 'Centro'), 'WIFICEL', 'RK'];
-    } else {
-        CAPSULAS = ['General'];
-        if (miRegion !== 'N/A') CAPSULAS.push(miRegion);
-        if (miMarca === 'WifiCel') CAPSULAS.push('WIFICEL');
-        if (miMarca === 'RK') CAPSULAS.push('RK');
-        CAPSULAS = [...new Set(CAPSULAS)]; // Evitar duplicados
+    // --- ARREGLOS DE CÁPSULAS ---
+    const CAPSULAS_REGIONES = ['Todos', 'General', 'Centro', ...REGIONES_DISPONIBLES.filter(r => r !== 'Centro')];
+    const CAPSULAS_MARCAS = ['WIFICEL', 'RK'];
+
+    // LÓGICA PARA ADMIN REGIONAL (Fija)
+    let CAPSULAS_REGIONAL = ['General'];
+    if (!esAdminGeneral) {
+        if (miRegion !== 'N/A') CAPSULAS_REGIONAL.push(miRegion);
+        if (miMarca === 'WifiCel') CAPSULAS_REGIONAL.push('WIFICEL');
+        if (miMarca === 'RK') CAPSULAS_REGIONAL.push('RK');
+        CAPSULAS_REGIONAL = [...new Set(CAPSULAS_REGIONAL)];
     }
 
-    // --- LÓGICA DE FILTRADO MAESTRO ---
     const productosFiltrados = inventario.filter(p => {
-        // 1. Filtro de Búsqueda de texto
         const matchBusqueda = p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || p.marca.toLowerCase().includes(busqueda.toLowerCase());
-        
-        // 2. Filtro de Dropdowns (Marca y Categoría)
         const matchMarca = filtroMarca ? p.marca === filtroMarca : true;
         const matchCategoria = filtroCategoria ? p.categoria === filtroCategoria : true;
         
-        // 3. Filtro de CÁPSULAS
         let matchCapsula = false;
         if (capsulaActiva === 'Todos') matchCapsula = true;
         else if (capsulaActiva === 'General') matchCapsula = p.almacen === 'CATALOGO_BASE';
         else if (capsulaActiva === 'WIFICEL') matchCapsula = p.almacen === 'WIFICEL' || p.marca === 'WifiCel' || p.marca === 'WIFICEL';
         else if (capsulaActiva === 'RK') matchCapsula = p.almacen === 'RK' || p.marca === 'RK';
-        else matchCapsula = p.region === capsulaActiva || p.almacen === capsulaActiva.toUpperCase(); // Para las regiones
+        else matchCapsula = p.region === capsulaActiva || p.almacen === capsulaActiva.toUpperCase(); 
 
-        // 4. Seguridad: Si NO es Admin General, ocultar stock de otras sucursales (aunque mueva la cápsula)
         let matchPermiso = true;
         if (!esAdminGeneral && p.almacen !== 'CATALOGO_BASE') {
             matchPermiso = (p.region === miRegion || p.almacen === miRegion || p.marca === miMarca || p.almacen === miMarca.toUpperCase());
@@ -83,13 +77,17 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         alert("Producto Base agregado al catálogo exitosamente.");
     };
 
+    // Helper para nombre corto
+    const getShortName = (name) => {
+        if(name === 'San Diego de la Unión') return 'SDU';
+        if(name === 'Santa María del Río') return 'SMR';
+        if(name === 'Jalpan de Serra') return 'Jalpan';
+        return name;
+    };
+
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden relative">
-            
-            {/* CABECERA: DROPDOWNS, BUSCADOR Y CÁPSULAS */}
             <div className="p-5 border-b border-gray-100 bg-white shrink-0 flex flex-col gap-5">
-                
-                {/* Fila 1: Filtros Select y Buscador */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-3">
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
@@ -111,35 +109,74 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                     </div>
                 </div>
 
-                {/* Fila 2: Cápsulas y Botón Agregar */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 overflow-hidden">
                     <div className="flex overflow-x-auto custom-scrollbar gap-2 w-full md:w-auto pb-2 md:pb-0 items-center">
-                        {CAPSULAS.map(cap => {
-                            // Abreviaturas para mantener la UI limpia como en tu diseño
-                            let shortName = cap;
-                            if(cap === 'San Diego de la Unión') shortName = 'SDU';
-                            if(cap === 'Santa María del Río') shortName = 'SMR';
-                            if(cap === 'Jalpan de Serra') shortName = 'Jalpan';
-                            
-                            const isDark = cap === 'WIFICEL' || cap === 'RK';
-                            const isActive = capsulaActiva === cap;
-                            
-                            let baseStyle = "px-4 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all ";
-                            if (isActive) {
-                                baseStyle += isDark ? "bg-gray-700 text-white shadow-md" : "bg-white text-blue-600 border border-blue-200 shadow-sm";
-                            } else {
-                                baseStyle += isDark ? "bg-gray-500 text-white hover:bg-gray-600" : "bg-transparent text-gray-400 hover:text-gray-600";
-                            }
+                        
+                        {/* MODO ADMIN GENERAL (Cápsulas Plegables) */}
+                        {esAdminGeneral ? (
+                            <>
+                                {!regionesExpandidas ? (
+                                    // BOTÓN PLEGADO (Muestra lo que está seleccionado, o "General")
+                                    <button 
+                                        onClick={() => setRegionesExpandidas(true)} 
+                                        className={`px-4 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all flex items-center gap-1 ${CAPSULAS_REGIONES.includes(capsulaActiva) && capsulaActiva !== 'Todos' ? 'bg-gray-600 text-white shadow-md' : 'bg-gray-500 text-white hover:bg-gray-600'}`}
+                                    >
+                                        {CAPSULAS_REGIONES.includes(capsulaActiva) && capsulaActiva !== 'Todos' ? getShortName(capsulaActiva) : 'General'} <span className="text-[8px]">◀▶</span>
+                                    </button>
+                                ) : (
+                                    // BOTONES DESPLEGADOS
+                                    CAPSULAS_REGIONES.map(cap => {
+                                        const isActive = capsulaActiva === cap;
+                                        const baseStyle = `px-4 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all ${isActive ? 'bg-white text-blue-600 border border-blue-200 shadow-sm' : 'bg-transparent text-gray-500 hover:bg-gray-100'}`;
 
-                            return (
-                                <button key={cap} onClick={() => setCapsulaActiva(cap)} className={baseStyle}>
-                                    {shortName}
-                                </button>
-                            );
-                        })}
+                                        return (
+                                            <button key={cap} onClick={() => {
+                                                if (isActive) setRegionesExpandidas(false); // Cierra si se le da clic al activo
+                                                else setCapsulaActiva(cap);
+                                            }} className={baseStyle}>
+                                                {getShortName(cap)}
+                                            </button>
+                                        );
+                                    })
+                                )}
+
+                                {/* MARCAS FIJAS AL FINAL (Siempre visibles) */}
+                                {CAPSULAS_MARCAS.map(cap => {
+                                    const isActive = capsulaActiva === cap;
+                                    // REGLA CUMPLIDA: Si está activo = blanco con azul. Si inactivo = gris con blanco.
+                                    const baseStyle = `px-4 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all ${isActive ? 'bg-white text-blue-600 border border-blue-200 shadow-sm' : 'bg-gray-500 text-white hover:bg-gray-600 shadow-sm'}`;
+                                    
+                                    return (
+                                        <button key={cap} onClick={() => setCapsulaActiva(cap)} className={baseStyle}>
+                                            {cap}
+                                        </button>
+                                    );
+                                })}
+                            </>
+                        ) : (
+                            // MODO ADMIN REGIONAL (Vista fija para no administradores generales)
+                            CAPSULAS_REGIONAL.map(cap => {
+                                const isDark = cap === 'WIFICEL' || cap === 'RK';
+                                const isActive = capsulaActiva === cap;
+                                
+                                let baseStyle = `px-4 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all `;
+                                if (isActive) {
+                                    baseStyle += 'bg-white text-blue-600 border border-blue-200 shadow-sm';
+                                } else if (isDark) {
+                                    baseStyle += 'bg-gray-500 text-white hover:bg-gray-600 shadow-sm';
+                                } else {
+                                    baseStyle += 'bg-transparent text-gray-500 hover:bg-gray-100';
+                                }
+
+                                return (
+                                    <button key={cap} onClick={() => setCapsulaActiva(cap)} className={baseStyle}>
+                                        {getShortName(cap)}
+                                    </button>
+                                );
+                            })
+                        )}
                     </div>
 
-                    {/* Botón azul tipo píldora como en tu diseño */}
                     {esAdminGeneral && (
                         <button onClick={() => setModalAbierto(true)} className="w-full md:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-black text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 shrink-0">
                             <MdAdd className="text-lg"/> Agregar producto base
