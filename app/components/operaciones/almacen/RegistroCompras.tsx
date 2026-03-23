@@ -5,8 +5,16 @@
 import { useState } from 'react';
 import { MdShoppingCart, MdAdd, MdDelete, MdSave, MdFileUpload, MdCheckCircle } from "react-icons/md";
 
+// LISTAS SEPARADAS: Propietarios vs Ubicaciones Físicas
 const MARCAS_DISPONIBLES = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
-const REGIONES_DISPONIBLES = ['Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
+
+const REGIONES_DISPONIBLES = [
+    // Ubicaciones geográficas
+    'Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 
+    'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río',
+    // Almacenes corporativos que fungen como ubicación física
+    'WifiCel', 'RK', 'Fibrox MX', 'Intercheap', 'JAVAK (Corporativo)'
+];
 
 export default function RegistroCompras({ useData, usuarioActivo }) {
     const { inventario, registrarCompra } = useData;
@@ -109,7 +117,7 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">
             <div className="p-5 border-b border-gray-100 bg-gray-50/50 shrink-0">
                 <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdShoppingCart className="text-blue-600"/> Ingreso de Mercancía a Sucursales</h3>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Sube la factura y asigna los productos a una marca/región</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Sube la factura y asigna los productos a una marca y/o región</p>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
@@ -136,7 +144,7 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                             <div>
                                 <h4 className="text-xs font-black text-blue-800 uppercase tracking-widest">Detalle de Artículos Comprados</h4>
-                                <p className="text-[10px] text-blue-600/70 font-medium">Asigna hacia qué sucursal y empresa va cada pieza</p>
+                                <p className="text-[10px] text-blue-600/70 font-medium">Asigna hacia qué sucursal va cada pieza y a qué empresa pertenece</p>
                             </div>
                             <button type="button" onClick={handleAgregarItem} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1 hover:bg-blue-700 transition-colors shadow-md active:scale-95"><MdAdd className="text-lg"/> Añadir Fila</button>
                         </div>
@@ -151,18 +159,23 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
                                             {catalogoBase.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                                         </select>
                                     </div>
+                                    
+                                    {/* SELECTOR DE EMPRESA / PROPIETARIO */}
                                     <div className="w-1/2 md:w-36">
-                                        <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">Marca Destino</label>
+                                        <label className="block text-[9px] font-black text-gray-400 uppercase mb-1" title="¿A qué empresa pertenece este equipo?">Propietario (Marca)</label>
                                         <select required disabled={!esAdminGeneral} value={item.marca} onChange={e=>handleCambioItem(idx, 'marca', e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-gray-700 outline-none uppercase tracking-wide disabled:bg-gray-200 disabled:text-gray-500 cursor-pointer disabled:cursor-not-allowed">
                                             {marcasPermitidas.map(m => <option key={m} value={m}>{m}</option>)}
                                         </select>
                                     </div>
+
+                                    {/* SELECTOR DE ALMACÉN FÍSICO */}
                                     <div className="w-1/2 md:w-36">
-                                        <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">Región Destino</label>
+                                        <label className="block text-[9px] font-black text-gray-400 uppercase mb-1" title="¿En dónde se va a guardar físicamente?">Ubicación Física</label>
                                         <select required disabled={!esAdminGeneral} value={item.region} onChange={e=>handleCambioItem(idx, 'region', e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-gray-700 outline-none uppercase tracking-wide disabled:bg-gray-200 disabled:text-gray-500 cursor-pointer disabled:cursor-not-allowed">
                                             {regionesPermitidas.map(r => <option key={r} value={r}>{r}</option>)}
                                         </select>
                                     </div>
+
                                     <div className="w-20 md:w-24">
                                         <label className="block text-[9px] font-black text-gray-400 uppercase mb-1 text-center">Cant.</label>
                                         <input required type="number" min="1" value={item.cantidad} onChange={e=>handleCambioItem(idx, 'cantidad', e.target.value)} className="w-full bg-blue-50 border-2 border-blue-200 rounded-lg px-2 py-1.5 text-sm font-black text-center text-blue-800 outline-none focus:border-blue-500" />
