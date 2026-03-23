@@ -5,8 +5,8 @@
 import { useState } from 'react';
 import { MdComputer, MdAdd, MdClose, MdSearch, MdPerson, MdQrCode, MdStickyNote2 } from "react-icons/md";
 
-// Reglas de Negocio para Activos
-const CATEGORIAS_ACTIVOS = ['EQUIPO_COMPUTO', 'MOBILIARIO', 'HERRAMIENTA_MAYOR', 'VEHICULO'];
+// Reglas de Negocio para Activos (Vehículos removidos)
+const CATEGORIAS_ACTIVOS = ['EQUIPO_COMPUTO', 'MOBILIARIO', 'HERRAMIENTA_MAYOR'];
 const UBICACIONES_FISICAS = [
     'Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 
     'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río',
@@ -27,24 +27,20 @@ export default function ActivosFijos({ useData, usuarioActivo, colaboradores = [
     const miRegion = (usuarioActivo?.region && usuarioActivo.region !== 'N/A') ? usuarioActivo.region : UBICACIONES_FISICAS[0];
     const miMarca = usuarioActivo?.marca || 'N/A';
 
-    // El formulario arranca pre-configurado con la región del usuario si no es admin
     const [nuevoActivo, setNuevoActivo] = useState({
         nombre: '', marca: '', numero_serie: '', 
         categoria: CATEGORIAS_ACTIVOS[0], region: miRegion, 
         responsable_id: '', estado: 'ACTIVO', notas: ''
     });
 
-    // 1. Filtramos lo que el usuario puede ver (Admin ve todo, Regional ve lo suyo)
     const activosPermitidos = esAdminGeneral 
         ? activos 
         : activos.filter(a => a.region === miRegion || a.region === miMarca);
 
-    // 2. Filtramos por la barra de búsqueda (Busca por nombre, serie o responsable)
     const activosFiltrados = activosPermitidos.filter(a => {
         if(!busqueda) return true;
         const q = busqueda.toLowerCase();
         
-        // Buscar el nombre del colaborador asignado para poder buscar por persona
         const responsableInfo = colaboradores.find(c => c.id === a.responsable_id);
         const nombreResponsable = responsableInfo ? responsableInfo.nombre.toLowerCase() : '';
 
@@ -82,7 +78,7 @@ export default function ActivosFijos({ useData, usuarioActivo, colaboradores = [
             <div className="p-5 border-b border-gray-100 bg-gray-50/50 shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdComputer className="text-gray-700"/> Control de Activos Fijos</h3>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Mobiliario, Equipo de Cómputo y Vehículos</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Mobiliario, Equipo de Cómputo y Herramienta Mayor</p>
                 </div>
                 
                 <div className="flex w-full md:w-auto gap-3">
@@ -110,7 +106,7 @@ export default function ActivosFijos({ useData, usuarioActivo, colaboradores = [
                         <thead className="text-[9px] text-gray-400 uppercase bg-white sticky top-0 z-10 shadow-sm">
                             <tr>
                                 <th className="p-4 rounded-tl-xl font-black tracking-widest">Activo / Marca</th>
-                                <th className="p-4 font-black tracking-widest">N° Serie / Placas</th>
+                                <th className="p-4 font-black tracking-widest">Número de Serie</th>
                                 <th className="p-4 font-black tracking-widest">Ubicación Física</th>
                                 <th className="p-4 font-black tracking-widest">Asignado a</th>
                                 <th className="p-4 text-center font-black tracking-widest rounded-tr-xl">Estado</th>
@@ -188,17 +184,17 @@ export default function ActivosFijos({ useData, usuarioActivo, colaboradores = [
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 
                                 <div className="md:col-span-2">
-                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Descripción del Activo (Ej. Laptop Dell Latitude 3420) *</label>
+                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Descripción del Activo (Ej. Laptop Dell, Rotomartillo) *</label>
                                     <input required type="text" value={nuevoActivo.nombre} onChange={e => setNuevoActivo({...nuevoActivo, nombre: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
                                 </div>
                                 
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Marca / Fabricante</label>
-                                    <input type="text" value={nuevoActivo.marca} onChange={e => setNuevoActivo({...nuevoActivo, marca: e.target.value})} placeholder="Ej. Dell, Truper, Ford..." className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
+                                    <input type="text" value={nuevoActivo.marca} onChange={e => setNuevoActivo({...nuevoActivo, marca: e.target.value})} placeholder="Ej. Dell, Truper, HP..." className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
                                 </div>
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1 flex items-center gap-1"><MdQrCode className="text-gray-400"/> Número de Serie / Placas</label>
+                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1 flex items-center gap-1"><MdQrCode className="text-gray-400"/> Número de Serie</label>
                                     <input type="text" value={nuevoActivo.numero_serie} onChange={e => setNuevoActivo({...nuevoActivo, numero_serie: e.target.value})} placeholder="S/N..." className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-mono font-bold text-gray-600 outline-none focus:border-blue-500 shadow-sm" />
                                 </div>
 
