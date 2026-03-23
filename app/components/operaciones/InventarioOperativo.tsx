@@ -3,33 +3,20 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react';
-import { MdInventory2, MdDashboard, MdList, MdShoppingCart, MdLocalShipping, MdAddBox } from "react-icons/md";
+import { MdInventory2, MdDashboard, MdList, MdShoppingCart, MdLocalShipping, MdAddBox, MdComputer } from "react-icons/md";
 
 import DashboardAlmacen from './almacen/DashboardAlmacen';
 import CatalogoProductos from './almacen/CatalogoProductos';
 import RegistroCompras from './almacen/RegistroCompras';
 import MesaLogistica from './almacen/MesaLogistica';
 import PortalSolicitudes from './almacen/PortalSolicitudes';
+import ActivosFijos from './almacen/ActivosFijos'; // NUEVO MÓDULO
 
 export default function InventarioOperativo({ useData, usuarioActivo, colaboradores = [] }) {
     
-    // --- LÓGICA DE ROLES Y TÍTULOS ---
-    const ROLES_ADMIN_GENERAL = ['ENCARGADO_ALMACEN', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL'];
-    const ROLES_ADMIN_ALMACEN = [...ROLES_ADMIN_GENERAL, 'GERENTE_MKT'];
-    
-    const esAdminGeneral = usuarioActivo && ROLES_ADMIN_GENERAL.includes(usuarioActivo.rol);
+    const ROLES_ADMIN_ALMACEN = ['ENCARGADO_ALMACEN', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL', 'GERENTE_MKT'];
     const esEncargado = usuarioActivo && ROLES_ADMIN_ALMACEN.includes(usuarioActivo.rol);
-    
     const [vistaActiva, setVistaActiva] = useState(esEncargado ? 'dashboard' : 'portal');
-
-    // 1. TÍTULO DINÁMICO EXACTO (Regla de Negocio)
-    let tituloPrincipal = 'Materiales y Herramientas';
-    if (esAdminGeneral) {
-        tituloPrincipal = 'Centro de Logística y Almacén General';
-    } else if (esEncargado) {
-        const miRegionOMarca = (usuarioActivo?.region && usuarioActivo.region !== 'N/A') ? usuarioActivo.region : (usuarioActivo?.marca && usuarioActivo.marca !== 'N/A' ? usuarioActivo.marca : 'Regional');
-        tituloPrincipal = `Centro de Logística y Almacén ${miRegionOMarca}`;
-    }
 
     return (
         <div className="h-full flex flex-col animate-fade-in pb-2">
@@ -37,10 +24,10 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                 <div>
                     <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
                         <MdInventory2 className="text-blue-600"/> 
-                        {tituloPrincipal}
+                        {esEncargado ? 'Centro de Logística y Almacén' : 'Materiales y Herramientas'}
                     </h2>
                     <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">
-                        {esEncargado ? 'Encargado de almacén, región o marca' : 'Solicita insumos para tus actividades'}
+                        {esEncargado ? 'Warehouse Management System (WMS)' : 'Solicita insumos para tus actividades'}
                     </p>
                 </div>
 
@@ -60,6 +47,9 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                             <button onClick={() => setVistaActiva('compras')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'compras' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                                 <MdShoppingCart className="text-lg"/> Compras
                             </button>
+                            <button onClick={() => setVistaActiva('activos')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'activos' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <MdComputer className="text-lg"/> Activos Fijos
+                            </button>
                             <button onClick={() => setVistaActiva('logistica')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'logistica' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                                 <MdLocalShipping className="text-lg"/> Logística
                             </button>
@@ -75,6 +65,7 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                 {vistaActiva === 'dashboard' && <DashboardAlmacen useData={useData} />}
                 {vistaActiva === 'catalogo' && <CatalogoProductos useData={useData} usuarioActivo={usuarioActivo} />}
                 {vistaActiva === 'compras' && <RegistroCompras useData={useData} usuarioActivo={usuarioActivo} />}
+                {vistaActiva === 'activos' && <ActivosFijos useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} />}
                 {vistaActiva === 'logistica' && <MesaLogistica useData={useData} colaboradores={colaboradores} usuarioActivo={usuarioActivo} />}
                 {vistaActiva === 'portal' && <PortalSolicitudes useData={useData} usuarioActivo={usuarioActivo} />}
             </div>
