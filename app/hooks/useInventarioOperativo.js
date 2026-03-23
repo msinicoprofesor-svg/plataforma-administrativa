@@ -10,7 +10,7 @@ export function useInventarioOperativo() {
   const [movimientos, setMovimientos] = useState([]);
   const [compras, setCompras] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
-  const [activos, setActivos] = useState([]); // NUEVO: Para mobiliario y equipo
+  const [activos, setActivos] = useState([]); 
   const [cargando, setCargando] = useState(true);
 
   const mapInvFromDB = (db) => ({
@@ -23,6 +23,11 @@ export function useInventarioOperativo() {
     id: inv.id, nombre: inv.nombre, almacen: inv.almacen, 
     categoria: inv.categoria, stock: inv.stock, minimo: inv.minimo, unidad: inv.unidad,
     marca: inv.marca || 'General', region: inv.region || 'N/A'
+  });
+
+  const mapMovFromDB = (db) => ({
+    id: db.id, fecha: db.fecha, productoId: db.producto_id, 
+    cantidad: db.cantidad, tipo: db.tipo, motivo: db.motivo, usuario: db.usuario
   });
 
   const fetchData = async () => {
@@ -43,7 +48,6 @@ export function useInventarioOperativo() {
         const { data: dSol } = await supabase.from('inventario_solicitudes').select('*, detalles:inventario_solicitudes_detalle(*)').order('fecha_solicitud', { ascending: false });
         if (dSol) setSolicitudes(dSol);
 
-        // Cargar los activos fijos (Mobiliario)
         const { data: dAct } = await supabase.from('inventario_activos').select('*').order('fecha_asignacion', { ascending: false });
         if (dAct) setActivos(dAct);
 
@@ -78,42 +82,44 @@ export function useInventarioOperativo() {
       await supabase.from('inventario_operativo').insert([mapInvToDB(prod)]);
   };
 
-  // ERP MAGIA: Registrar compra y crear clon si no existe en la sucursal
+  // --- ESCUDO ANTI-CONGELAMIENTO EN COMPRAS ---
   const registrarCompra = async (compraPayload, productosComprados) => {
-      const { data: compraBD, error } = await supabase.from('inventario_compras').insert([compraPayload]).select();
-      if(error) return { success: false, error };
+      try {
+          // 1. Guardar la factura
+          const { data: compraBD, error } = await supabase.from('inventario_compras').insert([compraPayload]).select();
+          if(error) return { success: false, error: error.message };
 
-      for(const p of productosComprados) {
-          const baseProd = inventario.find(inv => inv.id === p.productoBaseId);
-          if(!baseProd) continue;
+          // 2. Procesar los productos
+          for(const p of productosComprados) {
+              const baseProd = inventario.find(inv => inv.id === p.productoBaseId);
+              if(!baseProd) continue;
 
-          // ¿Ya existe este producto físicamente en esa marca y región específica?
-          const prodFisico = inventario.find(inv => inv.nombre === baseProd.nombre && inv.marca === p.marca && (inv.almacen === p.region || inv.region === p.region));
-          
-          if(prodFisico) {
-              // Ya existe, solo sumamos stock
-              await registrarMovimiento(prodFisico.id, p.cantidad, 'ENTRADA', `Compra Fac: ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
-          } else {
-              // NO EXISTE en esta sucursal. Lo clonamos del base y le metemos el stock inicial.
-              const nuevoFisico = {
-                  ...baseProd,
-                  id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`,
-                  marca: p.marca,
-                  almacen: p.region.toUpperCase(), // Se guarda en el almacén de la región
-                  region: p.region,
-                  stock: parseInt(p.cantidad, 10)
-              };
+              const prodFisico = inventario.find(inv => inv.nombre === baseProd.nombre && inv.marca === p.marca && (inv.almacen === p.region || inv.region === p.region));
               
-              // 1. Crear el producto físico
-              await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
-              
-              // 2. Registrar el movimiento inicial
-              const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: nuevoFisico.stock, tipo: 'ENTRADA', motivo: `Alta por Compra Fac: ${compraPayload.proveedor}`, usuario: compraPayload.usuario_registro_id };
-              await supabase.from('inventario_movimientos').insert([mov]);
+              if(prodFisico) {
+                  await registrarMovimiento(prodFisico.id, p.cantidad, 'ENTRADA', `Compra Fac: ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
+              } else {
+                  const nuevoFisico = {
+                      ...baseProd,
+                      id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                      marca: p.marca,
+                      almacen: p.region.toUpperCase(),
+                      region: p.region,
+                      stock: parseInt(p.cantidad, 10)
+                  };
+                  
+                  await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
+                  
+                  const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: nuevoFisico.stock, tipo: 'ENTRADA', motivo: `Alta por Compra Fac: ${compraPayload.proveedor}`, usuario: compraPayload.usuario_registro_id };
+                  await supabase.from('inventario_movimientos').insert([mov]);
+              }
           }
+          fetchData();
+          return { success: true };
+      } catch (err) {
+          console.error("Fallo crítico en registrarCompra:", err);
+          return { success: false, error: err.message || "Error de conexión o archivo muy pesado" };
       }
-      fetchData();
-      return { success: true };
   };
 
   const crearSolicitud = async (solicitudPayload, detalles) => {
@@ -136,7 +142,6 @@ export function useInventarioOperativo() {
       return { success: !error, error };
   };
 
-  // Funciones preparadas para la Fase 3 (Activos Fijos)
   const agregarActivoFijo = async (activo) => {
       const { error } = await supabase.from('inventario_activos').insert([activo]);
       if(!error) fetchData();

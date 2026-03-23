@@ -15,13 +15,10 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
     const [nombreArchivo, setNombreArchivo] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Los administradores regionales por defecto ven su marca y región seleccionada
     const miRegion = usuarioActivo?.region !== 'N/A' ? usuarioActivo?.region : REGIONES_DISPONIBLES[0];
     const miMarca = usuarioActivo?.marca !== 'N/A' ? usuarioActivo?.marca : MARCAS_DISPONIBLES[0];
 
     const [items, setItems] = useState([{ productoBaseId: '', cantidad: 1, marca: miMarca, region: miRegion }]);
-
-    // Solo mostramos en el dropdown los productos "BASE" genéricos para comprar
     const catalogoBase = inventario.filter(p => p.almacen === 'CATALOGO_BASE');
 
     const handleAgregarItem = () => setItems([...items, { productoBaseId: '', cantidad: 1, marca: miMarca, region: miRegion }]);
@@ -32,60 +29,75 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
         setItems(nuevos);
     };
 
-    // --- MOTOR DE COMPRESIÓN DE IMÁGENES ---
+    // --- MOTOR DE COMPRESIÓN Y PROTECCIÓN DE ARCHIVOS ---
     const handleSubirArchivo = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+
+        // PROTECCIÓN: Evitamos PDFs gigantes que crashean la base de datos (Max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            alert("⚠️ El archivo es demasiado pesado (Máximo 2MB permitido). Intenta comprimir el PDF o subir una foto.");
+            e.target.value = ''; // Limpiamos el input
+            return;
+        }
+
         setNombreArchivo(file.name);
 
         const reader = new FileReader();
         reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800; // Reducimos el tamaño para no saturar la BD
-                const scaleSize = MAX_WIDTH / img.width;
-                canvas.width = MAX_WIDTH;
-                canvas.height = img.height * scaleSize;
-                
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                // Comprimimos a JPEG calidad media (0.6)
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                setArchivoBase64(compressedDataUrl);
-            };
-            // Si no es imagen (ej. PDF), lo guardamos como base64 directo (cuidado con PDFs gigantes)
             if(file.type.startsWith('image/')) {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; 
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    setArchivoBase64(compressedDataUrl);
+                };
                 img.src = event.target.result;
             } else {
+                // Si es un PDF menor a 2MB, lo dejamos pasar crudo
                 setArchivoBase64(event.target.result);
             }
         };
         reader.readAsDataURL(file);
     };
 
+    // --- GUARDADO BLINDADO ---
     const handleGuardar = async (e) => {
         e.preventDefault();
         const itemsValidos = items.filter(i => i.productoBaseId && i.cantidad > 0);
         if(itemsValidos.length === 0) return alert("Selecciona al menos un artículo base.");
 
         setIsSubmitting(true);
-        const payload = {
-            proveedor,
-            factura_url: archivoBase64, // Guardamos la foto comprimida o PDF
-            total_articulos: itemsValidos.reduce((acc, el) => acc + parseInt(el.cantidad), 0),
-            usuario_registro_id: usuarioActivo.id
-        };
+        try {
+            const payload = {
+                proveedor,
+                factura_url: archivoBase64,
+                total_articulos: itemsValidos.reduce((acc, el) => acc + parseInt(el.cantidad), 0),
+                usuario_registro_id: usuarioActivo?.id || 'SISTEMA'
+            };
 
-        const res = await registrarCompra(payload, itemsValidos);
-        setIsSubmitting(false);
+            const res = await registrarCompra(payload, itemsValidos);
 
-        if(res.success) {
-            alert("✅ Compra registrada. Los productos han sido asignados y clonados a sus sucursales correspondientes.");
-            setProveedor(''); setArchivoBase64(''); setNombreArchivo(''); setItems([{ productoBaseId: '', cantidad: 1, marca: miMarca, region: miRegion }]);
-        } else {
-            alert("Error registrando compra.");
+            if(res.success) {
+                alert("✅ Compra registrada. Los productos han sido asignados y clonados a sus sucursales correspondientes.");
+                setProveedor(''); setArchivoBase64(''); setNombreArchivo(''); setItems([{ productoBaseId: '', cantidad: 1, marca: miMarca, region: miRegion }]);
+                document.getElementById('file-upload').value = '';
+            } else {
+                alert("❌ Fallo en Base de Datos: " + JSON.stringify(res.error));
+            }
+        } catch (err) {
+            alert("❌ Error de red o archivo corrupto: " + err.message);
+        } finally {
+            // Esto asegura que el botón SIEMPRE se destrabe, pase lo que pase
+            setIsSubmitting(false); 
         }
     };
 
@@ -106,7 +118,7 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
                             <input required type="text" value={proveedor} onChange={e=>setProveedor(e.target.value)} placeholder="Ej. Syscom, Steren, Home Depot..." className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Comprobante / Factura (Autocompresión)</label>
+                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Comprobante / Factura (Max 2MB)</label>
                             <div className="relative w-full">
                                 <input type="file" accept="image/*,application/pdf" onChange={handleSubirArchivo} className="hidden" id="file-upload" />
                                 <label htmlFor="file-upload" className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border border-dashed cursor-pointer transition-colors ${archivoBase64 ? 'bg-green-50 border-green-300 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100'}`}>
@@ -160,7 +172,8 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
                     </div>
 
                     <button type="submit" disabled={isSubmitting} className="w-full bg-gray-900 hover:bg-black text-white font-black py-4 rounded-xl transition-all shadow-md active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50">
-                        <MdSave className="text-lg"/> Cargar Documento e Ingresar Stock
+                        {isSubmitting ? <div className="w-5 h-5 border-2 border-gray-400 border-t-white rounded-full animate-spin"></div> : <MdSave className="text-lg"/>} 
+                        {isSubmitting ? 'Procesando en Servidor...' : 'Cargar Documento e Ingresar Stock'}
                     </button>
                 </form>
             </div>
