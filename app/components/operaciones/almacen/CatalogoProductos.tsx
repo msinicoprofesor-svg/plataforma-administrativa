@@ -4,6 +4,7 @@
 'use client';
 import { useState } from 'react';
 import { MdSearch, MdAdd, MdClose, MdInventory2 } from "react-icons/md";
+import { MdSearch, MdAdd, MdClose, MdInventory2, MdWarning } from "react-icons/md";
 
 export default function CatalogoProductos({ useData }) {
     const { inventario, agregarProducto, cargando } = useData;
