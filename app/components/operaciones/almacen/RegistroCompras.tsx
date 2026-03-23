@@ -15,8 +15,17 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
     const [nombreArchivo, setNombreArchivo] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const miRegion = usuarioActivo?.region !== 'N/A' ? usuarioActivo?.region : REGIONES_DISPONIBLES[0];
-    const miMarca = usuarioActivo?.marca !== 'N/A' ? usuarioActivo?.marca : MARCAS_DISPONIBLES[0];
+    // --- LÓGICA DE PERMISOS DE VISTA ---
+    const ROLES_ADMIN_GENERAL = ['ENCARGADO_ALMACEN', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL'];
+    const esAdminGeneral = usuarioActivo && ROLES_ADMIN_GENERAL.includes(usuarioActivo.rol);
+
+    // Valores seguros para el usuario
+    const miRegion = (usuarioActivo?.region && usuarioActivo.region !== 'N/A') ? usuarioActivo.region : REGIONES_DISPONIBLES[0];
+    const miMarca = (usuarioActivo?.marca && usuarioActivo.marca !== 'N/A') ? usuarioActivo.marca : MARCAS_DISPONIBLES[0];
+
+    // Si es admin general, ve todas las opciones. Si es regional, solo ve la suya.
+    const marcasPermitidas = esAdminGeneral ? MARCAS_DISPONIBLES : [miMarca];
+    const regionesPermitidas = esAdminGeneral ? REGIONES_DISPONIBLES : [miRegion];
 
     const [items, setItems] = useState([{ productoBaseId: '', cantidad: 1, marca: miMarca, region: miRegion }]);
     const catalogoBase = inventario.filter(p => p.almacen === 'CATALOGO_BASE');
@@ -29,15 +38,13 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
         setItems(nuevos);
     };
 
-    // --- MOTOR DE COMPRESIÓN Y PROTECCIÓN DE ARCHIVOS ---
     const handleSubirArchivo = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // PROTECCIÓN: Evitamos PDFs gigantes que crashean la base de datos (Max 2MB)
         if (file.size > 2 * 1024 * 1024) {
             alert("⚠️ El archivo es demasiado pesado (Máximo 2MB permitido). Intenta comprimir el PDF o subir una foto.");
-            e.target.value = ''; // Limpiamos el input
+            e.target.value = ''; 
             return;
         }
 
@@ -62,14 +69,12 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
                 };
                 img.src = event.target.result;
             } else {
-                // Si es un PDF menor a 2MB, lo dejamos pasar crudo
                 setArchivoBase64(event.target.result);
             }
         };
         reader.readAsDataURL(file);
     };
 
-    // --- GUARDADO BLINDADO ---
     const handleGuardar = async (e) => {
         e.preventDefault();
         const itemsValidos = items.filter(i => i.productoBaseId && i.cantidad > 0);
@@ -87,16 +92,15 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
             const res = await registrarCompra(payload, itemsValidos);
 
             if(res.success) {
-                alert("✅ Compra registrada. Los productos han sido asignados y clonados a sus sucursales correspondientes.");
+                alert("✅ Compra registrada. Los productos han sido asignados a sus sucursales correspondientes.");
                 setProveedor(''); setArchivoBase64(''); setNombreArchivo(''); setItems([{ productoBaseId: '', cantidad: 1, marca: miMarca, region: miRegion }]);
                 document.getElementById('file-upload').value = '';
             } else {
                 alert("❌ Fallo en Base de Datos: " + JSON.stringify(res.error));
             }
         } catch (err) {
-            alert("❌ Error de red o archivo corrupto: " + err.message);
+            alert("❌ Error general: " + err.message);
         } finally {
-            // Esto asegura que el botón SIEMPRE se destrabe, pase lo que pase
             setIsSubmitting(false); 
         }
     };
@@ -111,7 +115,6 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                 <form onSubmit={handleGuardar} className="max-w-4xl mx-auto space-y-6">
                     
-                    {/* DATOS DE COMPRA Y ARCHIVO */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Nombre del Proveedor *</label>
@@ -129,7 +132,6 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
                         </div>
                     </div>
 
-                    {/* LISTA DE PARTIDAS (MULTI-SUCURSAL) */}
                     <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                             <div>
@@ -151,14 +153,14 @@ export default function RegistroCompras({ useData, usuarioActivo }) {
                                     </div>
                                     <div className="w-1/2 md:w-36">
                                         <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">Marca Destino</label>
-                                        <select required value={item.marca} onChange={e=>handleCambioItem(idx, 'marca', e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-gray-700 outline-none uppercase tracking-wide">
-                                            {MARCAS_DISPONIBLES.map(m => <option key={m} value={m}>{m}</option>)}
+                                        <select required disabled={!esAdminGeneral} value={item.marca} onChange={e=>handleCambioItem(idx, 'marca', e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-gray-700 outline-none uppercase tracking-wide disabled:bg-gray-200 disabled:text-gray-500 cursor-pointer disabled:cursor-not-allowed">
+                                            {marcasPermitidas.map(m => <option key={m} value={m}>{m}</option>)}
                                         </select>
                                     </div>
                                     <div className="w-1/2 md:w-36">
                                         <label className="block text-[9px] font-black text-gray-400 uppercase mb-1">Región Destino</label>
-                                        <select required value={item.region} onChange={e=>handleCambioItem(idx, 'region', e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-gray-700 outline-none uppercase tracking-wide">
-                                            {REGIONES_DISPONIBLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                        <select required disabled={!esAdminGeneral} value={item.region} onChange={e=>handleCambioItem(idx, 'region', e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-gray-700 outline-none uppercase tracking-wide disabled:bg-gray-200 disabled:text-gray-500 cursor-pointer disabled:cursor-not-allowed">
+                                            {regionesPermitidas.map(r => <option key={r} value={r}>{r}</option>)}
                                         </select>
                                     </div>
                                     <div className="w-20 md:w-24">
