@@ -11,14 +11,6 @@ const UBICACIONES_FISICAS = [
     'WifiCel', 'RK', 'Fibrox MX', 'Intercheap'
 ];
 
-const SUGERENCIAS_MOTIVO = [
-    "Instalación de cliente nuevo",
-    "Mantenimiento correctivo (Falla)",
-    "Stock de seguridad para la región",
-    "Reemplazo de equipo dañado",
-    "Proyecto de expansión de red"
-];
-
 export default function PortalSolicitudes({ useData, usuarioActivo }) {
     const { inventario, solicitudes, crearSolicitud, cargando } = useData;
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,6 +19,35 @@ export default function PortalSolicitudes({ useData, usuarioActivo }) {
     const [form, setForm] = useState({ productoId: '', cantidad: 1, destino: '', motivo: '' });
 
     const misSolicitudes = solicitudes.filter(s => s.usuario_solicitante_id === usuarioActivo?.id);
+
+    // 1. REGLA: Mostrar SOLO productos base (plantillas) para que el usuario no vea stock ni duplicados
+    const catalogoBase = inventario.filter(p => p.almacen === 'CATALOGO_BASE');
+
+    // 2. REGLA: Sugerencias dinámicas según el material seleccionado
+    const getSugerencias = (productoId) => {
+        if (!productoId) return ["Mantenimiento correctivo (Falla)", "Instalación de cliente nuevo", "Stock de seguridad"];
+        
+        const prod = inventario.find(p => p.id === productoId);
+        if (!prod) return [];
+
+        switch (prod.categoria) {
+            case 'FIBRA ÓPTICA':
+            case 'CABLEADO':
+                return ["Tendido de nueva ruta", "Reparación de corte de fibra", "Instalación de cliente nuevo"];
+            case 'ENLACE / ANTENA':
+            case 'REDES':
+                return ["Instalación de cliente", "Cambio de tecnología", "Reubicación de equipo", "Falla por descarga eléctrica"];
+            case 'HERRAMIENTA':
+            case 'EQUIPO':
+                return ["Asignación a cuadrilla nueva", "Reposición por desgaste", "Extravío / Robo"];
+            case 'CCTV':
+                return ["Instalación de cámaras", "Mantenimiento a DVR", "Reubicación de cámara"];
+            default:
+                return ["Uso en oficina", "Mantenimiento general", "Stock de seguridad para la región"];
+        }
+    };
+
+    const sugerenciasDinamicas = getSugerencias(form.productoId);
 
     const handleSugerencia = (texto) => {
         setForm(prev => ({ ...prev, motivo: prev.motivo ? `${prev.motivo} - ${texto}` : texto }));
@@ -47,8 +68,9 @@ export default function PortalSolicitudes({ useData, usuarioActivo }) {
             motivo: form.motivo
         };
         
+        // Guardamos SOLO el nombre genérico. Logística decidirá qué marca y de qué almacén despacha.
         const detalles = [{
-            producto_id: `${productoSeleccionado.nombre} (${productoSeleccionado.marca})`, 
+            producto_id: productoSeleccionado.nombre, 
             cantidad_solicitada: form.cantidad
         }];
 
@@ -63,7 +85,6 @@ export default function PortalSolicitudes({ useData, usuarioActivo }) {
         }
     };
 
-    // Rastreador visual estilo MercadoLibre
     const RenderRastreador = ({ estado, comentarios }) => {
         const pasos = ['PENDIENTE', 'COMPRADO', 'EN_ALMACEN', 'EN_ENVIO', 'ENTREGADO'];
         let pasoActual = pasos.indexOf(estado);
@@ -76,9 +97,7 @@ export default function PortalSolicitudes({ useData, usuarioActivo }) {
                 ) : (
                     <>
                         <div className="flex justify-between items-center relative mb-2">
-                            {/* Línea de fondo */}
                             <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 -z-10 rounded-full transform -translate-y-1/2"></div>
-                            {/* Línea de progreso */}
                             <div className="absolute top-1/2 left-0 h-1 bg-blue-500 -z-10 rounded-full transform -translate-y-1/2 transition-all duration-500" style={{ width: `${(pasoActual / (pasos.length - 1)) * 100}%` }}></div>
                             
                             {pasos.map((paso, index) => (
@@ -94,7 +113,6 @@ export default function PortalSolicitudes({ useData, usuarioActivo }) {
                         </div>
                     </>
                 )}
-                {/* Estimación de Entrega */}
                 {comentarios && estado !== 'CANCELADO' && (
                     <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100 flex gap-2 items-start">
                         <MdLocalShipping className="text-blue-600 text-lg shrink-0 mt-0.5"/>
@@ -119,9 +137,9 @@ export default function PortalSolicitudes({ useData, usuarioActivo }) {
                     <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 space-y-4">
                         <div>
                             <label className="block text-[10px] font-black text-blue-800 uppercase mb-2 ml-1">Selecciona el Material</label>
-                            <select required value={form.productoId} onChange={e => setForm({...form, productoId: e.target.value})} className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 shadow-sm">
-                                <option value="">Buscar en el catálogo disponible...</option>
-                                {inventario.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.marca}) - Stock: {p.stock}</option>)}
+                            <select required value={form.productoId} onChange={e => setForm({...form, productoId: e.target.value})} className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 shadow-sm cursor-pointer">
+                                <option value="">Buscar en el catálogo de plantillas...</option>
+                                {catalogoBase.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                             </select>
                         </div>
                         
@@ -141,8 +159,8 @@ export default function PortalSolicitudes({ useData, usuarioActivo }) {
 
                     <div>
                         <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1 flex items-center gap-1"><MdLightbulbOutline className="text-yellow-500"/> Sugerencias de Justificación</label>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                            {SUGERENCIAS_MOTIVO.map(sug => (
+                        <div className="flex flex-wrap gap-2 mb-3 min-h-[30px]">
+                            {sugerenciasDinamicas.map(sug => (
                                 <button type="button" key={sug} onClick={() => handleSugerencia(sug)} className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 rounded-full text-[10px] font-bold transition-all shadow-sm active:scale-95">
                                     {sug}
                                 </button>
