@@ -2,7 +2,7 @@
 /* ARCHIVO: app/components/operaciones/almacen/CatalogoProductos.tsx          */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MdSearch, MdAdd, MdClose, MdInventory2, MdWarning, MdFilterList } from "react-icons/md";
 
 const MARCAS_DISPONIBLES = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
@@ -22,12 +22,31 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     const [filtroMarca, setFiltroMarca] = useState('');
     const [filtroCategoria, setFiltroCategoria] = useState('');
     
-    // 1. REGLA: "General" por defecto
     const [capsulaActiva, setCapsulaActiva] = useState('General'); 
     const [regionesExpandidas, setRegionesExpandidas] = useState(false);
     
-    // 3. REGLA: Ref para el Scroll Suave
+    // ESTADOS Y REF PARA EL MOTOR DE SCROLL INTELIGENTE
     const scrollRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(true);
+
+    const checkScroll = () => {
+        if (scrollRef.current) {
+            const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+            setCanScrollLeft(scrollLeft > 0);
+            setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2); // 2px de tolerancia
+        }
+    };
+
+    // Escuchar cambios de tamaño y cuando se expande el carrusel
+    useEffect(() => {
+        if (regionesExpandidas) {
+            setTimeout(checkScroll, 100);
+            setTimeout(checkScroll, 400); // Doble check por la animación CSS
+        }
+        window.addEventListener('resize', checkScroll);
+        return () => window.removeEventListener('resize', checkScroll);
+    }, [regionesExpandidas]);
 
     const [modalAbierto, setModalAbierto] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +64,6 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     const isLeftActive = leftGroup.includes(capsulaActiva);
     const isMidActive = midGroup.includes(capsulaActiva);
     
-    // 2. REGLA: El "Pivote/Cover" es la cápsula activa. Si estoy en WIFICEL, el pivote de la izq es 'General'.
     const coverCapsule = (isLeftActive || isMidActive) ? capsulaActiva : 'General';
 
     let CAPSULAS_REGIONAL = ['General'];
@@ -105,10 +123,14 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden relative">
             
-            {/* CSS para ocultar la barra de scroll y mantener el smooth intacto */}
+            {/* CSS AVANZADO: Ocultar scrollbar y crear efecto de desvanecimiento en los bordes */}
             <style>{`
                 .hide-scroll::-webkit-scrollbar { display: none; }
                 .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+                .fade-edges {
+                    -webkit-mask-image: linear-gradient(to right, transparent, black 15px, black calc(100% - 15px), transparent);
+                    mask-image: linear-gradient(to right, transparent, black 15px, black calc(100% - 15px), transparent);
+                }
             `}</style>
 
             <div className="p-5 border-b border-gray-100 bg-white shrink-0 flex flex-col gap-5">
@@ -163,19 +185,19 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                     )
                                 })}
 
-                                {/* FLECHA IZQUIERDA CARRUSEL */}
+                                {/* FLECHA IZQUIERDA CARRUSEL (Minimalista e Inteligente) */}
                                 <button 
-                                    onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
-                                    className={`transition-all duration-500 ease-in-out overflow-hidden rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200
-                                        ${regionesExpandidas ? 'w-7 h-7 max-w-[28px] opacity-100 mx-0.5' : 'max-w-0 opacity-0 h-7 px-0 mx-0 border-transparent'}
+                                    onClick={() => scrollRef.current?.scrollBy({ left: -150, behavior: 'smooth' })}
+                                    className={`transition-all duration-300 ease-in-out flex items-center justify-center shrink-0
+                                        ${regionesExpandidas && canScrollLeft ? 'w-5 opacity-100 text-gray-300 hover:text-blue-600 scale-100' : 'w-0 opacity-0 scale-50 pointer-events-none'}
                                     `}
                                 >
-                                    <span className="text-[10px]">◀</span>
+                                    <span className="text-[14px]">◀</span>
                                 </button>
 
-                                {/* GRUPO CENTRAL (Scroll Animado de Regiones) */}
-                                <div className={`transition-all duration-500 ease-in-out flex items-center overflow-hidden ${regionesExpandidas ? 'max-w-[260px] opacity-100' : (isMidActive ? 'max-w-[150px] opacity-100' : 'max-w-0 opacity-0')}`}>
-                                    <div ref={scrollRef} className="flex items-center overflow-x-auto hide-scroll scroll-smooth w-full">
+                                {/* GRUPO CENTRAL (Scroll Animado de Regiones con Efecto Fade) */}
+                                <div className={`transition-all duration-500 ease-in-out flex items-center overflow-hidden ${regionesExpandidas ? 'max-w-[280px] opacity-100' : (isMidActive ? 'max-w-[150px] opacity-100' : 'max-w-0 opacity-0')}`}>
+                                    <div ref={scrollRef} onScroll={checkScroll} className={`flex items-center overflow-x-auto hide-scroll scroll-smooth w-full py-1 ${regionesExpandidas ? 'fade-edges' : ''}`}>
                                         {midGroup.map(cap => {
                                             const isActive = capsulaActiva === cap;
                                             const isCover = !regionesExpandidas && coverCapsule === cap;
@@ -199,14 +221,14 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                     </div>
                                 </div>
 
-                                {/* FLECHA DERECHA CARRUSEL */}
+                                {/* FLECHA DERECHA CARRUSEL (Minimalista e Inteligente) */}
                                 <button 
-                                    onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
-                                    className={`transition-all duration-500 ease-in-out overflow-hidden rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center shrink-0 border border-gray-200
-                                        ${regionesExpandidas ? 'w-7 h-7 max-w-[28px] opacity-100 mx-0.5' : 'max-w-0 opacity-0 h-7 px-0 mx-0 border-transparent'}
+                                    onClick={() => scrollRef.current?.scrollBy({ left: 150, behavior: 'smooth' })}
+                                    className={`transition-all duration-300 ease-in-out flex items-center justify-center shrink-0
+                                        ${regionesExpandidas && canScrollRight ? 'w-5 opacity-100 text-gray-300 hover:text-blue-600 scale-100' : 'w-0 opacity-0 scale-50 pointer-events-none'}
                                     `}
                                 >
-                                    <span className="text-[10px]">▶</span>
+                                    <span className="text-[14px]">▶</span>
                                 </button>
 
                                 {/* SEPARADOR ANIMADO */}
