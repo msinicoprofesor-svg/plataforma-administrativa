@@ -62,7 +62,7 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                 {vistaActiva === 'catalogo' && <CatalogoProductos useData={useData} />}
                 {vistaActiva === 'compras' && <RegistroCompras useData={useData} usuarioActivo={usuarioActivo} />}
                 {vistaActiva === 'logistica' && <MesaLogistica useData={useData} colaboradores={colaboradores} usuarioActivo={usuarioActivo} />}
-                {vistaActiva === 'portal' && <PortalSolicitudes />}
+                {vistaActiva === 'portal' && <PortalSolicitudes useData={useData} usuarioActivo={usuarioActivo} />}
             </div>
         </div>
     );
