@@ -39,19 +39,15 @@ export function useInventarioOperativo() {
   const fetchData = async () => {
     setCargando(true);
     try {
-        // 1. Cargar Inventario
         const { data: dInv } = await supabase.from('inventario_operativo').select('*').order('nombre', { ascending: true });
         if (dInv) setInventario(dInv.map(mapInvFromDB));
 
-        // 2. Cargar Movimientos (Kardex)
         const { data: dMov } = await supabase.from('inventario_movimientos').select('*').order('created_at', { ascending: false });
         if (dMov) setMovimientos(dMov.map(mapMovFromDB));
 
-        // 3. Cargar Compras
         const { data: dCom } = await supabase.from('inventario_compras').select('*').order('fecha_compra', { ascending: false });
         if (dCom) setCompras(dCom);
 
-        // 4. Cargar Solicitudes Logísticas (Con sus detalles internos)
         const { data: dSol } = await supabase.from('inventario_solicitudes').select('*, detalles:inventario_solicitudes_detalle(*)').order('fecha_solicitud', { ascending: false });
         if (dSol) setSolicitudes(dSol);
 
@@ -64,7 +60,6 @@ export function useInventarioOperativo() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- 2. REGISTRAR MOVIMIENTO BÁSICO ---
   const registrarMovimiento = async (productoId, cantidad, tipo, motivo, usuario) => {
     const productoActual = inventario.find(p => p.id === productoId);
     if (!productoActual) return;
@@ -87,18 +82,15 @@ export function useInventarioOperativo() {
     }
   };
 
-  // --- 3. AGREGAR NUEVO PRODUCTO AL CATÁLOGO ---
   const agregarProducto = async (nuevoProd) => {
       const prod = { ...nuevoProd, id: `INV-${Date.now()}`, stock: 0 };
       setInventario(prev => [...prev, prod]);
       await supabase.from('inventario_operativo').insert([mapInvToDB(prod)]);
   };
 
-  // --- 4. REGISTRAR COMPRA MAYORISTA ---
   const registrarCompra = async (compraPayload, productosComprados) => {
-      const { data, error } = await supabase.from('inventario_compras').insert([compraPayload]).select();
+      const { error } = await supabase.from('inventario_compras').insert([compraPayload]).select();
       if(!error) {
-          // Por cada producto de la factura, sumamos el stock automáticamente
           for(const p of productosComprados) {
               await registrarMovimiento(p.productoId, p.cantidad, 'ENTRADA', `Ingreso de Factura/Compra a ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
           }
@@ -107,7 +99,6 @@ export function useInventarioOperativo() {
       return { success: !error, error };
   };
 
-  // --- 5. SOLICITUDES DE MATERIAL (EMPLEADOS/TÉCNICOS) ---
   const crearSolicitud = async (solicitudPayload, detalles) => {
       const { data, error } = await supabase.from('inventario_solicitudes').insert([solicitudPayload]).select();
       if(error || !data) return { success: false, error };

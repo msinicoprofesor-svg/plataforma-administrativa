@@ -2,7 +2,7 @@
 /* ARCHIVO: app/components/operaciones/almacen/DashboardAlmacen.tsx           */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { MdWarning, MdInventory2, MdTrendingUp, MdLocalShipping, MdErrorOutline } from "react-icons/md";
+import { MdWarning, MdInventory2, MdTrendingUp, MdLocalShipping, MdErrorOutline, MdCheckCircle } from "react-icons/md";
 
 export default function DashboardAlmacen({ useData }) {
     const { inventario, movimientos, solicitudes, cargando } = useData;
