@@ -5,7 +5,6 @@
 import { useState } from 'react';
 import { MdInventory2, MdList, MdShoppingCart, MdLocalShipping, MdAddBox, MdComputer } from "react-icons/md";
 
-// Se removió la importación del Dashboard
 import CatalogoProductos from './almacen/CatalogoProductos';
 import RegistroCompras from './almacen/RegistroCompras';
 import MesaLogistica from './almacen/MesaLogistica';
@@ -14,11 +13,29 @@ import ActivosFijos from './almacen/ActivosFijos';
 
 export default function InventarioOperativo({ useData, usuarioActivo, colaboradores = [] }) {
     
-    const ROLES_ADMIN_ALMACEN = ['ENCARGADO_ALMACEN', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL', 'GERENTE_MKT'];
-    const esEncargado = usuarioActivo && ROLES_ADMIN_ALMACEN.includes(usuarioActivo.rol);
+    // --- NUEVA LÓGICA SINCRONIZADA DE ROLES ---
+    // Usamos .rol o .puesto dependiendo de cómo lo guarde tu sistema de Login
+    const rolUsuario = usuarioActivo?.rol || usuarioActivo?.puesto || '';
+
+    // Los "Dioses": Ven todo de todas las sucursales
+    const ROLES_ADMIN_GENERAL = ['Encargado de almacén', 'Gerente General', 'Director', 'Soporte General'];
     
-    // Ahora la vista por defecto para administradores es el 'catalogo'
+    // Los que tienen acceso al módulo WMS (Dioses + Administradores Regionales)
+    const ROLES_ADMIN_ALMACEN = [...ROLES_ADMIN_GENERAL, 'Gerente Marketing', 'Administrador'];
+
+    const esEncargado = rolUsuario && ROLES_ADMIN_ALMACEN.includes(rolUsuario);
+    const esAdminGeneral = rolUsuario && ROLES_ADMIN_GENERAL.includes(rolUsuario);
+    
     const [vistaActiva, setVistaActiva] = useState(esEncargado ? 'catalogo' : 'portal');
+
+    // Título dinámico
+    let tituloPrincipal = 'Materiales y Herramientas';
+    if (esAdminGeneral) {
+        tituloPrincipal = 'Centro de Logística y Almacén General';
+    } else if (esEncargado) {
+        const miRegionOMarca = (usuarioActivo?.region && usuarioActivo.region !== 'N/A') ? usuarioActivo.region : (usuarioActivo?.marca && usuarioActivo.marca !== 'N/A' ? usuarioActivo.marca : 'Regional');
+        tituloPrincipal = `Centro de Logística y Almacén ${miRegionOMarca}`;
+    }
 
     return (
         <div className="h-full flex flex-col animate-fade-in pb-2">
@@ -26,7 +43,7 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                 <div>
                     <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
                         <MdInventory2 className="text-blue-600"/> 
-                        {esEncargado ? 'Centro de Logística y Almacén' : 'Materiales y Herramientas'}
+                        {tituloPrincipal}
                     </h2>
                     <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">
                         {esEncargado ? 'Warehouse Management System (WMS)' : 'Solicita insumos para tus actividades'}
