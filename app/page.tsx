@@ -258,7 +258,7 @@ export default function Home() {
                 </div>
             )}
             
-           {activeModule === 'almacen_operativo' && verLogistica && (
+          {activeModule === 'almacen_operativo' && verLogistica && (
                 <div className="animate-slide-up h-full pb-10">
                     <InventarioOperativo 
                         useData={inventarioOps} 
