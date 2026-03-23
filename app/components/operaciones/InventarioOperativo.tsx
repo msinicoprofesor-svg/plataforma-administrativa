@@ -13,9 +13,23 @@ import PortalSolicitudes from './almacen/PortalSolicitudes';
 
 export default function InventarioOperativo({ useData, usuarioActivo, colaboradores = [] }) {
     
-    const ROLES_ADMIN_ALMACEN = ['ENCARGADO_ALMACEN', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL', 'GERENTE_MKT'];
+    // --- LÓGICA DE ROLES Y TÍTULOS ---
+    const ROLES_ADMIN_GENERAL = ['ENCARGADO_ALMACEN', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL'];
+    const ROLES_ADMIN_ALMACEN = [...ROLES_ADMIN_GENERAL, 'GERENTE_MKT'];
+    
+    const esAdminGeneral = usuarioActivo && ROLES_ADMIN_GENERAL.includes(usuarioActivo.rol);
     const esEncargado = usuarioActivo && ROLES_ADMIN_ALMACEN.includes(usuarioActivo.rol);
+    
     const [vistaActiva, setVistaActiva] = useState(esEncargado ? 'dashboard' : 'portal');
+
+    // 1. TÍTULO DINÁMICO EXACTO (Regla de Negocio)
+    let tituloPrincipal = 'Materiales y Herramientas';
+    if (esAdminGeneral) {
+        tituloPrincipal = 'Centro de Logística y Almacén General';
+    } else if (esEncargado) {
+        const miRegionOMarca = (usuarioActivo?.region && usuarioActivo.region !== 'N/A') ? usuarioActivo.region : (usuarioActivo?.marca && usuarioActivo.marca !== 'N/A' ? usuarioActivo.marca : 'Regional');
+        tituloPrincipal = `Centro de Logística y Almacén ${miRegionOMarca}`;
+    }
 
     return (
         <div className="h-full flex flex-col animate-fade-in pb-2">
@@ -23,10 +37,10 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                 <div>
                     <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
                         <MdInventory2 className="text-blue-600"/> 
-                        {esEncargado ? 'Centro de Logística y Almacén' : 'Materiales y Herramientas'}
+                        {tituloPrincipal}
                     </h2>
                     <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">
-                        {esEncargado ? 'Warehouse Management System (WMS)' : 'Solicita insumos para tus actividades'}
+                        {esEncargado ? 'Encargado de almacén, región o marca' : 'Solicita insumos para tus actividades'}
                     </p>
                 </div>
 
