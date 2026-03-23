@@ -3,20 +3,22 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react';
-import { MdInventory2, MdDashboard, MdList, MdShoppingCart, MdLocalShipping, MdAddBox, MdComputer } from "react-icons/md";
+import { MdInventory2, MdList, MdShoppingCart, MdLocalShipping, MdAddBox, MdComputer } from "react-icons/md";
 
-import DashboardAlmacen from './almacen/DashboardAlmacen';
+// Se removió la importación del Dashboard
 import CatalogoProductos from './almacen/CatalogoProductos';
 import RegistroCompras from './almacen/RegistroCompras';
 import MesaLogistica from './almacen/MesaLogistica';
 import PortalSolicitudes from './almacen/PortalSolicitudes';
-import ActivosFijos from './almacen/ActivosFijos'; // NUEVO MÓDULO
+import ActivosFijos from './almacen/ActivosFijos';
 
 export default function InventarioOperativo({ useData, usuarioActivo, colaboradores = [] }) {
     
     const ROLES_ADMIN_ALMACEN = ['ENCARGADO_ALMACEN', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL', 'GERENTE_MKT'];
     const esEncargado = usuarioActivo && ROLES_ADMIN_ALMACEN.includes(usuarioActivo.rol);
-    const [vistaActiva, setVistaActiva] = useState(esEncargado ? 'dashboard' : 'portal');
+    
+    // Ahora la vista por defecto para administradores es el 'catalogo'
+    const [vistaActiva, setVistaActiva] = useState(esEncargado ? 'catalogo' : 'portal');
 
     return (
         <div className="h-full flex flex-col animate-fade-in pb-2">
@@ -38,9 +40,6 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
                         </button>
                     ) : (
                         <>
-                            <button onClick={() => setVistaActiva('dashboard')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'dashboard' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <MdDashboard className="text-lg"/> Dashboard
-                            </button>
                             <button onClick={() => setVistaActiva('catalogo')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'catalogo' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                                 <MdList className="text-lg"/> Catálogo
                             </button>
@@ -62,7 +61,6 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
             </div>
 
             <div className="flex-1 min-h-0 mt-6 relative">
-                {vistaActiva === 'dashboard' && <DashboardAlmacen useData={useData} />}
                 {vistaActiva === 'catalogo' && <CatalogoProductos useData={useData} usuarioActivo={usuarioActivo} />}
                 {vistaActiva === 'compras' && <RegistroCompras useData={useData} usuarioActivo={usuarioActivo} />}
                 {vistaActiva === 'activos' && <ActivosFijos useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} />}
