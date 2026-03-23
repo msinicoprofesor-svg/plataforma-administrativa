@@ -2,7 +2,7 @@
 /* ARCHIVO: app/components/operaciones/almacen/CatalogoProductos.tsx          */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MdSearch, MdAdd, MdClose, MdInventory2, MdWarning, MdFilterList } from "react-icons/md";
 
 const MARCAS_DISPONIBLES = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
@@ -25,7 +25,13 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     const [capsulaActiva, setCapsulaActiva] = useState('General'); 
     const [regionesExpandidas, setRegionesExpandidas] = useState(false);
     
-    // ESTADOS Y REF PARA EL MOTOR DE SCROLL INTELIGENTE
+    // ESTADOS PARA LAS FILAS EXPANDIBLES (EL BOTÓN "+")
+    const [filasExpandidas, setFilasExpandidas] = useState({});
+    
+    const toggleFila = (id) => {
+        setFilasExpandidas(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
     const scrollRef = useRef(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
@@ -34,15 +40,14 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         if (scrollRef.current) {
             const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
             setCanScrollLeft(scrollLeft > 0);
-            setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2); // 2px de tolerancia
+            setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2); 
         }
     };
 
-    // Escuchar cambios de tamaño y cuando se expande el carrusel
     useEffect(() => {
         if (regionesExpandidas) {
             setTimeout(checkScroll, 100);
-            setTimeout(checkScroll, 400); // Doble check por la animación CSS
+            setTimeout(checkScroll, 400); 
         }
         window.addEventListener('resize', checkScroll);
         return () => window.removeEventListener('resize', checkScroll);
@@ -56,43 +61,65 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL' 
     });
 
-    // --- GRUPOS DE CÁPSULAS ---
+    // --- GRUPOS DE CÁPSULAS ACTUALIZADOS ---
     const leftGroup = ['Todos', 'General'];
     const midGroup = REGIONES_DISPONIBLES; 
-    const rightGroup = ['WIFICEL', 'RK'];
+    const rightGroup = ['WIFICEL', 'RK', 'FIBROX', 'INTERCHEAP'];
 
     const isLeftActive = leftGroup.includes(capsulaActiva);
     const isMidActive = midGroup.includes(capsulaActiva);
-    
     const coverCapsule = (isLeftActive || isMidActive) ? capsulaActiva : 'General';
 
     let CAPSULAS_REGIONAL = ['General'];
     if (!esAdminGeneral) {
         if (miRegion !== 'N/A') CAPSULAS_REGIONAL.push(miRegion);
-        if (miMarca === 'WifiCel') CAPSULAS_REGIONAL.push('WIFICEL');
-        if (miMarca === 'RK') CAPSULAS_REGIONAL.push('RK');
+        if (miMarca !== 'N/A' && rightGroup.includes(miMarca.toUpperCase())) CAPSULAS_REGIONAL.push(miMarca.toUpperCase());
         CAPSULAS_REGIONAL = [...new Set(CAPSULAS_REGIONAL)];
     }
 
-    const productosFiltrados = inventario.filter(p => {
-        const matchBusqueda = p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || p.marca.toLowerCase().includes(busqueda.toLowerCase());
-        const matchMarca = filtroMarca ? p.marca === filtroMarca : true;
-        const matchCategoria = filtroCategoria ? p.categoria === filtroCategoria : true;
-        
-        let matchCapsula = false;
-        if (capsulaActiva === 'Todos') matchCapsula = true;
-        else if (capsulaActiva === 'General') matchCapsula = p.almacen === 'CATALOGO_BASE';
-        else if (capsulaActiva === 'WIFICEL') matchCapsula = p.almacen === 'WIFICEL' || p.marca === 'WifiCel' || p.marca === 'WIFICEL';
-        else if (capsulaActiva === 'RK') matchCapsula = p.almacen === 'RK' || p.marca === 'RK';
-        else matchCapsula = p.region === capsulaActiva || p.almacen === capsulaActiva.toUpperCase(); 
+    // --- LÓGICA DE AGRUPACIÓN (ERP MAGIA) ---
+    const catalogoBase = inventario.filter(p => p.almacen === 'CATALOGO_BASE');
+    const fisicos = inventario.filter(p => p.almacen !== 'CATALOGO_BASE');
 
-        let matchPermiso = true;
-        if (!esAdminGeneral && p.almacen !== 'CATALOGO_BASE') {
-            matchPermiso = (p.region === miRegion || p.almacen === miRegion || p.marca === miMarca || p.almacen === miMarca.toUpperCase());
+    const productosAgrupados = catalogoBase.map(base => {
+        let fisicosFiltrados = fisicos.filter(f => f.nombre === base.nombre);
+
+        // 1. Filtros de barra superior
+        fisicosFiltrados = fisicosFiltrados.filter(f => {
+            const matchBusqueda = f.nombre.toLowerCase().includes(busqueda.toLowerCase()) || f.marca.toLowerCase().includes(busqueda.toLowerCase());
+            const matchMarca = filtroMarca ? f.marca === filtroMarca : true;
+            const matchCategoria = filtroCategoria ? f.categoria === filtroCategoria : true;
+            return matchBusqueda && matchMarca && matchCategoria;
+        });
+
+        // 2. Filtros de Cápsulas Activas
+        if (capsulaActiva !== 'Todos') {
+            fisicosFiltrados = fisicosFiltrados.filter(f => {
+                if (capsulaActiva === 'General') return f.almacen === 'GENERAL' || f.marca.includes('JAVAK');
+                if (rightGroup.includes(capsulaActiva)) return f.almacen === capsulaActiva || f.marca.toUpperCase().includes(capsulaActiva);
+                return f.region === capsulaActiva || f.almacen === capsulaActiva.toUpperCase();
+            });
         }
 
-        return matchBusqueda && matchMarca && matchCategoria && matchCapsula && matchPermiso;
-    });
+        // 3. Filtros de Permisos Regionales
+        if (!esAdminGeneral) {
+            fisicosFiltrados = fisicosFiltrados.filter(f => f.region === miRegion || f.almacen === miRegion || f.marca === miMarca || f.almacen === miMarca.toUpperCase());
+        }
+
+        // 4. Sumatoria y Desglose
+        const stockTotal = fisicosFiltrados.reduce((acc, curr) => acc + curr.stock, 0);
+        const desglose = fisicosFiltrados.filter(f => f.stock > 0);
+
+        const baseMatchBusqueda = base.nombre.toLowerCase().includes(busqueda.toLowerCase());
+        const baseMatchCategoria = filtroCategoria ? base.categoria === filtroCategoria : true;
+
+        return {
+            ...base,
+            stockTotal,
+            desglose,
+            visible: (baseMatchBusqueda && baseMatchCategoria) && (capsulaActiva === 'Todos' || stockTotal > 0 || capsulaActiva === 'General')
+        };
+    }).filter(item => item.visible);
 
     const handleGuardar = async (e) => {
         e.preventDefault();
@@ -108,6 +135,8 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         if(name === 'San Diego de la Unión') return 'SDU';
         if(name === 'Santa María del Río') return 'SMR';
         if(name === 'Jalpan de Serra') return 'Jalpan';
+        if(name === 'INTERCHEAP') return 'Intercheap';
+        if(name === 'FIBROX') return 'Fibrox';
         return name;
     };
 
@@ -123,7 +152,6 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden relative">
             
-            {/* CSS AVANZADO: Ocultar scrollbar y crear efecto de desvanecimiento en los bordes */}
             <style>{`
                 .hide-scroll::-webkit-scrollbar { display: none; }
                 .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -158,20 +186,17 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 overflow-hidden w-full">
                     <div className="flex overflow-hidden w-full md:w-auto items-center p-1">
                         
-                        {/* MODO ADMIN GENERAL */}
                         {esAdminGeneral ? (
                             <div className="flex items-center">
                                 
-                                {/* GRUPO IZQUIERDO (Todos, General) */}
                                 {leftGroup.map(cap => {
                                     const isActive = capsulaActiva === cap;
                                     const isCover = !regionesExpandidas && coverCapsule === cap;
                                     const isVisible = regionesExpandidas || isCover;
 
                                     let btnClass = "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap rounded-full text-[11px] font-black flex items-center justify-center shrink-0 border ";
-                                    if (!isVisible) {
-                                        btnClass += "max-w-0 opacity-0 px-0 py-0 mx-0 border-transparent ";
-                                    } else {
+                                    if (!isVisible) btnClass += "max-w-0 opacity-0 px-0 py-0 mx-0 border-transparent ";
+                                    else {
                                         btnClass += "max-w-[150px] opacity-100 px-4 py-1.5 mx-0.5 ";
                                         if (isActive) btnClass += "bg-white text-blue-600 border-blue-200 shadow-sm ";
                                         else if (isCover) btnClass += "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200 shadow-sm ";
@@ -185,7 +210,6 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                     )
                                 })}
 
-                                {/* FLECHA IZQUIERDA CARRUSEL (Minimalista e Inteligente) */}
                                 <button 
                                     onClick={() => scrollRef.current?.scrollBy({ left: -150, behavior: 'smooth' })}
                                     className={`transition-all duration-300 ease-in-out flex items-center justify-center shrink-0
@@ -195,7 +219,6 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                     <span className="text-[14px]">◀</span>
                                 </button>
 
-                                {/* GRUPO CENTRAL (Scroll Animado de Regiones con Efecto Fade) */}
                                 <div className={`transition-all duration-500 ease-in-out flex items-center overflow-hidden ${regionesExpandidas ? 'max-w-[280px] opacity-100' : (isMidActive ? 'max-w-[150px] opacity-100' : 'max-w-0 opacity-0')}`}>
                                     <div ref={scrollRef} onScroll={checkScroll} className={`flex items-center overflow-x-auto hide-scroll scroll-smooth w-full py-1 ${regionesExpandidas ? 'fade-edges' : ''}`}>
                                         {midGroup.map(cap => {
@@ -204,9 +227,8 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                             const isVisible = regionesExpandidas || isCover;
 
                                             let btnClass = "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap rounded-full text-[11px] font-black flex items-center justify-center shrink-0 border ";
-                                            if (!isVisible) {
-                                                btnClass += "max-w-0 opacity-0 px-0 py-0 mx-0 border-transparent ";
-                                            } else {
+                                            if (!isVisible) btnClass += "max-w-0 opacity-0 px-0 py-0 mx-0 border-transparent ";
+                                            else {
                                                 btnClass += "max-w-[150px] opacity-100 px-4 py-1.5 mx-0.5 ";
                                                 if (isActive) btnClass += "bg-white text-blue-600 border-blue-200 shadow-sm ";
                                                 else btnClass += "bg-transparent text-gray-500 border-transparent hover:bg-gray-100 ";
@@ -221,7 +243,6 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                     </div>
                                 </div>
 
-                                {/* FLECHA DERECHA CARRUSEL (Minimalista e Inteligente) */}
                                 <button 
                                     onClick={() => scrollRef.current?.scrollBy({ left: 150, behavior: 'smooth' })}
                                     className={`transition-all duration-300 ease-in-out flex items-center justify-center shrink-0
@@ -231,10 +252,8 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                     <span className="text-[14px]">▶</span>
                                 </button>
 
-                                {/* SEPARADOR ANIMADO */}
                                 <div className={`transition-all duration-500 ease-in-out bg-gray-200 hidden md:block rounded-full ${regionesExpandidas ? 'w-[2px] h-6 mx-2 opacity-100' : 'w-0 h-6 mx-0 opacity-0 border-transparent'}`}></div>
 
-                                {/* GRUPO DERECHO (Fijos: WIFICEL, RK) */}
                                 {rightGroup.map(cap => {
                                     const isActive = capsulaActiva === cap;
                                     let btnClass = "px-4 py-1.5 mx-0.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all duration-300 border ";
@@ -243,16 +262,15 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
 
                                     return (
                                         <button key={cap} onClick={() => { setCapsulaActiva(cap); setRegionesExpandidas(false); }} className={btnClass}>
-                                            {cap}
+                                            {getShortName(cap)}
                                         </button>
                                     )
                                 })}
                             </div>
                         ) : (
-                            // MODO ADMIN REGIONAL
                             <div className="flex items-center gap-1">
                                 {CAPSULAS_REGIONAL.map(cap => {
-                                    const isDark = cap === 'WIFICEL' || cap === 'RK';
+                                    const isDark = rightGroup.includes(cap);
                                     const isActive = capsulaActiva === cap;
                                     let baseStyle = `px-4 py-1.5 mx-0.5 rounded-full text-[11px] font-black whitespace-nowrap cursor-pointer transition-all duration-300 `;
                                     if (isActive) baseStyle += 'bg-white text-blue-600 border border-blue-200 shadow-sm';
@@ -277,51 +295,81 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                 </div>
             </div>
             
-            {/* TABLA DE CATÁLOGO */}
+            {/* TABLA DE CATÁLOGO (AGRUPADA Y DESPLEGABLE) */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                 {cargando ? (
                     <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div></div>
-                ) : productosFiltrados.length === 0 ? (
+                ) : productosAgrupados.length === 0 ? (
                     <div className="text-center py-20 text-gray-400 font-bold">No se encontraron productos en esta cápsula.</div>
                 ) : (
                     <table className="w-full text-left border-collapse">
                         <thead className="text-[9px] text-gray-400 uppercase bg-white sticky top-0 z-10 shadow-sm">
-                            <tr><th className="p-4 rounded-tl-xl font-black tracking-widest">Articulo Base</th><th className="p-4 font-black tracking-widest">Marca</th><th className="p-4 font-black tracking-widest">Categoría</th><th className="p-4 font-black tracking-widest">Ubicación / Región</th><th className="p-4 text-center font-black tracking-widest rounded-tr-xl">Stock Actual</th></tr>
+                            <tr><th className="p-4 rounded-tl-xl font-black tracking-widest">Articulo Base</th><th className="p-4 font-black tracking-widest">Marca / Propiedad</th><th className="p-4 font-black tracking-widest">Categoría</th><th className="p-4 font-black tracking-widest">Ubicación Global</th><th className="p-4 text-center font-black tracking-widest rounded-tr-xl">Stock Consolidado</th></tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {productosFiltrados.map(p => (
-                                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="p-4">
-                                        <p className="font-black text-gray-800 text-xs">{p.nombre}</p>
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Mínimo: {p.minimo} {p.unidad}</p>
-                                    </td>
-                                    <td className="p-4">
-                                        {p.marca === 'MULTI-MARCA' ? <span className="text-[9px] font-bold text-gray-400 italic">Genérico</span> : <span className="text-[10px] font-black text-gray-700">{p.marca}</span>}
-                                    </td>
-                                    <td className="p-4"><span className="bg-blue-50 text-blue-600 border border-blue-100 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest">{p.categoria}</span></td>
-                                    <td className="p-4">
-                                        {p.almacen === 'CATALOGO_BASE' ? (
-                                            <span className="text-[9px] bg-purple-50 text-purple-600 px-2 py-1 rounded font-bold uppercase tracking-widest">Catálogo Base</span>
-                                        ) : (
-                                            <>
-                                                <p className="text-xs font-bold text-gray-800">{p.almacen}</p>
-                                                {p.region !== 'N/A' && p.region !== 'GENERAL' && <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{p.region}</p>}
-                                            </>
-                                        )}
-                                    </td>
-                                    <td className="p-4 text-center">
-                                        <span className={`text-xs font-black px-3 py-1 rounded-lg border ${p.stock <= p.minimo && p.almacen !== 'CATALOGO_BASE' ? 'bg-red-100 text-red-700 border-red-200 animate-pulse' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                                            {p.stock} {p.unidad}
-                                        </span>
-                                    </td>
-                                </tr>
+                            {productosAgrupados.map(p => (
+                                <React.Fragment key={p.id}>
+                                    <tr className="hover:bg-gray-50 transition-colors">
+                                        <td className="p-4">
+                                            <p className="font-black text-gray-800 text-xs">{p.nombre}</p>
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Mínimo: {p.minimo} {p.unidad}</p>
+                                        </td>
+                                        <td className="p-4">
+                                            {capsulaActiva === 'Todos' ? (
+                                                <span className="text-[9px] font-bold text-gray-400 italic">Múltiples Marcas</span>
+                                            ) : (
+                                                <span className="text-[10px] font-black text-gray-700">{p.desglose.length > 0 ? p.desglose[0].marca : 'N/A'}</span>
+                                            )}
+                                        </td>
+                                        <td className="p-4"><span className="bg-blue-50 text-blue-600 border border-blue-100 text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest">{p.categoria}</span></td>
+                                        <td className="p-4">
+                                            {capsulaActiva === 'Todos' ? (
+                                                <span className="text-[9px] bg-purple-50 text-purple-600 px-2 py-1 rounded font-bold uppercase tracking-widest">Global</span>
+                                            ) : (
+                                                <span className="text-[10px] font-black text-gray-700">{capsulaActiva}</span>
+                                            )}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <span className={`text-xs font-black px-3 py-1 rounded-lg border ${p.stockTotal <= p.minimo ? 'bg-red-100 text-red-700 border-red-200 animate-pulse' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                                                    {p.stockTotal} {p.unidad}
+                                                </span>
+                                                {/* EL BOTÓN MÁGICO "+" */}
+                                                {p.desglose.length > 0 && (
+                                                    <button onClick={() => toggleFila(p.id)} className="w-6 h-6 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center font-bold transition-all shadow-sm">
+                                                        {filasExpandidas[p.id] ? '-' : '+'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    {/* LA TARJETA DESPLEGABLE CON EL DESGLOSE */}
+                                    {filasExpandidas[p.id] && p.desglose.length > 0 && (
+                                        <tr className="bg-blue-50/20 border-b border-blue-50">
+                                            <td colSpan="5" className="p-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pl-4 border-l-2 border-blue-300">
+                                                    {p.desglose.map((d, index) => (
+                                                        <div key={`${d.id}-${index}`} className="flex justify-between items-center bg-white p-3 rounded-xl border border-blue-100 shadow-sm animate-fade-in">
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-gray-700 uppercase">{d.marca}</p>
+                                                                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">UBICACIÓN: {d.almacen} {d.region !== 'N/A' && d.region !== 'GENERAL' && `- ${d.region}`}</p>
+                                                            </div>
+                                                            <span className="text-xs font-black text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">{d.stock} {d.unidad}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>
                 )}
             </div>
 
-            {/* MODAL DE ALTA DE PRODUCTO BASE (Simplificado) */}
+            {/* MODAL DE ALTA DE PRODUCTO BASE */}
             {modalAbierto && (
                 <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                     <form onSubmit={handleGuardar} className="bg-white rounded-[2rem] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
