@@ -3,14 +3,15 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { MdSearch, MdAdd, MdClose, MdInventory2, MdWarning, MdFilterList, MdRemoveCircleOutline, MdHistory, MdArrowUpward, MdArrowDownward } from "react-icons/md";
+import { MdSearch, MdAdd, MdClose, MdInventory2, MdWarning, MdFilterList, MdHistory, MdArrowUpward, MdArrowDownward, MdAddShoppingCart, MdShoppingCart } from "react-icons/md";
+import ModalDespacho from './ModalDespacho'; // IMPORTAMOS EL PUNTO DE VENTA
 
 const MARCAS_DISPONIBLES = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
 const REGIONES_DISPONIBLES = ['Almacén General', 'Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
 const CATEGORIAS_DISPONIBLES = ['FIBRA ÓPTICA', 'ENLACE / ANTENA', 'CCTV', 'CABLEADO', 'HERRAJES', 'REDES', 'EQUIPO', 'HERRAMIENTA', 'PAPELERIA', 'LIMPIEZA'];
 
-export default function CatalogoProductos({ useData, usuarioActivo }) {
-    const { inventario, agregarProducto, registrarMovimiento, movimientos, cargando } = useData;
+export default function CatalogoProductos({ useData, usuarioActivo, colaboradores = [] }) {
+    const { inventario, agregarProducto, movimientos, cargando } = useData;
     
     // --- LÓGICA DE PERMISOS (RBAC) ---
     const rolNormalizado = (usuarioActivo?.rol || usuarioActivo?.puesto || '').toUpperCase().trim();
@@ -29,10 +30,11 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
     const [regionesExpandidas, setRegionesExpandidas] = useState(false);
     const [filasExpandidas, setFilasExpandidas] = useState({});
     
-    // ESTADOS PARA NUEVOS MODALES
-    const [modalAbierto, setModalAbierto] = useState(false); // Alta Producto Base
-    const [modalRetiro, setModalRetiro] = useState(null); // Retiro Manual
-    const [modalHistorial, setModalHistorial] = useState(false); // Historial de Movimientos
+    // ESTADOS PARA MODALES Y CARRITO (PUNTO DE VENTA)
+    const [modalAbierto, setModalAbierto] = useState(false); 
+    const [modalHistorial, setModalHistorial] = useState(false); 
+    const [modalDespachoAbierto, setModalDespachoAbierto] = useState(false);
+    const [carrito, setCarrito] = useState([]);
     
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -113,7 +115,6 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         };
     }).filter(item => item.visible);
 
-    // --- ACCIONES DEL USUARIO ---
     const handleGuardarProductoBase = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -124,22 +125,20 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         alert("Producto Base agregado al catálogo exitosamente.");
     };
 
-    const handleRetirarStock = async (e) => {
-        e.preventDefault();
-        if (modalRetiro.cantidad > modalRetiro.producto.stock) {
-            return alert("No puedes retirar más stock del que hay disponible.");
-        }
-        setIsSubmitting(true);
-        await registrarMovimiento(
-            modalRetiro.producto.id, 
-            modalRetiro.cantidad, 
-            'SALIDA', 
-            `Retiro Manual: ${modalRetiro.motivo}`, 
-            usuarioActivo.nombre || 'Administrador'
-        );
-        setIsSubmitting(false);
-        setModalRetiro(null);
-        alert("Stock retirado correctamente.");
+    // --- LÓGICA DE AÑADIR AL CARRITO (PUNTO DE VENTA) ---
+    const handleAgregarCarrito = (productoFisico) => {
+        if (productoFisico.stock <= 0) return alert("No hay stock disponible.");
+        setCarrito(prev => {
+            const existe = prev.find(item => item.producto.id === productoFisico.id);
+            if (existe) {
+                if (existe.cantidad >= productoFisico.stock) {
+                    alert(`Solo hay ${productoFisico.stock} unidades de este producto disponibles.`);
+                    return prev;
+                }
+                return prev.map(item => item.producto.id === productoFisico.id ? { ...item, cantidad: item.cantidad + 1 } : item);
+            }
+            return [...prev, { producto: productoFisico, cantidad: 1 }];
+        });
     };
 
     // --- PREPARAR HISTORIAL ---
@@ -147,9 +146,8 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
         const prod = inventario.find(i => i.id === m.producto_id);
         return { ...m, producto: prod };
     }).filter(m => {
-        if (!m.producto) return false; // Ignorar si el producto fue borrado
-        if (esAdminGeneral) return true; // El admin ve todo
-        // Regional solo ve lo de su región o marca
+        if (!m.producto) return false; 
+        if (esAdminGeneral) return true; 
         return m.producto.region === miRegion || m.producto.almacen === miRegion.toUpperCase() || m.producto.marca === miMarca || m.producto.almacen === miMarca.toUpperCase();
     });
 
@@ -178,6 +176,22 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                 .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
                 .fade-edges { mask-image: linear-gradient(to right, transparent, black 15px, black calc(100% - 15px), transparent); }
             `}</style>
+
+            {/* BOTÓN FLOTANTE DEL CARRITO (PUNTO DE VENTA) */}
+            {carrito.length > 0 && (
+                <button 
+                    onClick={() => setModalDespachoAbierto(true)}
+                    className="absolute bottom-8 right-8 z-[100] bg-gray-900 hover:bg-black text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 transition-transform hover:scale-105 animate-fade-in"
+                >
+                    <div className="relative">
+                        <MdShoppingCart className="text-2xl" />
+                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-gray-900">
+                            {carrito.reduce((acc, c) => acc + c.cantidad, 0)}
+                        </span>
+                    </div>
+                    <span className="font-black text-sm hidden md:inline">Despachar</span>
+                </button>
+            )}
 
             <div className="p-5 border-b border-gray-100 bg-white shrink-0 flex flex-col gap-5">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -366,9 +380,9 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs font-black text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">{d.stock} {d.unidad}</span>
                                                                 
-                                                                {/* BOTÓN DE RETIRO MANUAL (PUNTO 5) */}
-                                                                <button onClick={() => setModalRetiro({ producto: d, cantidad: 1, motivo: 'Uso interno / Instalación' })} className="w-6 h-6 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-full flex items-center justify-center transition-colors shadow-sm opacity-100 md:opacity-0 group-hover:opacity-100" title="Retirar Material">
-                                                                    <MdRemoveCircleOutline className="text-sm"/>
+                                                                {/* BOTÓN DE AÑADIR AL CARRITO (PUNTO DE VENTA) */}
+                                                                <button onClick={() => handleAgregarCarrito(d)} className="w-6 h-6 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-full flex items-center justify-center transition-colors shadow-sm opacity-100 md:opacity-0 group-hover:opacity-100" title="Añadir al Carrito">
+                                                                    <MdAddShoppingCart className="text-sm"/>
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -428,50 +442,7 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                 </div>
             )}
 
-            {/* MODAL 2: RETIRO MANUAL DE STOCK (PUNTO 5) */}
-            {modalRetiro && (
-                <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <form onSubmit={handleRetirarStock} className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-scale-in">
-                        <div className="p-6 border-b border-red-100 bg-red-50/50 flex justify-between items-center shrink-0">
-                            <div>
-                                <h3 className="text-lg font-black text-red-700 flex items-center gap-2"><MdRemoveCircleOutline/> Retirar Material</h3>
-                                <p className="text-[10px] font-bold text-red-400 uppercase mt-1">Descontar stock del inventario físico</p>
-                            </div>
-                            <button type="button" onClick={() => setModalRetiro(null)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
-                        </div>
-                        
-                        <div className="p-6 space-y-4">
-                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-center">
-                                <p className="text-xs font-black text-gray-800">{modalRetiro.producto.nombre}</p>
-                                <p className="text-[10px] font-bold text-gray-500">{modalRetiro.producto.marca} • {modalRetiro.producto.almacen}</p>
-                                <p className="text-xs font-black text-blue-600 mt-2">Stock Disponible: {modalRetiro.producto.stock}</p>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Cantidad a Retirar *</label>
-                                <input required type="number" min="1" max={modalRetiro.producto.stock} value={modalRetiro.cantidad} onChange={e => setModalRetiro({...modalRetiro, cantidad: parseInt(e.target.value)})} className="w-full bg-white border-2 border-red-200 rounded-xl px-4 py-3 text-lg font-black text-red-600 outline-none focus:border-red-500 text-center shadow-inner" />
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Motivo / Justificación *</label>
-                                <select required value={modalRetiro.motivo} onChange={e => setModalRetiro({...modalRetiro, motivo: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-red-500">
-                                    <option value="Uso interno / Instalación">Uso interno / Instalación</option>
-                                    <option value="Merma / Dañado">Merma / Material Dañado</option>
-                                    <option value="Muestra / Demostración">Muestra / Demostración</option>
-                                    <option value="Ajuste de Inventario (Faltante)">Ajuste de Inventario (Faltante)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex gap-3">
-                            <button type="button" onClick={() => setModalRetiro(null)} disabled={isSubmitting} className="flex-1 bg-white border border-gray-200 text-gray-600 font-black py-4 rounded-xl">Cancelar</button>
-                            <button type="submit" disabled={isSubmitting} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-lg shadow-red-500/30">Confirmar Retiro</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* MODAL 3: HISTORIAL DE MOVIMIENTOS (PUNTO 4) */}
+            {/* MODAL 2: HISTORIAL DE MOVIMIENTOS */}
             {modalHistorial && (
                 <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
@@ -516,6 +487,17 @@ export default function CatalogoProductos({ useData, usuarioActivo }) {
                     </div>
                 </div>
             )}
+
+            {/* MODAL 3: EL PUNTO DE VENTA (Despacho Rápido) */}
+            <ModalDespacho 
+                isOpen={modalDespachoAbierto} 
+                onClose={() => setModalDespachoAbierto(false)} 
+                useData={useData} 
+                usuarioActivo={usuarioActivo} 
+                colaboradores={colaboradores} 
+                carrito={carrito} 
+                setCarrito={setCarrito} 
+            />
         </div>
     );
 }

@@ -81,7 +81,9 @@ export default function InventarioOperativo({ useData, usuarioActivo, colaborado
             </div>
 
             <div className="flex-1 min-h-0 mt-6 relative">
-                {vistaActiva === 'catalogo' && <CatalogoProductos useData={useData} usuarioActivo={usuarioActivo} />}
+                {/* LA CONEXIÓN MÁGICA: Le pasamos los colaboradores al Catálogo */}
+                {vistaActiva === 'catalogo' && <CatalogoProductos useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} />}
+                
                 {vistaActiva === 'compras' && <RegistroCompras useData={useData} usuarioActivo={usuarioActivo} />}
                 {vistaActiva === 'activos' && <ActivosFijos useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} />}
                 {vistaActiva === 'logistica' && <MesaLogistica useData={useData} colaboradores={colaboradores} usuarioActivo={usuarioActivo} />}

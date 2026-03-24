@@ -5,10 +5,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { MdClose, MdPointOfSale, MdQrCodeScanner, MdShoppingCart, MdDelete, MdPrint, MdCheckCircle, MdPerson, MdStore } from "react-icons/md";
 
-export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo, colaboradores = [] }) {
+// RECIBIMOS EL CARRITO COMO PROP DESDE EL CATÁLOGO
+export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo, colaboradores = [], carrito, setCarrito }) {
     const { inventario, registrarMovimiento } = useData;
     
-    const [carrito, setCarrito] = useState([]);
     const [busquedaLector, setBusquedaLector] = useState('');
     
     // Datos de Entrega
@@ -17,11 +17,10 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
     const [motivo, setMotivo] = useState('Uso interno / Instalación');
     
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [ticketGenerado, setTicketGenerado] = useState(null); // Guarda los datos del ticket al terminar
+    const [ticketGenerado, setTicketGenerado] = useState(null);
 
     const lectorRef = useRef(null);
 
-    // Auto-focus en el lector al abrir el modal para que el encargado use la pistola de códigos rápido
     useEffect(() => {
         if (isOpen && lectorRef.current && !ticketGenerado) {
             lectorRef.current.focus();
@@ -30,14 +29,12 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
 
     if (!isOpen) return null;
 
-    // Solo podemos despachar stock físico real
     const stockFisico = inventario.filter(p => p.almacen !== 'CATALOGO_BASE' && p.stock > 0);
 
     const handleScan = (e) => {
         e.preventDefault();
         if(!busquedaLector.trim()) return;
 
-        // Simulamos la búsqueda del código de barras por el nombre, marca o serie
         const q = busquedaLector.toLowerCase();
         const productoEncontrado = stockFisico.find(p => 
             p.nombre.toLowerCase().includes(q) || 
@@ -46,7 +43,7 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
 
         if (productoEncontrado) {
             agregarAlCarrito(productoEncontrado);
-            setBusquedaLector(''); // Limpiamos para el siguiente bip
+            setBusquedaLector(''); 
         } else {
             alert("❌ Producto no encontrado o sin stock disponible.");
         }
@@ -98,7 +95,6 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
         const horaEntrega = new Date();
 
         try {
-            // Descontamos del inventario uno por uno
             for (const item of carrito) {
                 const motivoCompleto = `Despacho Mostrador | Entregado a: ${nombreColab} | Destino: ${destino} | Motivo: ${motivo}`;
                 await registrarMovimiento(
@@ -110,7 +106,6 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
                 );
             }
 
-            // Generamos la data para el Ticket Térmico
             setTicketGenerado({
                 folio: `DSP-${Date.now().toString().slice(-6)}`,
                 fecha: horaEntrega,
@@ -141,7 +136,6 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
     return (
         <div className="fixed inset-0 bg-black/70 z-[300] flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm">
             
-            {/* ESTILOS EXCLUSIVOS PARA IMPRESIÓN TÉRMICA */}
             <style>{`
                 @media print {
                     body * { visibility: hidden; }
@@ -152,10 +146,8 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
             `}</style>
 
             {!ticketGenerado ? (
-                // ---------------- VISTA DE PUNTO DE VENTA (CAJERO) ----------------
                 <div className="bg-gray-100 rounded-[2rem] w-full max-w-5xl h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-scale-in">
                     
-                    {/* CABECERA POS */}
                     <div className="bg-gray-900 text-white p-5 flex justify-between items-center shrink-0">
                         <div>
                             <h2 className="text-xl font-black flex items-center gap-2"><MdPointOfSale className="text-blue-400"/> Punto de Despacho Rápido</h2>
@@ -166,9 +158,7 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
 
                     <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                         
-                        {/* PANEL IZQUIERDO: Escáner y Carrito */}
                         <div className="flex-[3] bg-white border-r border-gray-200 flex flex-col">
-                            {/* ESCÁNER */}
                             <form onSubmit={handleScan} className="p-5 border-b border-gray-100 bg-blue-50/30">
                                 <label className="block text-[10px] font-black text-blue-600 uppercase mb-2 flex items-center gap-1"><MdQrCodeScanner className="text-lg"/> Escáner / Búsqueda Rápida</label>
                                 <input 
@@ -178,7 +168,6 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
                                 />
                             </form>
 
-                            {/* TABLA DEL CARRITO */}
                             <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50 p-2">
                                 {carrito.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-gray-300">
@@ -209,7 +198,6 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
                             </div>
                         </div>
 
-                        {/* PANEL DERECHO: Datos de Entrega y Botón de Pago */}
                         <div className="flex-[2] bg-white flex flex-col">
                             <div className="flex-1 overflow-y-auto p-6 space-y-5">
                                 <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-2"><MdPerson className="text-blue-500 text-lg"/> Datos de Responsiva</h3>
@@ -256,10 +244,8 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
                     </div>
                 </div>
             ) : (
-                // ---------------- VISTA DE TICKET GENERADO (TÉRMICA 80mm) ----------------
                 <div className="flex flex-col items-center w-full max-w-sm animate-scale-in">
                     
-                    {/* TICKET VISUAL (El que se va a imprimir) */}
                     <div className="zona-ticket bg-white shadow-2xl p-6 w-[80mm] min-h-[100mm] text-black">
                         <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
                             <h2 className="text-xl font-black mb-1 tracking-tighter uppercase">JAVAK LOGÍSTICA</h2>
@@ -293,11 +279,10 @@ export default function ModalDespacho({ isOpen, onClose, useData, usuarioActivo,
                             <p className="text-[10px] mb-8 uppercase">Firma de Conformidad</p>
                             <div className="border-b border-black w-3/4 mx-auto mb-2"></div>
                             <p className="text-[9px] font-bold uppercase">{ticketGenerado.recibe}</p>
-                            <p className="text-[8px] mt-4 italic text-center">El material entregado es responsabilidad del técnico a partir de la firma de este documento.</p>
+                            <p className="text-[8px] mt-4 italic text-center">El material entregado es responsabilidad del técnico a partir de la firma.</p>
                         </div>
                     </div>
 
-                    {/* BOTONES DE CONTROL (No se imprimen) */}
                     <div className="no-print w-full flex gap-3 mt-6">
                         <button onClick={resetear} className="flex-1 bg-white hover:bg-gray-100 text-gray-800 font-black py-4 rounded-2xl shadow-lg transition-colors">Terminar</button>
                         <button onClick={handleImprimir} className="flex-[2] bg-gray-900 hover:bg-black text-white font-black py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95"><MdPrint className="text-xl"/> Imprimir Ticket 80mm</button>
