@@ -13,22 +13,29 @@ import ActivosFijos from './almacen/ActivosFijos';
 
 export default function InventarioOperativo({ useData, usuarioActivo, colaboradores = [] }) {
     
-    // --- NUEVA LÓGICA SINCRONIZADA DE ROLES ---
-    // Usamos .rol o .puesto dependiendo de cómo lo guarde tu sistema de Login
+    // Obtenemos el rol o puesto
     const rolUsuario = usuarioActivo?.rol || usuarioActivo?.puesto || '';
 
-    // Los "Dioses": Ven todo de todas las sucursales
-    const ROLES_ADMIN_GENERAL = ['Encargado de almacén', 'Gerente General', 'Director', 'Soporte General'];
+    // --- MATRIZ A PRUEBA DE BALAS (Acepta Formato Antiguo y Formato RRHH) ---
+    const ROLES_ADMIN_GENERAL = [
+        'ENCARGADO_ALMACEN', 'Encargado de almacén', 
+        'GERENTE_GENERAL', 'Gerente General', 
+        'DIRECTOR', 'Director', 
+        'SOPORTE_GENERAL', 'Soporte General'
+    ];
     
-    // Los que tienen acceso al módulo WMS (Dioses + Administradores Regionales)
-    const ROLES_ADMIN_ALMACEN = [...ROLES_ADMIN_GENERAL, 'Gerente Marketing', 'Administrador'];
+    // Administradores Regionales + Dioses Generales
+    const ROLES_ADMIN_ALMACEN = [
+        ...ROLES_ADMIN_GENERAL, 
+        'GERENTE_MKT', 'Gerente Marketing', 
+        'ADMINISTRADOR', 'Administrador'
+    ];
 
     const esEncargado = rolUsuario && ROLES_ADMIN_ALMACEN.includes(rolUsuario);
     const esAdminGeneral = rolUsuario && ROLES_ADMIN_GENERAL.includes(rolUsuario);
     
     const [vistaActiva, setVistaActiva] = useState(esEncargado ? 'catalogo' : 'portal');
 
-    // Título dinámico
     let tituloPrincipal = 'Materiales y Herramientas';
     if (esAdminGeneral) {
         tituloPrincipal = 'Centro de Logística y Almacén General';
