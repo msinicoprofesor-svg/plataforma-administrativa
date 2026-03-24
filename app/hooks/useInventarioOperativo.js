@@ -13,7 +13,6 @@ export function useInventarioOperativo() {
   const [activos, setActivos] = useState([]); 
   const [cargando, setCargando] = useState(true);
 
-  // INYECCIÓN DE CÓDIGO DE BARRAS EN MAPERS
   const mapInvFromDB = (db) => ({
     id: db.id, nombre: db.nombre, almacen: db.almacen, 
     categoria: db.categoria, stock: db.stock, minimo: db.minimo, unidad: db.unidad,
@@ -73,7 +72,16 @@ export function useInventarioOperativo() {
 
   const registrarCompra = async (compraPayload, productosComprados) => {
       try {
-          const { error } = await supabase.from('inventario_compras').insert([compraPayload]);
+          // ENRIQUECEMOS LOS DETALLES CON EL NOMBRE REAL DEL PRODUCTO
+          const detallesEnriquecidos = productosComprados.map(p => {
+              const base = inventario.find(i => i.id === p.productoBaseId);
+              return { ...p, nombre: base ? base.nombre : 'Producto Desconocido' };
+          });
+
+          // AGREGAMOS LOS DETALLES AL PAYLOAD DE LA COMPRA
+          const payloadFinal = { ...compraPayload, detalles: detallesEnriquecidos };
+
+          const { error } = await supabase.from('inventario_compras').insert([payloadFinal]);
           if(error) return { success: false, error: error.message };
 
           for(const p of productosComprados) {
@@ -89,7 +97,6 @@ export function useInventarioOperativo() {
               if(prodFisico) {
                   await registrarMovimiento(prodFisico.id, p.cantidad, 'ENTRADA', `Compra Fac: ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
               } else {
-                  // Al clonar la plantilla con el spread operator (...baseProd), el codigoBarras se copia automáticamente
                   const nuevoFisico = { ...baseProd, id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`, marca: marcaSegura, almacen: almacenSeguro, region: regionSegura, stock: parseInt(p.cantidad, 10) };
                   await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
                   const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: nuevoFisico.stock, tipo: 'ENTRADA', motivo: `Alta Compra Fac: ${compraPayload.proveedor}`, usuario: compraPayload.usuario_registro_id };
