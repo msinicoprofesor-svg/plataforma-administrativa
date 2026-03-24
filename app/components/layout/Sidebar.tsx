@@ -7,7 +7,7 @@ import {
   MdFactCheck, MdInventory2, MdCardGiftcard, MdBusiness, MdEngineering, 
   MdWork, MdLocalOffer, MdClose, MdFormatPaint, MdPoll, MdShare, 
   MdEventNote, MdGroups, MdReceiptLong, MdSupportAgent, MdPeopleAlt,
-  MdPhoneIphone, MdDirectionsCar, MdHistory, MdBuild, MdAssignment // <-- ÍCONOS NUEVOS
+  MdPhoneIphone, MdDirectionsCar, MdHistory, MdBuild, MdAssignment, MdComputer, MdLocalShipping
 } from "react-icons/md";
 import { FaStoreAlt, FaUserCircle } from "react-icons/fa";
 
@@ -22,9 +22,8 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
   const verCobertura = tienePermiso(usuario, 'marketing_cobertura');
   const verMesa = tienePermiso(usuario, 'marketing_mesa');
 
-  const verAlmacen = tienePermiso(usuario, 'almacen_operativo');
-
-  // --- PERMISOS VEHICULARES ---
+  // --- PERMISOS DE ALMACÉN Y LOGÍSTICA ---
+  const verAlmacen = tienePermiso(usuario, 'almacen_operativo'); // Encargados y Admins
   const verFlotilla = true; 
 
   const verCentroDiseno = tienePermiso(usuario, 'marketing_solicitudes');
@@ -83,13 +82,13 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
           {verCobertura && <MenuButton icon={<MdMap />} label="Cobertura" active={activeModule === 'marketing_cobertura'} onClick={() => setActiveModule('marketing_cobertura')} isOpen={isOpen} />}
           {verMesa && <MenuButton icon={<MdFactCheck />} label="Mesa de Control" active={activeModule === 'marketing_mesa'} onClick={() => setActiveModule('marketing_mesa')} isOpen={isOpen} />}
 
-          {verAlmacen && (
-            <>
-                <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
-                <SectionTitle label="Logística" isOpen={isOpen} />
-                <MenuButton icon={<MdInventory2 />} label="Almacén General" active={activeModule === 'almacen_operativo'} onClick={() => setActiveModule('almacen_operativo')} isOpen={isOpen} />
-            </>
-          )}
+          {/* --- SECCIÓN EXPANDIDA: SUMINISTROS Y LOGÍSTICA --- */}
+          <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
+          <SectionTitle label="Suministros y Logística" isOpen={isOpen} />
+          {verAlmacen && <MenuButton icon={<MdInventory2 />} label="Almacén General" active={activeModule === 'almacen_operativo'} onClick={() => setActiveModule('almacen_operativo')} isOpen={isOpen} />}
+          {verAlmacen && <MenuButton icon={<MdComputer />} label="Activos Fijos" active={activeModule === 'almacen_activos'} onClick={() => setActiveModule('almacen_activos')} isOpen={isOpen} />}
+          <MenuButton icon={<MdLocalShipping />} label="Logística y Pedidos" active={activeModule === 'almacen_logistica'} onClick={() => setActiveModule('almacen_logistica')} isOpen={isOpen} />
+
 
           {/* --- SECCIÓN EXPANDIDA: FLOTILLA --- */}
           {verFlotilla && (

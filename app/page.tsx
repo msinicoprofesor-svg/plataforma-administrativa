@@ -19,7 +19,12 @@ import { tienePermiso } from './config/permisos';
 
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
+
+// --- IMPORTS DEL ERP ALMACÉN Y LOGÍSTICA ---
 import InventarioOperativo from './components/operaciones/InventarioOperativo';
+import ActivosFijos from './components/operaciones/almacen/ActivosFijos';
+import ModuloLogistica from './components/operaciones/almacen/ModuloLogistica';
+
 import LikeStore from './components/marketing/LikeStore';         
 import CatalogoLikeStore from './components/marketing/CatalogoLikeStore'; 
 import ImportarInteracciones from './components/marketing/ImportarInteracciones';
@@ -40,11 +45,10 @@ import Cobertura from './components/tecnica/Cobertura';
 import MesaControl from './components/tecnica/MesaControl'; 
 import PanelVentas from './components/ventas/PanelVentas'; 
 
-// IMPORTS DE LA FLOTILLA INDEPENDIZADOS
 import PanelVehiculos from './components/vehiculos/PanelVehiculos';
 import BitacoraGlobal from './components/vehiculos/BitacoraGlobal';
 import PanelMantenimiento from './components/vehiculos/PanelMantenimiento';
-import ModuloSolicitudesVehiculos from './components/vehiculos/ModuloSolicitudesVehiculos'; // <--- NUEVO IMPORT
+import ModuloSolicitudesVehiculos from './components/vehiculos/ModuloSolicitudesVehiculos'; 
 
 
 export default function Home() {
@@ -107,7 +111,9 @@ export default function Home() {
   const verVentas = tienePermiso(u, 'marketing_ventas');
   const verCobertura = tienePermiso(u, 'marketing_cobertura');
   const verMesa = tienePermiso(u, 'marketing_mesa');
-  const verLogistica = tienePermiso(u, 'almacen_operativo');
+  
+  // PERMISOS DE ALMACÉN
+  const verAlmacen = tienePermiso(u, 'almacen_operativo');
   
   const verAtencionCliente = true; 
 
@@ -125,8 +131,6 @@ export default function Home() {
   const ROLES_TIENDA_FULL = ['GERENTE_MKT', 'CREADOR_CONTENIDO', 'COMMUNITY_MANAGER', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL'];
   const esMarketingFull = u && ROLES_TIENDA_FULL.includes(u.rol);
 
-  // --- LÓGICA PARA PERMISOS DE FLOTILLA ---
-  // Ahora limitamos la administración pesada a Gerencia y Encargado de Flotilla
   const ROLES_ADMIN_FLOTILLA = ['ENCARGADO_FLOTILLA', 'GERENTE_GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL', 'GERENTE_MKT'];
   const esEncargadoFlotilla = u && ROLES_ADMIN_FLOTILLA.includes(u.rol);
 
@@ -227,7 +231,7 @@ export default function Home() {
       />
       
       <div className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
-         {!isLikeStore && !isTecnicoMovil && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('vehiculos_', 'Flotilla: ').replace('almacen_operativo', 'Logística').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
+         {!isLikeStore && !isTecnicoMovil && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('vehiculos_', 'Flotilla: ').replace('almacen_operativo', 'Almacén General').replace('almacen_activos', 'Activos Fijos').replace('almacen_logistica', 'Logística y Pedidos').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
          
          <main className={mainContainerClasses}>
             {activeModule === 'marketing_dashboard' && (
@@ -258,15 +262,24 @@ export default function Home() {
                 </div>
             )}
             
-          {activeModule === 'almacen_operativo' && verLogistica && (
+            {/* --- RUTAS DEL ERP DE ALMACÉN --- */}
+            {activeModule === 'almacen_operativo' && verAlmacen && (
                 <div className="animate-slide-up h-full pb-10">
-                    <InventarioOperativo 
-                        useData={inventarioOps} 
-                        usuarioActivo={u} 
-                        colaboradores={colaboradoresReales} 
-                    />
+                    <InventarioOperativo useData={inventarioOps} usuarioActivo={u} colaboradores={colaboradoresReales} />
                 </div>
             )}
+            {activeModule === 'almacen_activos' && verAlmacen && (
+                <div className="animate-slide-up h-full pb-10">
+                    <ActivosFijos useData={inventarioOps} usuarioActivo={u} colaboradores={colaboradoresReales} />
+                </div>
+            )}
+            {activeModule === 'almacen_logistica' && (
+                <div className="animate-slide-up h-full pb-10">
+                    <ModuloLogistica useData={inventarioOps} usuarioActivo={u} colaboradores={colaboradoresReales} />
+                </div>
+            )}
+
+
             {activeModule.startsWith('rrhh_') && verRRHH && <div className="animate-slide-up h-full pb-10"><PanelRRHH usuario={u} colaboradores={colaboradoresReales} moduloActivo={activeModule} /></div>}
 
             {activeModule === 'marketing_colaboradores' && verColaboradores && (
@@ -275,13 +288,10 @@ export default function Home() {
                 </div>
             )}
 
-           {/* --- SECCIÓN: FLOTILLA VEHICULAR --- */}
+            {/* --- RUTAS DE FLOTILLA VEHICULAR --- */}
             {activeModule === 'vehiculos_panel' && (
                 <div className="animate-slide-up h-full pb-10">
-                    <PanelVehiculos 
-                        usuarioActivo={u} 
-                        colaboradores={colaboradoresReales} 
-                    />
+                    <PanelVehiculos usuarioActivo={u} colaboradores={colaboradoresReales} />
                 </div>
             )}
             
@@ -297,15 +307,9 @@ export default function Home() {
                 </div>
             )}
 
-            {/* AHORA SÍ, CARGAMOS EL MÓDULO REAL DE SOLICITUDES */}
             {activeModule === 'vehiculos_solicitudes' && (
                 <div className="animate-slide-up h-full pb-10">
-                    <ModuloSolicitudesVehiculos 
-                        usuarioActivo={u}
-                        esEncargado={esEncargadoFlotilla}
-                        colaboradores={colaboradoresReales}
-                        vehiculos={vehiculosData.vehiculos}
-                    />
+                    <ModuloSolicitudesVehiculos usuarioActivo={u} esEncargado={esEncargadoFlotilla} colaboradores={colaboradoresReales} vehiculos={vehiculosData.vehiculos} />
                 </div>
             )}
 
