@@ -3,8 +3,12 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { MdSearch, MdAdd, MdClose, MdInventory2, MdWarning, MdFilterList, MdHistory, MdArrowUpward, MdArrowDownward, MdAddShoppingCart, MdShoppingCart } from "react-icons/md";
-import ModalDespacho from './ModalDespacho'; // IMPORTAMOS EL PUNTO DE VENTA
+import { MdSearch, MdAdd, MdFilterList, MdHistory, MdAddShoppingCart, MdShoppingCart, MdPointOfSale } from "react-icons/md";
+
+// IMPORTACIÓN DE MÓDULOS SEPARADOS (ARQUITECTURA LIMPIA)
+import ModalDespacho from './ModalDespacho'; 
+import ModalHistorialInventario from './ModalHistorialInventario';
+import ModalAltaProducto from './ModalAltaProducto';
 
 const MARCAS_DISPONIBLES = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
 const REGIONES_DISPONIBLES = ['Almacén General', 'Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
@@ -30,13 +34,12 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
     const [regionesExpandidas, setRegionesExpandidas] = useState(false);
     const [filasExpandidas, setFilasExpandidas] = useState({});
     
-    // ESTADOS PARA MODALES Y CARRITO (PUNTO DE VENTA)
+    // ESTADOS PARA MODALES EXTERNOS
     const [modalAbierto, setModalAbierto] = useState(false); 
     const [modalHistorial, setModalHistorial] = useState(false); 
     const [modalDespachoAbierto, setModalDespachoAbierto] = useState(false);
-    const [carrito, setCarrito] = useState([]);
     
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [carrito, setCarrito] = useState([]);
 
     const toggleFila = (id) => setFilasExpandidas(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -57,11 +60,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
         window.addEventListener('resize', checkScroll);
         return () => window.removeEventListener('resize', checkScroll);
     }, [regionesExpandidas]);
-
-    const [nuevoProd, setNuevoProd] = useState({
-        nombre: '', categoria: CATEGORIAS_DISPONIBLES[0], minimo: 10, unidad: 'pza',
-        marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL' 
-    });
 
     const leftGroup = ['Todos', 'General'];
     const midGroup = REGIONES_DISPONIBLES.filter(r => r !== 'Almacén General'); 
@@ -115,17 +113,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
         };
     }).filter(item => item.visible);
 
-    const handleGuardarProductoBase = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        await agregarProducto(nuevoProd);
-        setIsSubmitting(false);
-        setModalAbierto(false);
-        setNuevoProd({ nombre: '', categoria: CATEGORIAS_DISPONIBLES[0], minimo: 10, unidad: 'pza', marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL' });
-        alert("Producto Base agregado al catálogo exitosamente.");
-    };
-
-    // --- LÓGICA DE AÑADIR AL CARRITO (PUNTO DE VENTA) ---
     const handleAgregarCarrito = (productoFisico) => {
         if (productoFisico.stock <= 0) return alert("No hay stock disponible.");
         setCarrito(prev => {
@@ -141,7 +128,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
         });
     };
 
-    // --- PREPARAR HISTORIAL ---
     const movimientosEnriquecidos = movimientos.map(m => {
         const prod = inventario.find(i => i.id === m.producto_id);
         return { ...m, producto: prod };
@@ -177,7 +163,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                 .fade-edges { mask-image: linear-gradient(to right, transparent, black 15px, black calc(100% - 15px), transparent); }
             `}</style>
 
-            {/* BOTÓN FLOTANTE DEL CARRITO (PUNTO DE VENTA) */}
             {carrito.length > 0 && (
                 <button 
                     onClick={() => setModalDespachoAbierto(true)}
@@ -304,12 +289,18 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                         )}
                     </div>
 
-                    <div className="flex w-full md:w-auto gap-3">
+                    <div className="flex w-full md:w-auto gap-2">
                         <button onClick={() => setModalHistorial(true)} className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-black text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 shrink-0">
                             <MdHistory className="text-lg"/> Historial
                         </button>
+
+                        {/* EL NUEVO BOTÓN PARA ABRIR DIRECTO EL POS */}
+                        <button onClick={() => setModalDespachoAbierto(true)} className="px-5 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-full font-black text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 shrink-0">
+                            <MdPointOfSale className="text-lg"/> Despachar
+                        </button>
+
                         {esAdminGeneral && (
-                            <button onClick={() => setModalAbierto(true)} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-black text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 shrink-0">
+                            <button onClick={() => setModalAbierto(true)} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-black text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 shrink-0">
                                 <MdAdd className="text-lg"/> Producto base
                             </button>
                         )}
@@ -317,7 +308,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                 </div>
             </div>
             
-            {/* TABLA DE CATÁLOGO */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                 {cargando ? (
                     <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div></div>
@@ -379,8 +369,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs font-black text-blue-700 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">{d.stock} {d.unidad}</span>
-                                                                
-                                                                {/* BOTÓN DE AÑADIR AL CARRITO (PUNTO DE VENTA) */}
                                                                 <button onClick={() => handleAgregarCarrito(d)} className="w-6 h-6 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-full flex items-center justify-center transition-colors shadow-sm opacity-100 md:opacity-0 group-hover:opacity-100" title="Añadir al Carrito">
                                                                     <MdAddShoppingCart className="text-sm"/>
                                                                 </button>
@@ -398,105 +386,14 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                 )}
             </div>
 
-            {/* MODAL 1: ALTA DE PRODUCTO BASE */}
-            {modalAbierto && (
-                <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <form onSubmit={handleGuardarProductoBase} className="bg-white rounded-[2rem] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-                            <div>
-                                <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdInventory2 className="text-blue-600"/> Nuevo Producto Base</h3>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 tracking-widest">Crear plantilla para futuras compras</p>
-                            </div>
-                            <button type="button" onClick={() => setModalAbierto(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div className="sm:col-span-2">
-                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Nombre genérico del Artículo *</label>
-                                    <input required type="text" value={nuevoProd.nombre} onChange={e => setNuevoProd({...nuevoProd, nombre: e.target.value})} placeholder="Ej. Cable Fibra Drop 1 Hilo (Sin marca)" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Categoría Principal *</label>
-                                    <select required value={nuevoProd.categoria} onChange={e => setNuevoProd({...nuevoProd, categoria: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500">
-                                        {CATEGORIAS_DISPONIBLES.map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1 flex items-center gap-1"><MdWarning className="text-red-400"/> Alerta de Stock Mínimo *</label>
-                                    <input required type="number" min="0" value={nuevoProd.minimo} onChange={e => setNuevoProd({...nuevoProd, minimo: parseInt(e.target.value)})} className="w-full bg-white border-2 border-red-100 rounded-xl px-4 py-3 text-sm font-black text-red-600 outline-none focus:border-red-400 text-center shadow-inner" />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Unidad de Medida *</label>
-                                    <select required value={nuevoProd.unidad} onChange={e => setNuevoProd({...nuevoProd, unidad: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500">
-                                        <option value="pza">Piezas (pza)</option><option value="mts">Metros (mts)</option><option value="caja">Cajas</option><option value="rollo">Rollos</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex gap-3 shrink-0">
-                            <button type="button" onClick={() => setModalAbierto(false)} disabled={isSubmitting} className="flex-1 bg-white border border-gray-200 text-gray-600 font-black py-4 rounded-xl">Cancelar</button>
-                            <button type="submit" disabled={isSubmitting} className="flex-1 bg-blue-600 text-white font-black py-4 rounded-xl">Crear Producto Base</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* MODAL 2: HISTORIAL DE MOVIMIENTOS */}
-            {modalHistorial && (
-                <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-slide-up">
-                        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
-                            <div>
-                                <h3 className="text-lg font-black text-gray-800 flex items-center gap-2"><MdHistory className="text-blue-600"/> Historial de Entradas y Salidas</h3>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Registro auditable de movimientos de stock</p>
-                            </div>
-                            <button type="button" onClick={() => setModalHistorial(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 shadow-sm transition-colors"><MdClose className="text-xl"/></button>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                            {movimientosEnriquecidos.length === 0 ? (
-                                <div className="text-center py-20 text-gray-400 font-bold">Aún no hay movimientos registrados en tu jurisdicción.</div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {movimientosEnriquecidos.map(mov => (
-                                        <div key={mov.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-md transition-shadow gap-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mov.tipo === 'ENTRADA' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                                    {mov.tipo === 'ENTRADA' ? <MdArrowDownward className="text-xl"/> : <MdArrowUpward className="text-xl"/>}
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs font-black text-gray-800">{mov.producto.nombre}</p>
-                                                    <p className="text-[10px] font-bold text-gray-500">{mov.producto.marca} • {mov.producto.almacen}</p>
-                                                    <p className="text-[9px] font-black text-gray-400 mt-1">RESPONSABLE: {mov.usuario || 'Sistema'}</p>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="text-left md:text-right w-full md:w-auto border-t md:border-t-0 border-gray-100 pt-3 md:pt-0">
-                                                <p className={`text-sm font-black ${mov.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {mov.tipo === 'ENTRADA' ? '+' : '-'}{mov.cantidad} unidades
-                                                </p>
-                                                <p className="text-[10px] font-bold text-gray-500 mt-1 max-w-[200px] truncate">{mov.motivo}</p>
-                                                <p className="text-[8px] font-black text-gray-400 uppercase mt-1 tracking-widest">{new Date(mov.fecha).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL 3: EL PUNTO DE VENTA (Despacho Rápido) */}
+            {/* MODALES IMPORTADOS */}
+            <ModalAltaProducto isOpen={modalAbierto} onClose={() => setModalAbierto(false)} agregarProducto={agregarProducto} />
+            <ModalHistorialInventario isOpen={modalHistorial} onClose={() => setModalHistorial(false)} movimientosEnriquecidos={movimientosEnriquecidos} />
+            
             <ModalDespacho 
-                isOpen={modalDespachoAbierto} 
-                onClose={() => setModalDespachoAbierto(false)} 
-                useData={useData} 
-                usuarioActivo={usuarioActivo} 
-                colaboradores={colaboradores} 
-                carrito={carrito} 
-                setCarrito={setCarrito} 
+                isOpen={modalDespachoAbierto} onClose={() => setModalDespachoAbierto(false)} 
+                useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} 
+                carrito={carrito} setCarrito={setCarrito} 
             />
         </div>
     );
