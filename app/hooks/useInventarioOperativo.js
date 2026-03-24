@@ -13,16 +13,19 @@ export function useInventarioOperativo() {
   const [activos, setActivos] = useState([]); 
   const [cargando, setCargando] = useState(true);
 
+  // INYECCIÓN DE CÓDIGO DE BARRAS EN MAPERS
   const mapInvFromDB = (db) => ({
     id: db.id, nombre: db.nombre, almacen: db.almacen, 
     categoria: db.categoria, stock: db.stock, minimo: db.minimo, unidad: db.unidad,
-    marca: db.marca || 'General', region: db.region || 'N/A'
+    marca: db.marca || 'General', region: db.region || 'N/A',
+    codigoBarras: db.codigo_barras || ''
   });
 
   const mapInvToDB = (inv) => ({
     id: inv.id, nombre: inv.nombre, almacen: inv.almacen, 
     categoria: inv.categoria, stock: inv.stock, minimo: inv.minimo, unidad: inv.unidad,
-    marca: inv.marca || 'General', region: inv.region || 'N/A'
+    marca: inv.marca || 'General', region: inv.region || 'N/A',
+    codigo_barras: inv.codigoBarras || null
   });
 
   const fetchData = async () => {
@@ -86,6 +89,7 @@ export function useInventarioOperativo() {
               if(prodFisico) {
                   await registrarMovimiento(prodFisico.id, p.cantidad, 'ENTRADA', `Compra Fac: ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
               } else {
+                  // Al clonar la plantilla con el spread operator (...baseProd), el codigoBarras se copia automáticamente
                   const nuevoFisico = { ...baseProd, id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`, marca: marcaSegura, almacen: almacenSeguro, region: regionSegura, stock: parseInt(p.cantidad, 10) };
                   await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
                   const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: nuevoFisico.stock, tipo: 'ENTRADA', motivo: `Alta Compra Fac: ${compraPayload.proveedor}`, usuario: compraPayload.usuario_registro_id };

@@ -3,15 +3,18 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react';
-import { MdClose, MdInventory2, MdWarning } from "react-icons/md";
+import { MdClose, MdInventory2, MdWarning, MdQrCodeScanner } from "react-icons/md";
 
 const CATEGORIAS_DISPONIBLES = ['FIBRA ÓPTICA', 'ENLACE / ANTENA', 'CCTV', 'CABLEADO', 'HERRAJES', 'REDES', 'EQUIPO', 'HERRAMIENTA', 'PAPELERIA', 'LIMPIEZA'];
 
 export default function ModalAltaProducto({ isOpen, onClose, agregarProducto }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // INYECCIÓN: Agregamos codigoBarras al estado inicial
     const [nuevoProd, setNuevoProd] = useState({
         nombre: '', categoria: CATEGORIAS_DISPONIBLES[0], minimo: 10, unidad: 'pza',
-        marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL' 
+        marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL',
+        codigoBarras: '' 
     });
 
     if (!isOpen) return null;
@@ -21,7 +24,7 @@ export default function ModalAltaProducto({ isOpen, onClose, agregarProducto }) 
         setIsSubmitting(true);
         await agregarProducto(nuevoProd);
         setIsSubmitting(false);
-        setNuevoProd({ nombre: '', categoria: CATEGORIAS_DISPONIBLES[0], minimo: 10, unidad: 'pza', marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL' });
+        setNuevoProd({ nombre: '', categoria: CATEGORIAS_DISPONIBLES[0], minimo: 10, unidad: 'pza', marca: 'MULTI-MARCA', almacen: 'CATALOGO_BASE', region: 'GENERAL', codigoBarras: '' });
         alert("Producto Base agregado al catálogo exitosamente.");
         onClose();
     };
@@ -39,6 +42,19 @@ export default function ModalAltaProducto({ isOpen, onClose, agregarProducto }) 
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        
+                        {/* NUEVO CAMPO: Lector de Código de Barras */}
+                        <div className="sm:col-span-2 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                            <label className="block text-[10px] font-black text-blue-600 uppercase mb-2 ml-1 flex items-center gap-1"><MdQrCodeScanner className="text-lg"/> Código de Barras (Opcional)</label>
+                            <input 
+                                type="text" 
+                                value={nuevoProd.codigoBarras} 
+                                onChange={e => setNuevoProd({...nuevoProd, codigoBarras: e.target.value})} 
+                                placeholder="Escanea el código UPC/EAN aquí..." 
+                                className="w-full bg-white border border-blue-200 rounded-lg px-4 py-3 text-sm font-mono font-bold text-gray-800 outline-none focus:border-blue-500 shadow-sm" 
+                            />
+                        </div>
+
                         <div className="sm:col-span-2">
                             <label className="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1">Nombre genérico del Artículo *</label>
                             <input required type="text" value={nuevoProd.nombre} onChange={e => setNuevoProd({...nuevoProd, nombre: e.target.value})} placeholder="Ej. Cable Fibra Drop 1 Hilo (Sin marca)" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500" />
