@@ -1,96 +1,160 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/operaciones/InventarioOperativo.tsx                */
+/* ARCHIVO: app/hooks/useInventarioOperativo.js (WMS MULTI-SUCURSAL)          */
 /* -------------------------------------------------------------------------- */
 'use client';
-import { useState } from 'react';
-import { MdInventory2, MdList, MdShoppingCart, MdLocalShipping, MdAddBox, MdComputer } from "react-icons/md";
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase'; 
 
-import CatalogoProductos from './almacen/CatalogoProductos';
-import RegistroCompras from './almacen/RegistroCompras';
-import MesaLogistica from './almacen/MesaLogistica';
-import PortalSolicitudes from './almacen/PortalSolicitudes';
-import ActivosFijos from './almacen/ActivosFijos';
+export function useInventarioOperativo() {
+  const [inventario, setInventario] = useState([]);
+  const [movimientos, setMovimientos] = useState([]);
+  const [compras, setCompras] = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
+  const [activos, setActivos] = useState([]); 
+  const [cargando, setCargando] = useState(true);
 
-export default function InventarioOperativo({ useData, usuarioActivo, colaboradores = [] }) {
-    
-    // Obtenemos el rol o puesto
-    const rolUsuario = usuarioActivo?.rol || usuarioActivo?.puesto || '';
+  const mapInvFromDB = (db) => ({
+    id: db.id, nombre: db.nombre, almacen: db.almacen, 
+    categoria: db.categoria, stock: db.stock, minimo: db.minimo, unidad: db.unidad,
+    marca: db.marca || 'General', region: db.region || 'N/A'
+  });
 
-    // --- MATRIZ A PRUEBA DE BALAS (Acepta Formato Antiguo y Formato RRHH) ---
-    const ROLES_ADMIN_GENERAL = [
-        'ENCARGADO_ALMACEN', 'Encargado de almacén', 
-        'GERENTE_GENERAL', 'Gerente General', 
-        'DIRECTOR', 'Director', 
-        'SOPORTE_GENERAL', 'Soporte General'
-    ];
-    
-    // Administradores Regionales + Dioses Generales
-    const ROLES_ADMIN_ALMACEN = [
-        ...ROLES_ADMIN_GENERAL, 
-        'GERENTE_MKT', 'Gerente Marketing', 
-        'ADMINISTRADOR', 'Administrador'
-    ];
+  const mapInvToDB = (inv) => ({
+    id: inv.id, nombre: inv.nombre, almacen: inv.almacen, 
+    categoria: inv.categoria, stock: inv.stock, minimo: inv.minimo, unidad: inv.unidad,
+    marca: inv.marca || 'General', region: inv.region || 'N/A'
+  });
 
-    const esEncargado = rolUsuario && ROLES_ADMIN_ALMACEN.includes(rolUsuario);
-    const esAdminGeneral = rolUsuario && ROLES_ADMIN_GENERAL.includes(rolUsuario);
-    
-    const [vistaActiva, setVistaActiva] = useState(esEncargado ? 'catalogo' : 'portal');
+  const fetchData = async () => {
+    setCargando(true);
+    try {
+        const { data: dInv } = await supabase.from('inventario_operativo').select('*').order('nombre', { ascending: true });
+        if (dInv) setInventario(dInv.map(mapInvFromDB));
 
-    let tituloPrincipal = 'Materiales y Herramientas';
-    if (esAdminGeneral) {
-        tituloPrincipal = 'Centro de Logística y Almacén General';
-    } else if (esEncargado) {
-        const miRegionOMarca = (usuarioActivo?.region && usuarioActivo.region !== 'N/A') ? usuarioActivo.region : (usuarioActivo?.marca && usuarioActivo.marca !== 'N/A' ? usuarioActivo.marca : 'Regional');
-        tituloPrincipal = `Centro de Logística y Almacén ${miRegionOMarca}`;
-    }
+        const { data: dMov } = await supabase.from('inventario_movimientos').select('*').order('created_at', { ascending: false });
+        if (dMov) setMovimientos(dMov);
 
-    return (
-        <div className="h-full flex flex-col animate-fade-in pb-2">
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 shrink-0 z-10">
-                <div>
-                    <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
-                        <MdInventory2 className="text-blue-600"/> 
-                        {tituloPrincipal}
-                    </h2>
-                    <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">
-                        {esEncargado ? 'Warehouse Management System (WMS)' : 'Solicita insumos para tus actividades'}
-                    </p>
-                </div>
+        const { data: dCom } = await supabase.from('inventario_compras').select('*').order('fecha_compra', { ascending: false });
+        if (dCom) setCompras(dCom);
 
-                <div className="flex flex-wrap bg-gray-50 p-1.5 rounded-2xl border border-gray-200/50 w-full xl:w-auto">
-                    {!esEncargado ? (
-                        <button onClick={() => setVistaActiva('portal')} className={`flex-1 xl:flex-none px-5 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-2 transition-all ${vistaActiva === 'portal' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                            <MdAddBox className="text-lg"/> Mis Pedidos
-                        </button>
-                    ) : (
-                        <>
-                            <button onClick={() => setVistaActiva('catalogo')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'catalogo' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <MdList className="text-lg"/> Catálogo
-                            </button>
-                            <button onClick={() => setVistaActiva('compras')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'compras' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <MdShoppingCart className="text-lg"/> Compras
-                            </button>
-                            <button onClick={() => setVistaActiva('activos')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'activos' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <MdComputer className="text-lg"/> Activos Fijos
-                            </button>
-                            <button onClick={() => setVistaActiva('logistica')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'logistica' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <MdLocalShipping className="text-lg"/> Logística
-                            </button>
-                            <button onClick={() => setVistaActiva('portal')} className={`flex-1 xl:flex-none px-4 py-2.5 rounded-xl text-[11px] font-black uppercase flex justify-center items-center gap-1.5 transition-all ${vistaActiva === 'portal' ? 'bg-white text-blue-600 shadow-sm border border-blue-100' : 'text-gray-500 hover:text-gray-700'}`}>
-                                Portal
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
+        const { data: dSol } = await supabase.from('inventario_solicitudes').select('*, detalles:inventario_solicitudes_detalle(*)').order('fecha_solicitud', { ascending: false });
+        if (dSol) setSolicitudes(dSol);
 
-            <div className="flex-1 min-h-0 mt-6 relative">
-                {vistaActiva === 'catalogo' && <CatalogoProductos useData={useData} usuarioActivo={usuarioActivo} />}
-                {vistaActiva === 'compras' && <RegistroCompras useData={useData} usuarioActivo={usuarioActivo} />}
-                {vistaActiva === 'activos' && <ActivosFijos useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} />}
-                {vistaActiva === 'logistica' && <MesaLogistica useData={useData} colaboradores={colaboradores} usuarioActivo={usuarioActivo} />}
-                {vistaActiva === 'portal' && <PortalSolicitudes useData={useData} usuarioActivo={usuarioActivo} />}
-            </div>
-        </div>
-    );
+        const { data: dAct } = await supabase.from('inventario_activos').select('*').order('fecha_asignacion', { ascending: false });
+        if (dAct) setActivos(dAct);
+    } catch (error) { console.error("Error WMS:", error); } finally { setCargando(false); }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const registrarMovimiento = async (productoId, cantidad, tipo, motivo, usuario) => {
+    const productoActual = inventario.find(p => p.id === productoId);
+    if (!productoActual) return;
+    const cantNum = parseInt(cantidad, 10);
+    const nuevoStock = tipo === 'ENTRADA' ? productoActual.stock + cantNum : Math.max(0, productoActual.stock - cantNum);
+
+    setInventario(prev => prev.map(p => p.id === productoId ? { ...p, stock: nuevoStock } : p));
+    const nuevoMovimiento = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: productoId, cantidad: cantNum, tipo, motivo, usuario };
+
+    await Promise.all([
+        supabase.from('inventario_operativo').update({ stock: nuevoStock }).eq('id', productoId),
+        supabase.from('inventario_movimientos').insert([nuevoMovimiento])
+    ]);
+  };
+
+  const agregarProducto = async (nuevoProd) => {
+      const prod = { ...nuevoProd, id: `INV-${Date.now()}`, stock: 0 };
+      setInventario(prev => [...prev, prod]);
+      await supabase.from('inventario_operativo').insert([mapInvToDB(prod)]);
+  };
+
+  const registrarCompra = async (compraPayload, productosComprados) => {
+      try {
+          const { error } = await supabase.from('inventario_compras').insert([compraPayload]);
+          if(error) return { success: false, error: error.message };
+
+          for(const p of productosComprados) {
+              const baseProd = inventario.find(inv => inv.id === p.productoBaseId);
+              if(!baseProd) continue;
+
+              const marcaSegura = p.marca || 'JAVAK (Corporativo)';
+              const regionSegura = p.region || 'Almacén General';
+              const almacenSeguro = regionSegura.toUpperCase();
+
+              const prodFisico = inventario.find(inv => inv.nombre === baseProd.nombre && inv.marca === marcaSegura && (inv.almacen === almacenSeguro || inv.region === regionSegura));
+              
+              if(prodFisico) {
+                  await registrarMovimiento(prodFisico.id, p.cantidad, 'ENTRADA', `Compra Fac: ${compraPayload.proveedor}`, compraPayload.usuario_registro_id);
+              } else {
+                  const nuevoFisico = { ...baseProd, id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`, marca: marcaSegura, almacen: almacenSeguro, region: regionSegura, stock: parseInt(p.cantidad, 10) };
+                  await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
+                  const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: nuevoFisico.stock, tipo: 'ENTRADA', motivo: `Alta Compra Fac: ${compraPayload.proveedor}`, usuario: compraPayload.usuario_registro_id };
+                  await supabase.from('inventario_movimientos').insert([mov]);
+              }
+          }
+          fetchData();
+          return { success: true };
+      } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  const crearSolicitud = async (solicitudPayload, detalles) => {
+      const { data, error } = await supabase.from('inventario_solicitudes').insert([solicitudPayload]).select();
+      if(error) return { success: false, error };
+      const detallesConId = detalles.map(d => ({ ...d, solicitud_id: data[0].id }));
+      await supabase.from('inventario_solicitudes_detalle').insert(detallesConId);
+      fetchData();
+      return { success: true };
+  };
+
+  const actualizarEstadoSolicitud = async (id, estado, comentarios_admin) => {
+      const updateData = { estado, comentarios_admin };
+      if(estado === 'ENTREGADO') updateData.fecha_entrega = new Date().toISOString();
+      const { error } = await supabase.from('inventario_solicitudes').update(updateData).eq('id', id);
+      
+      if(!error && estado === 'EN_ENVIO') {
+          // MOTOR CORRECTO DE DESPACHO DESDE ALMACÉN GENERAL
+          const sol = solicitudes.find(s => s.id === id);
+          if (sol && sol.detalles) {
+              for (const det of sol.detalles) {
+                  const str = det.producto_id;
+                  const lastParen = str.lastIndexOf(' (');
+                  const pNombre = lastParen !== -1 ? str.substring(0, lastParen).trim() : str.trim();
+                  
+                  const origenes = inventario.filter(p => p.nombre === pNombre && (p.region === 'Almacén General' || p.almacen === 'ALMACÉN GENERAL' || p.almacen === 'ALMACEN GENERAL') && p.stock > 0);
+                  
+                  let cantidadPendiente = parseInt(det.cantidad_solicitada, 10);
+                  const destinoLimpio = sol.destino;
+
+                  for (const origen of origenes) {
+                      if (cantidadPendiente <= 0) break;
+                      const cantidadATomar = Math.min(origen.stock, cantidadPendiente);
+
+                      await registrarMovimiento(origen.id, cantidadATomar, 'SALIDA', `Despacho a ${sol.destino} (Req: ${sol.id.substring(0,6)})`, 'SISTEMA_LOGISTICA');
+                      
+                      const destino = inventario.find(p => p.nombre === pNombre && p.marca === origen.marca && (p.region === destinoLimpio || p.almacen === destinoLimpio.toUpperCase()));
+                      
+                      if (destino) {
+                          await registrarMovimiento(destino.id, cantidadATomar, 'ENTRADA', `Transf. de Almacén Gral (Req: ${sol.id.substring(0,6)})`, 'SISTEMA_LOGISTICA');
+                      } else {
+                          const nuevoFisico = { ...origen, id: `INV-${Date.now()}-${Math.floor(Math.random()*1000)}`, almacen: destinoLimpio.toUpperCase(), region: destinoLimpio, stock: cantidadATomar };
+                          await supabase.from('inventario_operativo').insert([mapInvToDB(nuevoFisico)]);
+                          const mov = { id: `MOV-${Date.now()}`, fecha: new Date().toISOString(), producto_id: nuevoFisico.id, cantidad: cantidadATomar, tipo: 'ENTRADA', motivo: `Transf. Inicial Gral (Req: ${sol.id.substring(0,6)})`, usuario: 'SISTEMA_LOGISTICA' };
+                          await supabase.from('inventario_movimientos').insert([mov]);
+                      }
+                      cantidadPendiente -= cantidadATomar;
+                  }
+              }
+          }
+          fetchData();
+      }
+      return { success: !error, error };
+  };
+
+  const agregarActivoFijo = async (activo) => {
+      const { error } = await supabase.from('inventario_activos').insert([activo]);
+      if(!error) fetchData();
+      return { success: !error };
+  };
+
+  return { inventario, movimientos, compras, solicitudes, activos, cargando, registrarMovimiento, agregarProducto, registrarCompra, crearSolicitud, actualizarEstadoSolicitud, agregarActivoFijo, refetch: fetchData };
 }
