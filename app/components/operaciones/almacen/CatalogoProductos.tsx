@@ -5,9 +5,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MdSearch, MdAdd, MdFilterList, MdHistory, MdAddShoppingCart, MdShoppingCart, MdPointOfSale } from "react-icons/md";
 
-// IMPORTACIÓN DE MÓDULOS SEPARADOS (ARQUITECTURA LIMPIA)
 import ModalDespacho from './ModalDespacho'; 
-import ModalHistorialInventario from './ModalHistorialInventario';
+import ModalHistorialGlobal from './ModalHistorialGlobal'; // IMPORTACIÓN DEL NUEVO HISTORIAL
 import ModalAltaProducto from './ModalAltaProducto';
 
 const MARCAS_DISPONIBLES = ['JAVAK (Corporativo)', 'DMG NET', 'Intercheap', 'Fibrox MX', 'RK', 'WifiCel', 'Fundación Frenxo'];
@@ -15,9 +14,8 @@ const REGIONES_DISPONIBLES = ['Almacén General', 'Centro', 'Comonfort', 'Tlalpu
 const CATEGORIAS_DISPONIBLES = ['FIBRA ÓPTICA', 'ENLACE / ANTENA', 'CCTV', 'CABLEADO', 'HERRAJES', 'REDES', 'EQUIPO', 'HERRAMIENTA', 'PAPELERIA', 'LIMPIEZA'];
 
 export default function CatalogoProductos({ useData, usuarioActivo, colaboradores = [] }) {
-    const { inventario, agregarProducto, movimientos, cargando } = useData;
+    const { inventario, agregarProducto, cargando } = useData;
     
-    // --- LÓGICA DE PERMISOS (RBAC) ---
     const rolNormalizado = (usuarioActivo?.rol || usuarioActivo?.puesto || '').toUpperCase().trim();
     const ROLES_ADMIN_GENERAL = ['ENCARGADO_ALMACEN', 'ENCARGADO DE ALMACÉN', 'ENCARGADO DE ALMACEN', 'GERENTE_GENERAL', 'GERENTE GENERAL', 'DIRECTOR', 'SOPORTE_GENERAL'];
     const esAdminGeneral = rolNormalizado !== '' && ROLES_ADMIN_GENERAL.includes(rolNormalizado);
@@ -34,11 +32,9 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
     const [regionesExpandidas, setRegionesExpandidas] = useState(false);
     const [filasExpandidas, setFilasExpandidas] = useState({});
     
-    // ESTADOS PARA MODALES EXTERNOS
     const [modalAbierto, setModalAbierto] = useState(false); 
     const [modalHistorial, setModalHistorial] = useState(false); 
     const [modalDespachoAbierto, setModalDespachoAbierto] = useState(false);
-    
     const [carrito, setCarrito] = useState([]);
 
     const toggleFila = (id) => setFilasExpandidas(prev => ({ ...prev, [id]: !prev[id] }));
@@ -128,15 +124,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
         });
     };
 
-    const movimientosEnriquecidos = movimientos.map(m => {
-        const prod = inventario.find(i => i.id === m.producto_id);
-        return { ...m, producto: prod };
-    }).filter(m => {
-        if (!m.producto) return false; 
-        if (esAdminGeneral) return true; 
-        return m.producto.region === miRegion || m.producto.almacen === miRegion.toUpperCase() || m.producto.marca === miMarca || m.producto.almacen === miMarca.toUpperCase();
-    });
-
     const getShortName = (name) => {
         if(name === 'San Diego de la Unión') return 'SDU';
         if(name === 'Santa María del Río') return 'SMR';
@@ -194,9 +181,16 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                         </select>
                     </div>
 
-                    <div className="relative w-full md:w-80">
-                        <MdSearch className="absolute left-4 top-2.5 text-gray-400 text-lg" />
-                        <input type="text" placeholder="Buscar producto..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full bg-white border border-gray-200 rounded-full pl-11 pr-4 py-2.5 text-xs font-bold text-gray-800 outline-none focus:border-blue-500 shadow-sm" />
+                    <div className="flex w-full md:w-auto gap-3 items-center">
+                        <div className="relative flex-1 md:w-80">
+                            <MdSearch className="absolute left-4 top-2.5 text-gray-400 text-lg" />
+                            <input type="text" placeholder="Buscar producto..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full bg-white border border-gray-200 rounded-full pl-11 pr-4 py-2.5 text-xs font-bold text-gray-800 outline-none focus:border-blue-500 shadow-sm" />
+                        </div>
+                        
+                        {/* BOTÓN DE HISTORIAL MOVIDO JUNTO AL BUSCADOR */}
+                        <button onClick={() => setModalHistorial(true)} className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-black text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 shrink-0">
+                            <MdHistory className="text-lg"/> Historial
+                        </button>
                     </div>
                 </div>
 
@@ -290,11 +284,6 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                     </div>
 
                     <div className="flex w-full md:w-auto gap-2">
-                        <button onClick={() => setModalHistorial(true)} className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-black text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 shrink-0">
-                            <MdHistory className="text-lg"/> Historial
-                        </button>
-
-                        {/* EL NUEVO BOTÓN PARA ABRIR DIRECTO EL POS */}
                         <button onClick={() => setModalDespachoAbierto(true)} className="px-5 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-full font-black text-xs transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 shrink-0">
                             <MdPointOfSale className="text-lg"/> Despachar
                         </button>
@@ -386,15 +375,9 @@ export default function CatalogoProductos({ useData, usuarioActivo, colaboradore
                 )}
             </div>
 
-            {/* MODALES IMPORTADOS */}
             <ModalAltaProducto isOpen={modalAbierto} onClose={() => setModalAbierto(false)} agregarProducto={agregarProducto} />
-            <ModalHistorialInventario isOpen={modalHistorial} onClose={() => setModalHistorial(false)} movimientosEnriquecidos={movimientosEnriquecidos} />
-            
-            <ModalDespacho 
-                isOpen={modalDespachoAbierto} onClose={() => setModalDespachoAbierto(false)} 
-                useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} 
-                carrito={carrito} setCarrito={setCarrito} 
-            />
+            <ModalHistorialGlobal isOpen={modalHistorial} onClose={() => setModalHistorial(false)} useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} contextoInicial="CATALOGO" />
+            <ModalDespacho isOpen={modalDespachoAbierto} onClose={() => setModalDespachoAbierto(false)} useData={useData} usuarioActivo={usuarioActivo} colaboradores={colaboradores} carrito={carrito} setCarrito={setCarrito} />
         </div>
     );
 }
