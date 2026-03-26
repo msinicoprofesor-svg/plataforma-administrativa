@@ -20,7 +20,6 @@ import { tienePermiso } from './config/permisos';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 
-// --- IMPORTS DEL ERP ALMACÉN Y LOGÍSTICA ---
 import InventarioOperativo from './components/operaciones/InventarioOperativo';
 import ActivosFijos from './components/operaciones/almacen/ActivosFijos';
 import ModuloLogistica from './components/operaciones/almacen/ModuloLogistica';
@@ -112,7 +111,6 @@ export default function Home() {
   const verCobertura = tienePermiso(u, 'marketing_cobertura');
   const verMesa = tienePermiso(u, 'marketing_mesa');
   
-  // PERMISOS DE ALMACÉN
   const verAlmacen = tienePermiso(u, 'almacen_operativo');
   
   const verAtencionCliente = true; 
@@ -234,6 +232,8 @@ export default function Home() {
          {!isLikeStore && !isTecnicoMovil && <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title={activeModule.replace('marketing_', '').replace('vehiculos_', 'Flotilla: ').replace('almacen_operativo', 'Almacén General').replace('almacen_activos', 'Activos Fijos').replace('almacen_logistica', 'Logística y Pedidos').replace('rrhh_', '').replace('atencion_cliente', 'Atención al Cliente').replace('atencion_directorio', 'Directorio de Clientes').replace(/_/g, ' ')} />}
          
          <main className={mainContainerClasses}>
+            
+            {/* --- OPERACIONES --- */}
             {activeModule === 'marketing_dashboard' && (
                 <div className="h-full flex flex-col items-center justify-center text-center animate-fade-in">
                    <div className="w-40 h-40 md:w-64 md:h-64 bg-white rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(0,0,0,0.05)] mb-8 animate-pulse"><MdDashboard className="text-6xl md:text-8xl text-gray-200" /></div>
@@ -242,10 +242,12 @@ export default function Home() {
                 </div>
             )}
 
+            {/* --- ATENCIÓN AL CLIENTE --- */}
             {activeModule === 'atencion_cliente' && verAtencionCliente && <div className="animate-slide-up h-full pb-10"><PanelAtencionCliente /></div>}
             {activeModule === 'atencion_directorio' && verAtencionCliente && <div className="animate-slide-up h-full pb-10 pt-4 md:pt-6"><DirectorioClientes /></div>}
             {activeModule === 'tecnico_movil' && verAtencionCliente && <div className="animate-fade-in h-full w-full"><DashboardTecnico tecnicoId={u?.id || "1"} onOpenMenu={() => setSidebarOpen(true)} /></div>}
 
+            {/* --- COMERCIAL Y MARKETING --- */}
             {activeModule === 'marketing_ventas' && verVentas && <div className="animate-slide-up h-full pb-10"><PanelVentas ventas={ventasData.ventas} cobertura={ventasData.cobertura} cupones={ventasData.cupones} validarCupon={ventasData.validarCupon} onRegistrarVenta={ventasData.registrarVenta} vendedorActual={u} /></div>}
             {activeModule === 'marketing_cobertura' && verCobertura && <div className="animate-slide-up h-full pb-10"><Cobertura cobertura={ventasData.cobertura} onAgregarZona={ventasData.agregarZona} onActualizarZona={ventasData.actualizarZona} usuarioActual={u} /></div>}
             {activeModule === 'marketing_mesa' && verMesa && <div className="animate-slide-up h-full pb-10"><MesaControl ventas={ventasData.ventas} cobertura={ventasData.cobertura} onActualizarEstado={ventasData.actualizarEstadoVenta} usuarioActual={u} /></div>}
@@ -254,6 +256,13 @@ export default function Home() {
             {activeModule === 'marketing_estudios' && verEstudios && <div className="animate-slide-up h-full pb-10"><PanelEstudios usuario={u} /></div>}
             {activeModule === 'marketing_social' && verSocial && <div className="animate-slide-up h-full pb-10"><PanelSocial usuario={u} /></div>}
             {activeModule === 'marketing_promociones' && verPromociones && <div className="animate-slide-up h-full pb-10"><PanelMarketing cupones={ventasData.cupones} cobertura={ventasData.cobertura} onAgregarCupon={ventasData.agregarCupon} onEliminarCupon={ventasData.eliminarCupon} /></div>}
+            
+            {activeModule === 'marketing_colaboradores' && verColaboradores && (
+                <div className="animate-slide-up pb-10">
+                    <Directorio colaboradores={colaboradoresVisibles} busqueda={busqueda} setBusqueda={setBusqueda} paginacion={paginacion} onNuevo={() => { setColaboradorEditar(null); setIsViewOnly(false); setIsModalOpen(true); }} onVer={(col) => { setColaboradorEditar(col); setIsViewOnly(true); setIsModalOpen(true); }} onEditar={(col) => { setColaboradorEditar(col); setIsViewOnly(false); setIsModalOpen(true); }} onEliminar={eliminarColaborador} onImportar={importarMasivo} />
+                </div>
+            )}
+            
             {activeModule === 'marketing_importar' && verImportar && <div className="animate-slide-up h-full"><ImportarInteracciones colaboradores={colaboradoresReales} historial={historial} onProcesar={registrarPuntosMasivos} onEliminarHistorial={eliminarImportacion} /></div>}
             
             {activeModule === 'likestore' && verLikeStore && (
@@ -262,7 +271,7 @@ export default function Home() {
                 </div>
             )}
             
-            {/* --- RUTAS DEL ERP DE ALMACÉN --- */}
+            {/* --- ALMACÉN Y LOGÍSTICA --- */}
             {activeModule === 'almacen_operativo' && verAlmacen && (
                 <div className="animate-slide-up h-full pb-10">
                     <InventarioOperativo useData={inventarioOps} usuarioActivo={u} colaboradores={colaboradoresReales} />
@@ -279,16 +288,10 @@ export default function Home() {
                 </div>
             )}
 
-
+            {/* --- RRHH --- */}
             {activeModule.startsWith('rrhh_') && verRRHH && <div className="animate-slide-up h-full pb-10"><PanelRRHH usuario={u} colaboradores={colaboradoresReales} moduloActivo={activeModule} /></div>}
 
-            {activeModule === 'marketing_colaboradores' && verColaboradores && (
-                <div className="animate-slide-up pb-10">
-                    <Directorio colaboradores={colaboradoresVisibles} busqueda={busqueda} setBusqueda={setBusqueda} paginacion={paginacion} onNuevo={() => { setColaboradorEditar(null); setIsViewOnly(false); setIsModalOpen(true); }} onVer={(col) => { setColaboradorEditar(col); setIsViewOnly(true); setIsModalOpen(true); }} onEditar={(col) => { setColaboradorEditar(col); setIsViewOnly(false); setIsModalOpen(true); }} onEliminar={eliminarColaborador} onImportar={importarMasivo} />
-                </div>
-            )}
-
-            {/* --- RUTAS DE FLOTILLA VEHICULAR --- */}
+            {/* --- FLOTILLA VEHICULAR --- */}
             {activeModule === 'vehiculos_panel' && (
                 <div className="animate-slide-up h-full pb-10">
                     <PanelVehiculos usuarioActivo={u} colaboradores={colaboradoresReales} />
