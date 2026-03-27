@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/tecnica/Cobertura.tsx (PREPARADO PARA MAPAS GIS)   */
+/* ARCHIVO: app/components/tecnica/Cobertura.tsx (CON FICHA TÉCNICA GIS)      */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useMemo } from 'react';
@@ -35,12 +35,12 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
 
   const [modalOpen, setModalOpen] = useState(false);
   const [zonaAConfigurar, setZonaAConfigurar] = useState(null);
+  const [zonaDetalles, setZonaDetalles] = useState(null); // <-- ESTADO PARA EL ÚLTIMO PASO
   
   const [costos, setCostos] = useState({ instalacion: '', cambio: '' });
   const [planes, setPlanes] = useState([]); 
   const [nuevoPlan, setNuevoPlan] = useState({ velocidad: '', precio: '' });
 
-  // ESTADOS DEL FORMULARIO DE NUEVA ZONA
   const [tipoTecnologia, setTipoTecnologia] = useState('FIBRA'); 
   const [datosZona, setDatosZona] = useState({ nombreAp: '', sede: 'Centro', marca: 'DMG NET', municipio: '', estado: 'Guanajuato' });
   const [coordenadas, setCoordenadas] = useState({ lat: '', lng: '' });
@@ -49,8 +49,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const [comunidadesAP, setComunidadesAP] = useState([]); 
   const [nuevaComunidad, setNuevaComunidad] = useState('');
 
-  // NUEVO: ESTADO PARA EL EDITOR DE MAPAS
-  const [modoEdicionMapa, setModoEdicionMapa] = useState('ZONA'); // 'ZONA' | 'CAJA'
+  const [modoEdicionMapa, setModoEdicionMapa] = useState('ZONA');
 
   const rol = usuarioActual?.rol || '';
   const esMarketing = ['GERENTE_MKT', 'DIRECTOR', 'ADMINISTRADOR'].includes(rol);
@@ -70,7 +69,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
       });
   }, [cobertura, busqueda, filtroRegion, filtroMarca, filtroTipo]);
 
-  // EL MOTOR DE CLICS EN EL MAPA EDITOR
   const handleMapClick = (latlng) => {
       if (modoEdicionMapa === 'ZONA') {
           setCoordenadas({ lat: latlng.lat.toFixed(6), lng: latlng.lng.toFixed(6) });
@@ -84,7 +82,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
     if (!nuevaCaja.lat || !nuevaCaja.lng) return alert("Haz clic en el mapa para ubicar la caja.");
     setCajasTemporales([...cajasTemporales, { ...nuevaCaja, id: `TEMP-${Date.now()}` }]);
     setNuevaCaja({ nombre: '', calles: '', puertos: 8, lat: '', lng: '' }); 
-    setModoEdicionMapa('ZONA'); // Regresa el mapa a modo zona
+    setModoEdicionMapa('ZONA');
   };
   const eliminarCajaDeLista = (id) => setCajasTemporales(cajasTemporales.filter(c => c.id !== id));
 
@@ -225,7 +223,8 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
 
                                   <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
                                       {esFibra ? <p className="text-[10px] font-bold text-gray-400">{zona.cajas?.length || 0} Cajas NAP • {totalLibres} Puertos Libres</p> : <p className="text-[10px] font-bold text-gray-400">{zona.comunidades?.length || 0} Comunidades Cubiertas</p>}
-                                      <button className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">Ver Detalles</button>
+                                      {/* CONEXIÓN AL MODAL DE DETALLES */}
+                                      <button onClick={() => setZonaDetalles(zona)} className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors shadow-sm cursor-pointer relative z-10">Ver Detalles</button>
                                   </div>
                               </div>
                           );
@@ -263,11 +262,9 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                             <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">Estado</label><input required type="text" placeholder="Ej: Guanajuato" value={datosZona.estado} onChange={(e) => setDatosZona({...datosZona, estado: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-medium text-gray-800" /></div>
                         </div>
 
-                        {/* EL NUEVO EDITOR DE MAPA INCRUSTADO */}
                         <div className="bg-gray-50 p-4 rounded-3xl border border-gray-200 mt-6">
                             <h4 className="text-sm font-extrabold text-gray-800 mb-3 flex items-center gap-2"><MdMap className="text-blue-500"/> Ubicación Geográfica (Clic para ubicar)</h4>
                             
-                            {/* SWITCH DE EDICIÓN PARA FIBRA ÓPTICA */}
                             {tipoTecnologia === 'FIBRA' && (
                                 <div className="flex bg-gray-200/50 p-1 rounded-xl mb-3">
                                     <button type="button" onClick={() => setModoEdicionMapa('ZONA')} className={`flex-1 py-2 text-[10px] uppercase tracking-widest font-black rounded-lg transition-all ${modoEdicionMapa === 'ZONA' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-400'}`}>1. OLT Principal</button>
@@ -288,12 +285,10 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                             </div>
                         </div>
 
-                        {/* COMUNIDADES ANTENA */}
                         {tipoTecnologia === 'ANTENA' && (
                             <div className="bg-orange-50 p-5 rounded-3xl border border-orange-100"><h4 className="text-sm font-extrabold text-orange-800 mb-2 flex items-center gap-2"><MdPlace/> Comunidades Cubiertas</h4><div className="flex gap-2 mb-3"><input type="text" placeholder="Ej: La Soledad" value={nuevaComunidad} onChange={(e) => setNuevaComunidad(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), agregarComunidad())} className="flex-1 px-4 py-2 bg-white rounded-xl text-sm outline-none border border-orange-200" /><button type="button" onClick={agregarComunidad} className="px-4 py-2 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600">Agregar</button></div><div className="flex flex-wrap gap-2">{comunidadesAP.map((com, idx) => (<span key={idx} className="px-3 py-1 bg-white border border-orange-200 text-orange-700 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm">{com} <button type="button" onClick={() => eliminarComunidad(com)} className="text-orange-300 hover:text-red-500"><MdClose/></button></span>))}</div></div>
                         )}
 
-                        {/* FORMULARIO DE CAJAS (Ya no pide coordenadas manuales) */}
                         {tipoTecnologia === 'FIBRA' && (
                             <div className="bg-green-50 p-5 rounded-3xl border border-green-100">
                                 <h4 className="text-sm font-extrabold text-green-800 mb-2 flex items-center gap-2"><MdRouter/> Agregar Caja NAP</h4>
@@ -315,7 +310,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
         </div>
       )}
 
-      {/* --- MODAL CONFIGURACIÓN MARKETING (Se queda igual de hermoso) --- */}
+      {/* --- MODAL CONFIGURACIÓN MARKETING --- */}
       {zonaAConfigurar && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
             <div className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl animate-scale-in max-h-[90vh] flex flex-col">
@@ -354,6 +349,107 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                     <button onClick={guardarConfiguracionMarketing} className="w-full py-4 bg-orange-500 text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-2">
                         <MdCheckCircle className="text-xl" /> Activar Zona
                     </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* --- MODAL DETALLES DE ZONA (ÚLTIMO PASO: FICHA TÉCNICA) --- */}
+      {zonaDetalles && (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="bg-white rounded-[2rem] w-full max-w-5xl shadow-2xl animate-scale-in flex flex-col overflow-hidden max-h-[90vh]">
+                <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><MdMap className="text-blue-500"/> Ficha Técnica de Cobertura</h2>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{zonaDetalles.nombreAp || zonaDetalles.comunidad} • {zonaDetalles.municipio}</p>
+                    </div>
+                    <button onClick={() => setZonaDetalles(null)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 shadow-sm transition-all"><MdClose className="text-xl"/></button>
+                </div>
+                
+                <div className="flex flex-col lg:flex-row flex-1 min-h-0">
+                    {/* COLUMNA IZQUIERDA: DATOS */}
+                    <div className="w-full lg:w-1/3 p-6 overflow-y-auto custom-scrollbar bg-white border-r border-gray-100 space-y-6">
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Información General</p>
+                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                <p className="text-sm font-black text-gray-800">{zonaDetalles.marca}</p>
+                                <p className="text-xs font-bold text-gray-500 mt-1">Sede: {zonaDetalles.sede}</p>
+                                <p className="text-xs font-bold text-gray-500">Tipo: {zonaDetalles.tipo === 'FIBRA' ? 'Fibra Óptica (OLT)' : 'Antena (Torre)'}</p>
+                            </div>
+                        </div>
+
+                        {zonaDetalles.tipo === 'FIBRA' ? (
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Infraestructura (Cajas NAP)</p>
+                                <div className="space-y-2">
+                                    {zonaDetalles.cajas?.map((caja, idx) => (
+                                        <div key={idx} className="bg-purple-50 rounded-xl p-3 border border-purple-100 flex justify-between items-center">
+                                            <div>
+                                                <p className="text-xs font-black text-purple-800">{caja.nombre}</p>
+                                                <p className="text-[9px] font-bold text-purple-600">{caja.calles}</p>
+                                            </div>
+                                            <div className="text-center bg-white px-2 py-1 rounded-lg shadow-sm">
+                                                <p className="text-[10px] font-black text-gray-800">{caja.puertosLibres}</p>
+                                                <p className="text-[8px] font-bold text-gray-400">Libres</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Comunidades Cubiertas</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {zonaDetalles.comunidades?.map((com, idx) => (
+                                        <span key={idx} className="bg-orange-50 border border-orange-100 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-black">{com}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Oferta Comercial</p>
+                            {zonaDetalles.estatus === 'PENDIENTE_PRECIOS' ? (
+                                <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl text-center">
+                                    <MdWarning className="text-2xl text-orange-400 mx-auto mb-1"/>
+                                    <p className="text-xs font-bold text-orange-700">Tarifas pendientes de configurar por Marketing.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-green-50 rounded-xl p-2 border border-green-100 text-center">
+                                            <p className="text-[9px] font-black text-green-600 uppercase">Instalación</p>
+                                            <p className="text-sm font-black text-green-700">${zonaDetalles.costos?.instalacion}</p>
+                                        </div>
+                                        <div className="bg-blue-50 rounded-xl p-2 border border-blue-100 text-center">
+                                            <p className="text-[9px] font-black text-blue-600 uppercase">Cambio</p>
+                                            <p className="text-sm font-black text-blue-700">${zonaDetalles.costos?.cambio}</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {zonaDetalles.planes?.map((p, idx) => (
+                                            <div key={idx} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                                <span className="text-xs font-black text-gray-700 flex items-center gap-1"><MdSpeed className="text-gray-400"/> {p.velocidad}</span>
+                                                <span className="text-xs font-bold text-gray-500">${p.precio}/mes</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* COLUMNA DERECHA: MINI MAPA ESPECÍFICO */}
+                    <div className="w-full lg:w-2/3 min-h-[300px] lg:min-h-0 relative bg-gray-100">
+                        {zonaDetalles.lat && zonaDetalles.lng ? (
+                            <MapaGlobal zonas={[zonaDetalles]} />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full w-full opacity-50">
+                                <MdMap className="text-6xl text-gray-400 mb-2"/>
+                                <p className="text-sm font-bold text-gray-500">Sin coordenadas registradas en el mapa.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
