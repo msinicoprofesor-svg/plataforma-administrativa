@@ -104,6 +104,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const handleGuardarZona = (e) => {
     e.preventDefault();
     if (!datosZona.nombreAp || !datosZona.municipio || !coordenadas.lat) return alert("Faltan datos generales o ubicación central.");
+    if (tipoTecnologia === 'ANTENA' && comunidadesAP.length === 0) return alert("Agrega al menos una comunidad cubierta.");
     
     const payload = {
         ...datosZona, tipo: tipoTecnologia, lat: coordenadas.lat, lng: coordenadas.lng,
@@ -120,6 +121,27 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
     }
     setModalOpen(false);
   };
+
+  const guardarConfiguracionMarketing = (e) => {
+    e.preventDefault();
+    if (!costos.instalacion || !costos.cambio) return alert("Define los costos de instalación y cambio.");
+    if (planes.length === 0) return alert("Debes agregar al menos un plan de internet.");
+
+    const zonaActualizada = { ...zonaAConfigurar, costos: { instalacion: Number(costos.instalacion), cambio: Number(costos.cambio) }, planes: planes, estatus: 'ACTIVA' };
+    onActualizarZona(zonaActualizada);
+    setZonaAConfigurar(null);
+    setCostos({ instalacion: '', cambio: '' });
+    setPlanes([]);
+  };
+
+  const agregarPlan = () => {
+    if (!nuevoPlan.velocidad || !nuevoPlan.precio) return alert("Completa velocidad y precio del plan");
+    let vel = nuevoPlan.velocidad.toUpperCase();
+    if (!vel.includes('MB')) vel += ' MB';
+    setPlanes([...planes, { ...nuevoPlan, velocidad: vel, id: Date.now() }]);
+    setNuevoPlan({ velocidad: '', precio: '' });
+  };
+  const eliminarPlan = (id) => setPlanes(planes.filter(p => p.id !== id));
 
   const scrollbarInvisible = "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
@@ -167,6 +189,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                                   <h3 className="text-lg font-extrabold text-gray-800 leading-tight mb-1">{zona.nombreAp || zona.comunidad}</h3>
                                   <p className="text-xs text-gray-500 font-medium mb-4 flex items-center gap-1"><MdPlace className="text-gray-400" /> {zona.municipio}, {zona.estado}</p>
                                   
+                                  {/* BOTONES DE EDICIÓN Y DETALLES */}
                                   <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center gap-2">
                                       <button onClick={() => abrirModalEditarZona(zona)} className="flex-1 py-2 text-[10px] font-black text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"><MdEdit/> Editar GEO</button>
                                       <button onClick={() => setZonaDetalles(zona)} className="flex-1 py-2 text-[10px] font-black text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">Ver Detalles</button>
@@ -204,6 +227,29 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                         </div>
                         <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre (ID Identificador)</label><input required type="text" placeholder="Ej: Torre Principal Noria" value={datosZona.nombreAp} onChange={(e) => setDatosZona({...datosZona, nombreAp: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-none outline-none font-bold text-xs text-gray-800" /></div>
 
+                        {/* FIX: CAMPOS RESTAURADOS DE MUNICIPIO Y ESTADO */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Municipio</label><input required type="text" placeholder="Ej: San Diego" value={datosZona.municipio} onChange={(e) => setDatosZona({...datosZona, municipio: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-none outline-none font-bold text-xs text-gray-800" /></div>
+                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado</label><input required type="text" placeholder="Ej: Guanajuato" value={datosZona.estado} onChange={(e) => setDatosZona({...datosZona, estado: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-none outline-none font-bold text-xs text-gray-800" /></div>
+                        </div>
+
+                        {/* FIX: CAMPO RESTAURADO DE COMUNIDADES */}
+                        {tipoTecnologia === 'ANTENA' && (
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Comunidades Cubiertas</label>
+                                <div className="flex gap-2 mb-2">
+                                    <input type="text" placeholder="Ej: La Soledad..." value={nuevaComunidad} onChange={(e) => setNuevaComunidad(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), agregarComunidad())} className="flex-1 px-4 py-2.5 bg-gray-50 rounded-xl text-xs outline-none font-bold text-gray-800" />
+                                    <button type="button" onClick={agregarComunidad} className="px-4 py-2.5 bg-orange-100 text-orange-700 rounded-xl font-bold text-xs hover:bg-orange-200 transition-colors">Añadir</button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {comunidadesAP.map((com, idx) => (
+                                        <span key={idx} className="bg-orange-50 border border-orange-100 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-black flex items-center gap-1 shadow-sm">{com} <MdClose className="cursor-pointer hover:text-red-500" onClick={() => eliminarComunidad(com)}/></span>
+                                    ))}
+                                    {comunidadesAP.length === 0 && <span className="text-[10px] text-gray-400 italic">Agrega al menos una.</span>}
+                                </div>
+                            </div>
+                        )}
+
                         {/* CONTROLES AVANZADOS SEGÚN TECNOLOGÍA */}
                         {tipoTecnologia === 'ANTENA' && (
                             <div className="bg-orange-50 p-4 rounded-3xl border border-orange-100">
@@ -240,7 +286,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                     </div>
 
                     {/* COLUMNA DERECHA: EL MAPA EN VIVO */}
-                    {/* FIX: Se cambió lg:w-1/2 por lg:w-2/3 y se agregó p-4 para que ocupe todo el espacio sobrante */}
                     <div className="w-full lg:w-2/3 bg-gray-100 relative min-h-[400px] flex flex-col p-4 lg:p-6">
                         
                         <div className="absolute top-8 lg:top-10 left-1/2 -translate-x-1/2 z-[400] flex bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-gray-200">
@@ -248,12 +293,10 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                             {tipoTecnologia === 'FIBRA' && <button type="button" onClick={() => setModoEdicionMapa('CAJA')} className={`px-4 py-1.5 text-[10px] uppercase tracking-widest font-black rounded-full transition-all ${modoEdicionMapa === 'CAJA' ? 'bg-green-500 text-white shadow' : 'text-gray-500'}`}>Poner Cajas NAP</button>}
                         </div>
 
-                        {/* Contenedor flexible para el mapa */}
                         <div className="flex-1 w-full h-full relative mt-12 lg:mt-0">
                             <MapaEditor 
                                 posicionCentro={modoEdicionMapa === 'ZONA' ? coordenadas : nuevaCaja} 
                                 setPosicion={handleMapClick} 
-                                // FIX: Pasamos el tipo correcto para que pinte la Antena o el OLT al inicio
                                 tipoPunto={modoEdicionMapa === 'ZONA' ? tipoTecnologia : modoEdicionMapa}
                                 marcadoresExtra={cajasTemporales}
                                 coberturaGeo={coberturaGeo}
