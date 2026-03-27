@@ -11,7 +11,7 @@ import {
 
 export default function AnaliticaVentas({ ventas = [], colaboradores = [], comisiones = [] }) {
     const [vista, setVista] = useState('TABLA'); 
-    const [ventaSeleccionada, setVentaSeleccionada] = useState(null); // ESTADO PARA EL MODAL DE DETALLES
+    const [ventaSeleccionada, setVentaSeleccionada] = useState(null); 
     
     // FILTROS
     const [filtroMes, setFiltroMes] = useState('TODOS');
@@ -19,7 +19,6 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [], comis
     const [filtroMarca, setFiltroMarca] = useState('TODAS');
     const [filtroCanal, setFiltroCanal] = useState('TODOS');
 
-    // MOTOR ESTRICTO DE DESCUBRIMIENTO DE CANAL BASADO EN PUESTO
     const obtenerCanalVendedor = (vendedorId) => {
         const colab = colaboradores.find(c => c.id === vendedorId);
         if (!colab) return 'OTROS';
@@ -33,31 +32,41 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [], comis
         return 'OTROS';
     };
 
-    // CALCULADORA DE COMISIONES EN TIEMPO REAL
+    // EL CEREBRO MULTI-CONDICIONAL
     const calcularComision = (venta) => {
         let totalComision = 0;
         const canal = obtenerCanalVendedor(venta.vendedor?.id);
         const s = venta.servicio || {};
         const precioBase = (Number(s.costoInstalacion) || 0) + (Number(s.precioEquipo) || 0);
+        const mensualidad = Number(s.mensualidad) || 0;
 
         const reglasAplicadas = [];
 
-        comisiones.forEach(regla => {
+        (comisiones || []).forEach(regla => {
             let aplica = false;
-            if (regla.categoria === 'TIPO_VENTA' && regla.criterio === s.tipoVenta) aplica = true;
-            if (regla.categoria === 'CANAL' && regla.criterio === canal) aplica = true;
-            if (regla.categoria === 'REGION' && regla.criterio === s.region) aplica = true;
-            if (regla.categoria === 'MARCA' && regla.criterio === s.marca) aplica = true;
 
+            // 1. ¿Le toca a este beneficiario?
+            if (regla.beneficiarioTipo === 'CANAL' && regla.beneficiarioValor === canal) aplica = true;
+            if (regla.beneficiarioTipo === 'REGION' && regla.beneficiarioValor === s.region) aplica = true;
+
+            // 2. Si le toca, ¿Coinciden las reglas de la venta?
+            if (aplica) {
+                if (regla.condicionMarca !== 'TODAS' && regla.condicionMarca !== s.marca) aplica = false;
+                if (regla.condicionTipoVenta !== 'TODAS' && regla.condicionTipoVenta !== s.tipoVenta) aplica = false;
+            }
+
+            // 3. Si todo aplica, calculamos el dinero
             if (aplica) {
                 let monto = 0;
-                if (regla.tipoPago === 'MONTO_FIJO') {
-                    monto = Number(regla.valor);
-                } else if (regla.tipoPago === 'PORCENTAJE') {
-                    monto = precioBase * (Number(regla.valor) / 100);
-                }
+                if (regla.tipoPago === 'MONTO_FIJO') monto = Number(regla.valor);
+                else if (regla.tipoPago === 'PORCENTAJE') monto = precioBase * (Number(regla.valor) / 100);
+                else if (regla.tipoPago === 'MENSUALIDAD') monto = mensualidad * Number(regla.valor);
+
                 totalComision += monto;
-                reglasAplicadas.push({ nombre: `${regla.categoria.replace('_', ' ')}: ${regla.criterio.replace('_', ' ')}`, monto });
+                reglasAplicadas.push({ 
+                    nombre: `Regla ${regla.beneficiarioValor}: ${regla.condicionMarca === 'TODAS' ? 'Gral' : regla.condicionMarca} (${regla.condicionTipoVenta === 'TODAS' ? 'Todas' : regla.condicionTipoVenta})`, 
+                    monto 
+                });
             }
         });
 
@@ -239,7 +248,7 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [], comis
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-center">
-                                                    <button onClick={() => setVentaSeleccionada(v)} className="px-3 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                                    <button onClick={() => setVentaSeleccionada(v)} className="px-3 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors shadow-sm">
                                                         Ver Detalles
                                                     </button>
                                                 </td>
@@ -300,7 +309,7 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [], comis
                                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Servicio Contratado</h4>
                                 <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 flex justify-between items-center">
                                     <div>
-                                        <p className="text-sm font-black text-gray-800 uppercase">{ventaSeleccionada.servicio?.marca} ({ventaSeleccionada.servicio?.tecnologia})</p>
+                                        <p className="text-sm font-black text-gray-800 uppercase">{ventaSeleccionada.servicio?.marca} <span className="text-xs text-gray-500">({ventaSeleccionada.servicio?.tecnologia})</span></p>
                                         <p className="text-[10px] font-bold text-gray-500 uppercase mt-1">{ventaSeleccionada.servicio?.tipoVenta === 'CAMBIO' ? 'CAMBIO PROVEEDOR' : 'INSTALACIÓN NUEVA'}</p>
                                     </div>
                                     <div className="text-right">
@@ -312,14 +321,14 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [], comis
 
                             {/* INFO VENDEDOR */}
                             <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                <div className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400"><MdPerson className="text-xl"/></div>
+                                <div className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400 shrink-0"><MdPerson className="text-xl"/></div>
                                 <div>
                                     <p className="text-xs font-black text-gray-800">{ventaSeleccionada.vendedor?.nombre}</p>
                                     <p className="text-[10px] font-bold text-gray-500 uppercase mt-0.5">Canal: {obtenerCanalVendedor(ventaSeleccionada.vendedor?.id).replace('_', ' ')}</p>
                                 </div>
                             </div>
 
-                            {/* CÁLCULO DE COMISIÓN (MAGIA PURA) */}
+                            {/* CÁLCULO DE COMISIÓN (LA CALCULADORA MAESTRA) */}
                             {(() => {
                                 const comision = calcularComision(ventaSeleccionada);
                                 return (
@@ -327,10 +336,10 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [], comis
                                         <h4 className="text-sm font-black text-green-800 uppercase tracking-widest mb-4 flex items-center gap-2"><MdAttachMoney className="text-lg"/> Comisión Calculada</h4>
                                         
                                         {comision.desglose.length === 0 ? (
-                                            <p className="text-xs font-bold text-green-600/70 italic text-center py-2">No hay reglas de comisión que apliquen a esta venta.</p>
+                                            <p className="text-xs font-bold text-green-600/70 italic text-center py-2">No hay reglas configuradas para el canal o marca de esta venta.</p>
                                         ) : (
                                             comision.desglose.map((r, i) => (
-                                                <div key={i} className="flex justify-between items-center text-xs font-bold text-green-700 mb-2 bg-white/50 px-3 py-2 rounded-lg">
+                                                <div key={i} className="flex justify-between items-center text-xs font-bold text-green-700 mb-2 bg-white/50 px-3 py-2 rounded-lg border border-green-100">
                                                     <span>{r.nombre}</span>
                                                     <span className="font-black">+{formatoMoneda(r.monto)}</span>
                                                 </div>

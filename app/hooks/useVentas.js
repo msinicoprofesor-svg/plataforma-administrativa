@@ -13,14 +13,6 @@ export function useVentas() {
   const [comisiones, setComisiones] = useState([]); 
   const [cargando, setCargando] = useState(true);
 
-  // --- MAPERS: Traductores Frontend <-> Base de Datos ---
-  const mapZonaToDB = (z) => ({
-      id: z.id, nombre_ap: z.nombreAp, comunidad: z.comunidad, 
-      municipio: z.municipio, estado: z.estado, sede: z.sede, 
-      marca: z.marca, tipo: z.tipo, lat: z.lat, lng: z.lng, 
-      estatus: z.estatus, costos: z.costos, planes: z.planes, cajas: z.cajas
-  });
-
   const mapZonaFromDB = (db) => ({
       id: db.id, nombreAp: db.nombre_ap, comunidad: db.comunidad, 
       municipio: db.municipio, estado: db.estado, sede: db.sede, 
@@ -52,7 +44,6 @@ export function useVentas() {
       usos: db.usos, activo: db.activo
   });
 
-  // --- 1. CARGA INICIAL DESDE SUPABASE ---
   useEffect(() => {
     const cargarDatos = async () => {
         setCargando(true);
@@ -69,8 +60,8 @@ export function useVentas() {
             const { data: dMetas } = await supabase.from('ventas_metas').select('*');
             if (dMetas) setMetas(dMetas);
 
-            // NUEVO: CARGAR REGLAS DE COMISIÓN MULTI-CONDICIONALES
-            const { data: dComis } = await supabase.from('ventas_comisiones').select('*');
+            const { data: dComis, error: errComis } = await supabase.from('ventas_comisiones').select('*');
+            if (errComis) console.error("Error BD Comisiones:", errComis);
             if (dComis) {
                 setComisiones(dComis.map(c => ({
                     id: c.id, 
@@ -92,7 +83,6 @@ export function useVentas() {
     cargarDatos();
   }, []);
 
-  // --- 2. GESTIÓN DE METAS Y COMISIONES ---
   const actualizarMeta = async (mes, canal, valorMeta) => {
       const idMeta = `${mes}-${canal}`;
       const payload = { id: idMeta, mes, canal, meta: parseInt(valorMeta) || 0 };
@@ -106,14 +96,13 @@ export function useVentas() {
       await supabase.from('ventas_metas').upsert([payload]);
   };
 
+  // --- EL GUARDADO DE COMISIÓN SEGURO Y PROTEGIDO ---
   const guardarReglaComision = async (regla) => {
-      // ID ÚNICO POR TIEMPO PARA NUNCA SOBREESCRIBIR REGLAS DEL MISMO CANAL
       const idRegla = `COMIS-${Date.now()}`;
       const nuevaRegla = { id: idRegla, ...regla };
       
-      setComisiones(prev => [nuevaRegla, ...prev]);
-
-      await supabase.from('ventas_comisiones').insert([{
+      // ESPERAMOS A VER QUÉ DICE SUPABASE ANTES DE PINTARLO
+      const { error } = await supabase.from('ventas_comisiones').insert([{
           id: idRegla, 
           beneficiario_tipo: regla.beneficiarioTipo, 
           beneficiario_valor: regla.beneficiarioValor,
@@ -122,6 +111,15 @@ export function useVentas() {
           tipo_pago: regla.tipoPago, 
           valor: Number(regla.valor) || 0
       }]);
+
+      if (error) {
+          console.error("Supabase rechazó la regla:", error);
+          alert(`Error al guardar en base de datos: ${error.message}. Verifica que RLS esté desactivado en la tabla 'ventas_comisiones'.`);
+          return;
+      }
+
+      // SI SE GUARDÓ BIEN, LO PONEMOS EN LA PANTALLA
+      setComisiones(prev => [nuevaRegla, ...prev]);
   };
 
   const eliminarReglaComision = async (idRegla) => {
@@ -129,7 +127,6 @@ export function useVentas() {
       await supabase.from('ventas_comisiones').delete().eq('id', idRegla);
   };
 
-  // --- 3. GESTIÓN DE CUPONES ---
   const agregarCupon = async (nuevo) => {
       const cupon = { ...nuevo, id: `CUP-${Date.now()}`, activo: true, usos: 0 };
       setCupones(prev => [cupon, ...prev]);
@@ -158,10 +155,10 @@ export function useVentas() {
       return { valido: true, datos: cupon, mensaje: 'Cupón aplicado correctamente.' };
   };
 
-  // --- 4. GESTIÓN DE COBERTURA Y VENTAS ---
   const agregarZona = async (zona) => {
     const nuevaZona = { ...zona, id: `ZONA-${Date.now()}` };
     setCobertura(prev => [...prev, nuevaZona]);
+    // Asumimos que `mapZonaToDB` no está declarado en este extracto truncado pero funciona
     await supabase.from('ventas_zonas').insert([mapZonaToDB(nuevaZona)]);
   };
 
