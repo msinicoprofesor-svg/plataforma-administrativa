@@ -18,11 +18,11 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
   const verAtencionCliente = true; 
 
   const verDashboard = tienePermiso(usuario, 'marketing_dashboard');
-  
-  // AHORA PERTENECEN AL ECOSISTEMA COMERCIAL
-  const verVentas = tienePermiso(usuario, 'marketing_ventas');
   const verCobertura = tienePermiso(usuario, 'marketing_cobertura');
   const verMesa = tienePermiso(usuario, 'marketing_mesa');
+
+  // SOLO VENTAS SE MUEVE A MARKETING
+  const verVentas = tienePermiso(usuario, 'marketing_ventas');
 
   const verAlmacen = tienePermiso(usuario, 'almacen_operativo'); 
   const verFlotilla = true; 
@@ -42,8 +42,7 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
 
   const verSoporte = tienePermiso(usuario, 'soporte_tickets');
 
-  // LA CONDICIÓN SE EXPANDE PARA INCLUIR EL EMBUDO COMERCIAL
-  const verSeccionMarketing = verCentroDiseno || verEstudios || verSocial || verPromociones || verColaboradores || verImportar || verLikeStore || verVentas || verCobertura || verMesa;
+  const verSeccionMarketing = verCentroDiseno || verEstudios || verSocial || verPromociones || verColaboradores || verImportar || verLikeStore || verVentas;
   const verSeccionRRHH = verMural || verIncidencias || verNomina || verHubRRHH;
 
   return (
@@ -77,23 +76,23 @@ export default function Sidebar({ isOpen, setIsOpen, activeModule, setActiveModu
             </>
           )}
 
-          {verDashboard && (
+          {/* --- OPERACIONES (RESTAURADO) --- */}
+          { (verDashboard || verCobertura || verMesa) && (
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
                 <SectionTitle label="Operaciones" isOpen={isOpen} />
-                <MenuButton icon={<MdDashboard />} label="Dashboard" active={activeModule === 'marketing_dashboard'} onClick={() => setActiveModule('marketing_dashboard')} isOpen={isOpen} />
+                {verDashboard && <MenuButton icon={<MdDashboard />} label="Dashboard" active={activeModule === 'marketing_dashboard'} onClick={() => setActiveModule('marketing_dashboard')} isOpen={isOpen} />}
+                {verCobertura && <MenuButton icon={<MdMap />} label="Cobertura" active={activeModule === 'marketing_cobertura'} onClick={() => setActiveModule('marketing_cobertura')} isOpen={isOpen} />}
+                {verMesa && <MenuButton icon={<MdFactCheck />} label="Mesa de Control" active={activeModule === 'marketing_mesa'} onClick={() => setActiveModule('marketing_mesa')} isOpen={isOpen} />}
             </>
           )}
 
-          {/* --- SECCIÓN COMERCIAL Y MARKETING UNIFICADA --- */}
+          {/* --- MARKETING (CON VENTAS INTEGRADO) --- */}
           {verSeccionMarketing && (
             <>
                 <div className="my-4 border-t border-dashed border-gray-200 mx-2"></div>
-                <SectionTitle label="Comercial y Marketing" isOpen={isOpen} />
+                <SectionTitle label="Marketing" isOpen={isOpen} />
                 {verVentas && <MenuButton icon={<MdAttachMoney />} label="Ventas" active={activeModule === 'marketing_ventas'} onClick={() => setActiveModule('marketing_ventas')} isOpen={isOpen} />}
-                {verCobertura && <MenuButton icon={<MdMap />} label="Cobertura" active={activeModule === 'marketing_cobertura'} onClick={() => setActiveModule('marketing_cobertura')} isOpen={isOpen} />}
-                {verMesa && <MenuButton icon={<MdFactCheck />} label="Mesa de Control" active={activeModule === 'marketing_mesa'} onClick={() => setActiveModule('marketing_mesa')} isOpen={isOpen} />}
-                
                 {verCentroDiseno && <MenuButton icon={<MdFormatPaint />} label="Centro de Diseño" active={activeModule === 'marketing_solicitudes'} onClick={() => setActiveModule('marketing_solicitudes')} isOpen={isOpen} />}
                 {verEstudios && <MenuButton icon={<MdPoll />} label="Estudios Mercado" active={activeModule === 'marketing_estudios'} onClick={() => setActiveModule('marketing_estudios')} isOpen={isOpen} />}
                 {verSocial && <MenuButton icon={<MdShare />} label="Social Media" active={activeModule === 'marketing_social'} onClick={() => setActiveModule('marketing_social')} isOpen={isOpen} />}
