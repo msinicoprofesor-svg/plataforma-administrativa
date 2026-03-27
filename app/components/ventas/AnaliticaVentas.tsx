@@ -5,11 +5,13 @@
 import { useState, useMemo } from 'react';
 import { 
     MdFilterList, MdTrendingUp, MdShowChart, MdTableChart, 
-    MdStore, MdSignalCellularAlt, MdDateRange, MdRouter, MdPeople 
+    MdStore, MdSignalCellularAlt, MdDateRange, MdRouter, MdPeople,
+    MdClose, MdPerson, MdAssignment, MdAttachMoney
 } from "react-icons/md";
 
-export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
+export default function AnaliticaVentas({ ventas = [], colaboradores = [], comisiones = [] }) {
     const [vista, setVista] = useState('TABLA'); 
+    const [ventaSeleccionada, setVentaSeleccionada] = useState(null); // ESTADO PARA EL MODAL DE DETALLES
     
     // FILTROS
     const [filtroMes, setFiltroMes] = useState('TODOS');
@@ -24,14 +26,42 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
         const rol = (colab.rol || colab.puesto || '').toUpperCase();
         
         if (rol.includes('VENDEDOR') || rol.includes('CAMBACEO') || rol.includes('ASESOR')) return 'CAMBACEO';
-        // REGLA ESTRICTA: Solo Community Manager es Ventas Digitales
         if (rol.includes('COMMUNITY') || rol.includes('COMMUNITY MANAGER')) return 'DIGITAL';
         if (rol.includes('ATENCION') || rol.includes('RECEPCION') || rol.includes('CALL')) return 'ATENCION_CLIENTE';
         if (rol.includes('TECNICO') || rol.includes('SOPORTE')) return 'TECNICOS';
         if (rol.includes('ADMINISTRADOR') || rol.includes('GERENTE')) return 'ADMINISTRADORA';
-        
-        // CUALQUIER OTRO ROL CAE AQUÍ
         return 'OTROS';
+    };
+
+    // CALCULADORA DE COMISIONES EN TIEMPO REAL
+    const calcularComision = (venta) => {
+        let totalComision = 0;
+        const canal = obtenerCanalVendedor(venta.vendedor?.id);
+        const s = venta.servicio || {};
+        const precioBase = (Number(s.costoInstalacion) || 0) + (Number(s.precioEquipo) || 0);
+
+        const reglasAplicadas = [];
+
+        comisiones.forEach(regla => {
+            let aplica = false;
+            if (regla.categoria === 'TIPO_VENTA' && regla.criterio === s.tipoVenta) aplica = true;
+            if (regla.categoria === 'CANAL' && regla.criterio === canal) aplica = true;
+            if (regla.categoria === 'REGION' && regla.criterio === s.region) aplica = true;
+            if (regla.categoria === 'MARCA' && regla.criterio === s.marca) aplica = true;
+
+            if (aplica) {
+                let monto = 0;
+                if (regla.tipoPago === 'MONTO_FIJO') {
+                    monto = Number(regla.valor);
+                } else if (regla.tipoPago === 'PORCENTAJE') {
+                    monto = precioBase * (Number(regla.valor) / 100);
+                }
+                totalComision += monto;
+                reglasAplicadas.push({ nombre: `${regla.categoria.replace('_', ' ')}: ${regla.criterio.replace('_', ' ')}`, monto });
+            }
+        });
+
+        return { total: totalComision, desglose: reglasAplicadas };
     };
 
     const mesesDisponibles = useMemo(() => {
@@ -178,6 +208,7 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
                                             <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Servicio</th>
                                             <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Ubicación / Canal</th>
                                             <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Estado</th>
+                                            <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
@@ -207,6 +238,11 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
                                                         {v.estatus.replace('_', ' ')}
                                                     </span>
                                                 </td>
+                                                <td className="p-4 text-center">
+                                                    <button onClick={() => setVentaSeleccionada(v)} className="px-3 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                                        Ver Detalles
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -232,6 +268,83 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DE DETALLES Y COMISIÓN */}
+            {ventaSeleccionada && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-scale-in flex flex-col overflow-hidden max-h-[90vh]">
+                        <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-xl font-extrabold text-gray-800">Detalles de Venta</h2>
+                                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{ventaSeleccionada.id}</p>
+                            </div>
+                            <button onClick={() => setVentaSeleccionada(null)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 shadow-sm transition-all"><MdClose className="text-xl"/></button>
+                        </div>
+
+                        <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
+                            {/* INFO CLIENTE */}
+                            <div>
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Datos del Cliente</h4>
+                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                                    <p className="text-sm font-black text-gray-800 mb-1">{ventaSeleccionada.cliente?.nombre}</p>
+                                    <p className="text-xs font-bold text-gray-500">{ventaSeleccionada.cliente?.telefono1} {ventaSeleccionada.cliente?.telefono2 ? `/ ${ventaSeleccionada.cliente?.telefono2}` : ''}</p>
+                                    <p className="text-[10px] font-bold text-gray-400 mt-2"><MdStore className="inline text-gray-400"/> {ventaSeleccionada.cliente?.direccion}, {ventaSeleccionada.cliente?.comunidad}</p>
+                                </div>
+                            </div>
+
+                            {/* INFO SERVICIO */}
+                            <div>
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Servicio Contratado</h4>
+                                <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 flex justify-between items-center">
+                                    <div>
+                                        <p className="text-sm font-black text-gray-800 uppercase">{ventaSeleccionada.servicio?.marca} ({ventaSeleccionada.servicio?.tecnologia})</p>
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase mt-1">{ventaSeleccionada.servicio?.tipoVenta === 'CAMBIO' ? 'CAMBIO PROVEEDOR' : 'INSTALACIÓN NUEVA'}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-black text-green-700">Inst: {formatoMoneda((Number(ventaSeleccionada.servicio?.costoInstalacion) || 0) + (Number(ventaSeleccionada.servicio?.precioEquipo) || 0))}</p>
+                                        <p className="text-[10px] font-bold text-gray-500 mt-1">Mensual: {formatoMoneda(ventaSeleccionada.servicio?.mensualidad)}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* INFO VENDEDOR */}
+                            <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                                <div className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400"><MdPerson className="text-xl"/></div>
+                                <div>
+                                    <p className="text-xs font-black text-gray-800">{ventaSeleccionada.vendedor?.nombre}</p>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase mt-0.5">Canal: {obtenerCanalVendedor(ventaSeleccionada.vendedor?.id).replace('_', ' ')}</p>
+                                </div>
+                            </div>
+
+                            {/* CÁLCULO DE COMISIÓN (MAGIA PURA) */}
+                            {(() => {
+                                const comision = calcularComision(ventaSeleccionada);
+                                return (
+                                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl border border-green-200 shadow-sm">
+                                        <h4 className="text-sm font-black text-green-800 uppercase tracking-widest mb-4 flex items-center gap-2"><MdAttachMoney className="text-lg"/> Comisión Calculada</h4>
+                                        
+                                        {comision.desglose.length === 0 ? (
+                                            <p className="text-xs font-bold text-green-600/70 italic text-center py-2">No hay reglas de comisión que apliquen a esta venta.</p>
+                                        ) : (
+                                            comision.desglose.map((r, i) => (
+                                                <div key={i} className="flex justify-between items-center text-xs font-bold text-green-700 mb-2 bg-white/50 px-3 py-2 rounded-lg">
+                                                    <span>{r.nombre}</span>
+                                                    <span className="font-black">+{formatoMoneda(r.monto)}</span>
+                                                </div>
+                                            ))
+                                        )}
+
+                                        <div className="border-t border-green-200 mt-4 pt-4 flex justify-between items-center">
+                                            <span className="text-xs font-black text-green-800">TOTAL A PAGAR</span>
+                                            <span className="text-2xl font-black text-green-600">{formatoMoneda(comision.total)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     </div>
                 </div>
             )}

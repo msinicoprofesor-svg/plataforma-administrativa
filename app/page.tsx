@@ -260,6 +260,9 @@ export default function Home() {
                         metas={ventasData?.metas || []} 
                         actualizarMeta={ventasData?.actualizarMeta} 
                         colaboradores={colaboradoresReales || []} 
+                        comisiones={ventasData?.comisiones || []}
+guardarReglaComision={ventasData?.guardarReglaComision}
+eliminarReglaComision={ventasData?.eliminarReglaComision}
                     />
                 </div>
             )}

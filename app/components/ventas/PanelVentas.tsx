@@ -15,9 +15,9 @@ import ModalNuevaVenta from './ModalNuevaVenta';
 import GestorMetas from './GestorMetas';
 
 export default function PanelVentas({ 
-    ventas = [], cobertura = [], cupones = [], metas = [], 
+    ventas = [], cobertura = [], cupones = [], metas = [], comisiones = [],
     onRegistrarVenta, vendedorActual, validarCupon, 
-    actualizarMeta, colaboradores = [] 
+    actualizarMeta, guardarReglaComision, eliminarReglaComision, colaboradores = [] 
 }) {
   
   // VERIFICAR PERMISOS GERENCIALES PARA MOSTRAR LAS PESTAÑAS EXTRAS
@@ -118,7 +118,11 @@ export default function PanelVentas({
             {/* VISTA 2: ANALÍTICA GLOBAL (SÓLO GERENTES) */}
             {tabActiva === 'ANALITICA' && esGerencia && (
                 <div className="flex flex-col h-full animate-fade-in w-full">
-                    <AnaliticaVentas ventas={ventas} colaboradores={colaboradores} />
+                    <AnaliticaVentas 
+                        ventas={ventas} 
+                        colaboradores={colaboradores} 
+                        comisiones={comisiones} 
+                    />
                 </div>
             )}
 
@@ -130,6 +134,9 @@ export default function PanelVentas({
                         metas={metas} 
                         actualizarMeta={actualizarMeta} 
                         colaboradores={colaboradores} 
+                        comisiones={comisiones}
+                        guardarReglaComision={guardarReglaComision}
+                        eliminarReglaComision={eliminarReglaComision}
                     />
                 </div>
             )}
