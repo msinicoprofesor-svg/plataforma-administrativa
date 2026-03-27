@@ -267,7 +267,9 @@ eliminarReglaComision={ventasData?.eliminarReglaComision}
                 </div>
             )}
             
-            {activeModule === 'marketing_cobertura' && verCobertura && <div className="animate-slide-up h-full pb-10"><Cobertura cobertura={ventasData.cobertura} onAgregarZona={ventasData.agregarZona} onActualizarZona={ventasData.actualizarZona} usuarioActual={u} /></div>}
+            {/* FIX: SE AGREGÓ eliminarZona={ventasData.eliminarZona} */}
+            {activeModule === 'marketing_cobertura' && verCobertura && <div className="animate-slide-up h-full pb-10"><Cobertura cobertura={ventasData.cobertura} onAgregarZona={ventasData.agregarZona} onActualizarZona={ventasData.actualizarZona} eliminarZona={ventasData.eliminarZona} usuarioActual={u} /></div>}
+            
             {activeModule === 'marketing_mesa' && verMesa && <div className="animate-slide-up h-full pb-10"><MesaControl ventas={ventasData.ventas} cobertura={ventasData.cobertura} onActualizarEstado={ventasData.actualizarEstadoVenta} usuarioActual={u} /></div>}
 
             {activeModule === 'marketing_solicitudes' && verSolicitudesDiseno && <div className="animate-slide-up h-full pb-10"><PanelSolicitudes solicitudes={solicitudesData.solicitudes} onCrear={solicitudesData.crearSolicitud} onActualizar={solicitudesData.actualizarSolicitud} onEliminar={solicitudesData.eliminarSolicitud} onCancelar={solicitudesData.cancelarSolicitud} usuarioActual={u} /></div>}
