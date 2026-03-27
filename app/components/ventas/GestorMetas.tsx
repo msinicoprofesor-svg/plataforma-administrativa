@@ -5,9 +5,9 @@
 import { useState, useMemo } from 'react';
 import { MdFlag, MdDateRange, MdSave, MdMap, MdPeople, MdVerified } from "react-icons/md";
 
-// CONFIGURACIÓN EXACTA DE TU EMPRESA
 const REGIONES_INTERNET = ['Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
-const CANALES_VENTA = ['CAMBACEO', 'DIGITAL', 'ATENCION_CLIENTE', 'TECNICOS', 'ADMINISTRADORA'];
+// SE AGREGÓ "OTROS" PARA QUE TAMBIÉN SE PUEDA MEDIR SI ES NECESARIO
+const CANALES_VENTA = ['CAMBACEO', 'DIGITAL', 'ATENCION_CLIENTE', 'TECNICOS', 'ADMINISTRADORA', 'OTROS']; 
 const MARCAS_ESPECIALES = ['RK', 'WifiCel'];
 
 export default function GestorMetas({ ventas = [], metas = [], actualizarMeta, colaboradores = [] }) {
@@ -16,20 +16,21 @@ export default function GestorMetas({ ventas = [], metas = [], actualizarMeta, c
     const [metasEditando, setMetasEditando] = useState({});
     const [guardando, setGuardando] = useState(false);
 
-    // FUNCIÓN: DESCUBRE EL CANAL DEL VENDEDOR
+    // FUNCIÓN SINCRONIZADA ESTRICTAMENTE CON ANALÍTICA
     const obtenerCanalVendedor = (vendedorId) => {
         const colab = colaboradores.find(c => c.id === vendedorId);
         if (!colab) return 'OTROS';
         const rol = (colab.rol || colab.puesto || '').toUpperCase();
+        
         if (rol.includes('VENDEDOR') || rol.includes('CAMBACEO') || rol.includes('ASESOR')) return 'CAMBACEO';
-        if (rol.includes('COMMUNITY') || rol.includes('CREADOR') || rol.includes('MARKETING') || rol.includes('MKT')) return 'DIGITAL';
+        if (rol.includes('COMMUNITY') || rol.includes('COMMUNITY MANAGER')) return 'DIGITAL';
         if (rol.includes('ATENCION') || rol.includes('RECEPCION') || rol.includes('CALL')) return 'ATENCION_CLIENTE';
         if (rol.includes('TECNICO') || rol.includes('SOPORTE')) return 'TECNICOS';
         if (rol.includes('ADMINISTRADOR') || rol.includes('GERENTE')) return 'ADMINISTRADORA';
+        
         return 'OTROS';
     };
 
-    // FUNCIÓN: VALIDA SI EL VENDEDOR ES ADMINISTRADOR (Para RK y WifiCel)
     const esAdministradorDeMarca = (vendedorId) => {
         const colab = colaboradores.find(c => c.id === vendedorId);
         if (!colab) return false;
@@ -37,7 +38,6 @@ export default function GestorMetas({ ventas = [], metas = [], actualizarMeta, c
         return rol.includes('ADMINISTRADOR') || rol.includes('GERENTE');
     };
 
-    // CÁLCULOS PESADOS Y SEGUROS
     const { kpisRegiones, kpisCanales, kpisMarcas } = useMemo(() => {
         const ventasDelMes = ventas.filter(v => v.fechaRegistro?.startsWith(mesSeleccionado) && v.estatus !== 'CANCELADA');
 
@@ -79,7 +79,7 @@ export default function GestorMetas({ ventas = [], metas = [], actualizarMeta, c
             <div className="absolute bottom-0 left-0 h-1 bg-gray-200 w-full"><div className={`h-full transition-all duration-1000 ${dato.porcentaje >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${dato.porcentaje}%` }}></div></div>
             <div className="flex-1 flex items-center gap-3 z-10">
                 <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xs font-black text-gray-400 shadow-sm">{index + 1}</div>
-                <div><h5 className="font-black text-gray-800">{dato.nombre}</h5><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">Avance: {dato.porcentaje}%</p></div>
+                <div><h5 className="font-black text-gray-800">{dato.nombre.replace('_', ' ')}</h5><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">Avance: {dato.porcentaje}%</p></div>
             </div>
             <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-xl border border-gray-200 w-full sm:w-auto shadow-sm z-10">
                 <div className="text-center"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Real</p><p className="text-lg font-black text-blue-600 leading-none">{dato.ventasReales}</p></div>

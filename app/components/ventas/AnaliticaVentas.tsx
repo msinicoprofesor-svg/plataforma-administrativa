@@ -17,17 +17,20 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
     const [filtroMarca, setFiltroMarca] = useState('TODAS');
     const [filtroCanal, setFiltroCanal] = useState('TODOS');
 
-    // MOTOR DE DESCUBRIMIENTO DE CANAL BASADO EN PUESTO
+    // MOTOR ESTRICTO DE DESCUBRIMIENTO DE CANAL BASADO EN PUESTO
     const obtenerCanalVendedor = (vendedorId) => {
         const colab = colaboradores.find(c => c.id === vendedorId);
         if (!colab) return 'OTROS';
         const rol = (colab.rol || colab.puesto || '').toUpperCase();
         
         if (rol.includes('VENDEDOR') || rol.includes('CAMBACEO') || rol.includes('ASESOR')) return 'CAMBACEO';
-        if (rol.includes('COMMUNITY') || rol.includes('CREADOR') || rol.includes('MARKETING') || rol.includes('MKT')) return 'DIGITAL';
+        // REGLA ESTRICTA: Solo Community Manager es Ventas Digitales
+        if (rol.includes('COMMUNITY') || rol.includes('COMMUNITY MANAGER')) return 'DIGITAL';
         if (rol.includes('ATENCION') || rol.includes('RECEPCION') || rol.includes('CALL')) return 'ATENCION_CLIENTE';
         if (rol.includes('TECNICO') || rol.includes('SOPORTE')) return 'TECNICOS';
         if (rol.includes('ADMINISTRADOR') || rol.includes('GERENTE')) return 'ADMINISTRADORA';
+        
+        // CUALQUIER OTRO ROL CAE AQUÍ
         return 'OTROS';
     };
 
@@ -131,6 +134,7 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
                             <option value="ATENCION_CLIENTE">Atención al Cliente</option>
                             <option value="TECNICOS">Técnicos</option>
                             <option value="ADMINISTRADORA">Administradora</option>
+                            <option value="OTROS">Otros Colaboradores</option>
                         </select>
                     </div>
                 </div>
@@ -196,7 +200,7 @@ export default function AnaliticaVentas({ ventas = [], colaboradores = [] }) {
                                                 <td className="p-4">
                                                     <p className="text-xs font-bold text-gray-700">{v.servicio?.comunidad}</p>
                                                     <p className="text-[10px] text-gray-400 font-bold uppercase">{v.servicio?.region}</p>
-                                                    <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-black rounded uppercase">{obtenerCanalVendedor(v.vendedor?.id)}</span>
+                                                    <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-black rounded uppercase">{obtenerCanalVendedor(v.vendedor?.id).replace('_', ' ')}</span>
                                                 </td>
                                                 <td className="p-4 text-center">
                                                     <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${v.estatus === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-700' : v.estatus === 'FINALIZADA' ? 'bg-green-100 text-green-700' : v.estatus === 'CANCELADA' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
