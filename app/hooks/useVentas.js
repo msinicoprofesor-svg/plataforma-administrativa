@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/hooks/useVentas.js (MIGRADO A SUPABASE + METAS COMERCIALES)   */
+/* ARCHIVO: app/hooks/useVentas.js (MIGRADO A SUPABASE + METAS Y COMISIONES)  */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useEffect } from 'react';
@@ -9,7 +9,8 @@ export function useVentas() {
   const [cobertura, setCobertura] = useState([]);
   const [ventas, setVentas] = useState([]);
   const [cupones, setCupones] = useState([]);
-  const [metas, setMetas] = useState([]); // <-- NUEVO ESTADO PARA METAS
+  const [metas, setMetas] = useState([]); 
+  const [comisiones, setComisiones] = useState([]); // <-- NUEVO ESTADO PARA COMISIONES
   const [cargando, setCargando] = useState(true);
 
   // --- MAPERS: Traductores Frontend <-> Base de Datos ---
@@ -65,9 +66,17 @@ export function useVentas() {
             const { data: dCup } = await supabase.from('ventas_cupones').select('*');
             if (dCup) setCupones(dCup.map(mapCuponFromDB));
 
-            // NUEVO: CARGAR METAS
             const { data: dMetas } = await supabase.from('ventas_metas').select('*');
             if (dMetas) setMetas(dMetas);
+
+            // NUEVO: CARGAR REGLAS DE COMISIÓN
+            const { data: dComis } = await supabase.from('ventas_comisiones').select('*');
+            if (dComis) {
+                setComisiones(dComis.map(c => ({
+                    id: c.id, categoria: c.categoria, criterio: c.criterio, 
+                    tipoPago: c.tipo_pago, valor: c.valor
+                })));
+            }
 
         } catch (error) {
             console.error("Error cargando Ventas:", error);
@@ -78,7 +87,7 @@ export function useVentas() {
     cargarDatos();
   }, []);
 
-  // --- 2. GESTIÓN DE METAS (NUEVO) ---
+  // --- 2. GESTIÓN DE METAS Y COMISIONES (NUEVO) ---
   const actualizarMeta = async (mes, canal, valorMeta) => {
       const idMeta = `${mes}-${canal}`;
       const payload = { id: idMeta, mes, canal, meta: parseInt(valorMeta) || 0 };
@@ -90,6 +99,27 @@ export function useVentas() {
       });
 
       await supabase.from('ventas_metas').upsert([payload]);
+  };
+
+  const guardarReglaComision = async (regla) => {
+      const idRegla = `REGLA-${regla.categoria}-${regla.criterio}`.replace(/\s+/g, '_').toUpperCase();
+      const nuevaRegla = { id: idRegla, ...regla };
+      
+      setComisiones(prev => {
+          const existe = prev.find(c => c.id === idRegla);
+          if (existe) return prev.map(c => c.id === idRegla ? nuevaRegla : c);
+          return [...prev, nuevaRegla];
+      });
+
+      await supabase.from('ventas_comisiones').upsert([{
+          id: idRegla, categoria: regla.categoria, criterio: regla.criterio,
+          tipo_pago: regla.tipoPago, valor: Number(regla.valor) || 0
+      }]);
+  };
+
+  const eliminarReglaComision = async (idRegla) => {
+      setComisiones(prev => prev.filter(c => c.id !== idRegla));
+      await supabase.from('ventas_comisiones').delete().eq('id', idRegla);
   };
 
   // --- 3. GESTIÓN DE CUPONES ---
@@ -186,8 +216,9 @@ export function useVentas() {
   };
 
   return { 
-      cobertura, ventas, cupones, metas, cargando,
+      cobertura, ventas, cupones, metas, comisiones, cargando,
       agregarZona, actualizarZona, registrarVenta, actualizarEstadoVenta, 
-      agregarCupon, eliminarCupon, validarCupon, actualizarMeta
+      agregarCupon, eliminarCupon, validarCupon, actualizarMeta,
+      guardarReglaComision, eliminarReglaComision
   };
 }
