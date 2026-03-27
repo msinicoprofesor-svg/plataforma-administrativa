@@ -1,14 +1,15 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/hooks/useVentas.js (MIGRADO A SUPABASE)                       */
+/* ARCHIVO: app/hooks/useVentas.js (MIGRADO A SUPABASE + METAS COMERCIALES)   */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // <-- CONEXIÓN OFICIAL
+import { supabase } from '../lib/supabase';
 
 export function useVentas() {
   const [cobertura, setCobertura] = useState([]);
   const [ventas, setVentas] = useState([]);
   const [cupones, setCupones] = useState([]);
+  const [metas, setMetas] = useState([]); // <-- NUEVO ESTADO PARA METAS
   const [cargando, setCargando] = useState(true);
 
   // --- MAPERS: Traductores Frontend <-> Base de Datos ---
@@ -55,17 +56,18 @@ export function useVentas() {
     const cargarDatos = async () => {
         setCargando(true);
         try {
-            // Cargar Zonas
             const { data: dCob } = await supabase.from('ventas_zonas').select('*');
             if (dCob) setCobertura(dCob.map(mapZonaFromDB));
 
-            // Cargar Ventas
             const { data: dVen } = await supabase.from('ventas_registros').select('*').order('created_at', { ascending: false });
             if (dVen) setVentas(dVen.map(mapVentaFromDB));
 
-            // Cargar Cupones
             const { data: dCup } = await supabase.from('ventas_cupones').select('*');
             if (dCup) setCupones(dCup.map(mapCuponFromDB));
+
+            // NUEVO: CARGAR METAS
+            const { data: dMetas } = await supabase.from('ventas_metas').select('*');
+            if (dMetas) setMetas(dMetas);
 
         } catch (error) {
             console.error("Error cargando Ventas:", error);
@@ -76,7 +78,21 @@ export function useVentas() {
     cargarDatos();
   }, []);
 
-  // --- 2. GESTIÓN DE CUPONES ---
+  // --- 2. GESTIÓN DE METAS (NUEVO) ---
+  const actualizarMeta = async (mes, canal, valorMeta) => {
+      const idMeta = `${mes}-${canal}`;
+      const payload = { id: idMeta, mes, canal, meta: parseInt(valorMeta) || 0 };
+      
+      setMetas(prev => {
+          const existe = prev.find(m => m.id === idMeta);
+          if (existe) return prev.map(m => m.id === idMeta ? payload : m);
+          return [...prev, payload];
+      });
+
+      await supabase.from('ventas_metas').upsert([payload]);
+  };
+
+  // --- 3. GESTIÓN DE CUPONES ---
   const agregarCupon = async (nuevo) => {
       const cupon = { ...nuevo, id: `CUP-${Date.now()}`, activo: true, usos: 0 };
       setCupones(prev => [cupon, ...prev]);
@@ -90,38 +106,22 @@ export function useVentas() {
 
   const validarCupon = (codigo, contextoVenta) => {
       const cupon = cupones.find(c => c.codigo.toUpperCase() === codigo.toUpperCase() && c.activo);
-      
       if (!cupon) return { valido: false, mensaje: 'Cupón no existe o inactivo.' };
 
-      // Validar Vigencia
       const hoy = new Date().toISOString().split('T')[0];
       if (cupon.vigencia < hoy) return { valido: false, mensaje: 'Cupón expirado.' };
+      if (cupon.limite !== null && cupon.usados >= cupon.limite) return { valido: false, mensaje: 'Este cupón ha agotado sus usos disponibles.' };
 
-      // Validar Límite
-      if (cupon.limite !== null && cupon.usados >= cupon.limite) {
-          return { valido: false, mensaje: 'Este cupón ha agotado sus usos disponibles.' };
-      }
-
-      // Validar Restricciones
       const restr = cupon.restricciones || {};
-      if (restr.sede !== 'TODAS' && restr.sede !== contextoVenta.sede) {
-          return { valido: false, mensaje: `Solo válido para sede ${restr.sede}.` };
-      }
-      if (restr.marca !== 'TODAS' && restr.marca !== contextoVenta.marca) {
-          return { valido: false, mensaje: `Solo válido para marca ${restr.marca}.` };
-      }
-      
-      // Validar Zona Específica
+      if (restr.sede !== 'TODAS' && restr.sede !== contextoVenta.sede) return { valido: false, mensaje: `Solo válido para sede ${restr.sede}.` };
+      if (restr.marca !== 'TODAS' && restr.marca !== contextoVenta.marca) return { valido: false, mensaje: `Solo válido para marca ${restr.marca}.` };
       if (restr.zonaId && restr.zonaId !== 'TODAS') {
-          if (restr.zonaId !== contextoVenta.zonaId) {
-              return { valido: false, mensaje: 'Este cupón no es válido para esta zona.' };
-          }
+          if (restr.zonaId !== contextoVenta.zonaId) return { valido: false, mensaje: 'Este cupón no es válido para esta zona.' };
       }
-
       return { valido: true, datos: cupon, mensaje: 'Cupón aplicado correctamente.' };
   };
 
-  // --- 3. GESTIÓN DE COBERTURA Y VENTAS ---
+  // --- 4. GESTIÓN DE COBERTURA Y VENTAS ---
   const agregarZona = async (zona) => {
     const nuevaZona = { ...zona, id: `ZONA-${Date.now()}` };
     setCobertura(prev => [...prev, nuevaZona]);
@@ -136,7 +136,7 @@ export function useVentas() {
   const registrarVenta = async (datosFormulario, vendedor) => {
     const nuevaVenta = {
       id: `VENTA-${Date.now()}`,
-      fechaRegistro: new Date().toISOString(), // Formato estándar ISO para BD
+      fechaRegistro: new Date().toISOString(), 
       vendedor: { id: vendedor.id, nombre: vendedor.nombre },
       cliente: { ...datosFormulario }, 
       servicio: { ...datosFormulario },
@@ -144,75 +144,50 @@ export function useVentas() {
       bitacora: [{ fecha: new Date().toISOString(), mensaje: 'Venta registrada', usuario: vendedor.nombre }]
     };
 
-    // 1. Actualización Inmediata UI (Optimista)
     setVentas(prev => [nuevaVenta, ...prev]);
-
-    // PREPARAR ACTUALIZACIONES BD
     const updates = [];
-
-    // A) Guardar Venta
     updates.push(supabase.from('ventas_registros').insert([mapVentaToDB(nuevaVenta)]));
 
-    // B) Actualizar Inventario Puertos (Si es Fibra)
     if (datosFormulario.tecnologia === 'FIBRA' && datosFormulario.zonaId && datosFormulario.cajaId) {
         const zona = cobertura.find(z => z.id === datosFormulario.zonaId);
         if (zona) {
-            const nuevasCajas = zona.cajas.map(c => 
-                c.id === datosFormulario.cajaId ? { ...c, puertosLibres: Math.max(0, c.puertosLibres - 1) } : c
-            );
+            const nuevasCajas = zona.cajas.map(c => c.id === datosFormulario.cajaId ? { ...c, puertosLibres: Math.max(0, c.puertosLibres - 1) } : c);
             const zonaActualizada = { ...zona, cajas: nuevasCajas };
-            
-            // UI Update
             setCobertura(prev => prev.map(z => z.id === zona.id ? zonaActualizada : z));
-            // BD Update
             updates.push(supabase.from('ventas_zonas').update({ cajas: nuevasCajas }).eq('id', zona.id));
         }
     }
 
-    // C) Actualizar Uso de Cupón
     if (datosFormulario.cuponAplicado) {
         const cupon = cupones.find(c => c.id === datosFormulario.cuponAplicado.id);
         if (cupon) {
             const nuevosUsos = (cupon.usos || 0) + 1;
             const cuponActualizado = { ...cupon, usos: nuevosUsos };
-            
-            // UI Update
             setCupones(prev => prev.map(c => c.id === cupon.id ? cuponActualizado : c));
-            // BD Update
             updates.push(supabase.from('ventas_cupones').update({ usos: nuevosUsos }).eq('id', cupon.id));
         }
     }
-
-    // EJECUTAR TODO EN PARALELO
     await Promise.all(updates);
   };
 
   const actualizarEstadoVenta = async (idVenta, nuevoEstado, nota, usuarioAutor) => {
     let ventaActualizada = null;
-
     setVentas(prev => prev.map(v => {
       if (v.id === idVenta) {
-        ventaActualizada = {
-          ...v,
-          estatus: nuevoEstado,
-          bitacora: [{ fecha: new Date().toISOString(), mensaje: `Cambio a ${nuevoEstado}: ${nota}`, usuario: usuarioAutor }, ...v.bitacora || []]
-        };
+        ventaActualizada = { ...v, estatus: nuevoEstado, bitacora: [{ fecha: new Date().toISOString(), mensaje: `Cambio a ${nuevoEstado}: ${nota}`, usuario: usuarioAutor }, ...v.bitacora || []] };
         return ventaActualizada;
       }
       return v;
     }));
 
     if (ventaActualizada) {
-        await supabase.from('ventas_registros').update({ 
-            estatus: nuevoEstado, 
-            bitacora: ventaActualizada.bitacora 
-        }).eq('id', idVenta);
+        await supabase.from('ventas_registros').update({ estatus: nuevoEstado, bitacora: ventaActualizada.bitacora }).eq('id', idVenta);
     }
   };
 
   return { 
-      cobertura, ventas, cupones, cargando,
+      cobertura, ventas, cupones, metas, cargando,
       agregarZona, actualizarZona, registrarVenta, actualizarEstadoVenta, 
-      agregarCupon, eliminarCupon, validarCupon 
+      agregarCupon, eliminarCupon, validarCupon, actualizarMeta
   };
 }
