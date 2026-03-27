@@ -3,7 +3,7 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useMemo } from 'react';
-import dynamic from 'next/dynamic'; // <-- IMPORTANTE PARA EVITAR EL CRASH DE LEAFLET
+import dynamic from 'next/dynamic'; 
 import { 
   MdMap, MdAdd, MdSearch, MdWifi, MdCable, MdClose, MdRouter, 
   MdLocationOn, MdDelete, MdPlace, MdBusiness, MdDomain, 
@@ -11,25 +11,23 @@ import {
   MdViewModule
 } from "react-icons/md";
 
-// IMPORTACIÓN DINÁMICA DEL MAPA (Evita el error 'window is not defined')
+// IMPORTACIÓN DINÁMICA DE LOS DOS MAPAS
 const MapaGlobal = dynamic(() => import('./MapaGlobal'), { 
     ssr: false, 
-    loading: () => (
-        <div className="h-full w-full bg-gray-50 rounded-[2.5rem] border border-gray-100 flex flex-col items-center justify-center animate-pulse">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4"><MdMap className="text-4xl text-blue-600 animate-bounce"/></div>
-            <h3 className="text-lg font-black text-gray-400">Cargando Motor Cartográfico...</h3>
-        </div>
-    )
+    loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center animate-pulse"><MdMap className="text-4xl text-gray-300"/></div>
 });
 
-// --- CATÁLOGOS DEL SISTEMA ---
+const MapaEditor = dynamic(() => import('./MapaEditor'), { 
+    ssr: false, 
+    loading: () => <div className="h-64 w-full bg-gray-100 rounded-2xl flex items-center justify-center animate-pulse"><MdMap className="text-3xl text-gray-300"/></div>
+});
+
 const SEDES = ['Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
 const MARCAS = ['DMG NET', 'Intercheap', 'Fibrox MX', 'WifiCel'];
 
 export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZona, usuarioActual }) {
   const [vistaActiva, setVistaActiva] = useState('TARJETAS'); 
   
-  // --- ESTADOS DE FILTROS ---
   const [busqueda, setBusqueda] = useState('');
   const [filtroRegion, setFiltroRegion] = useState('TODAS');
   const [filtroMarca, setFiltroMarca] = useState('TODAS');
@@ -42,6 +40,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const [planes, setPlanes] = useState([]); 
   const [nuevoPlan, setNuevoPlan] = useState({ velocidad: '', precio: '' });
 
+  // ESTADOS DEL FORMULARIO DE NUEVA ZONA
   const [tipoTecnologia, setTipoTecnologia] = useState('FIBRA'); 
   const [datosZona, setDatosZona] = useState({ nombreAp: '', sede: 'Centro', marca: 'DMG NET', municipio: '', estado: 'Guanajuato' });
   const [coordenadas, setCoordenadas] = useState({ lat: '', lng: '' });
@@ -49,6 +48,9 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const [nuevaCaja, setNuevaCaja] = useState({ nombre: '', calles: '', puertos: 8, lat: '', lng: '' }); 
   const [comunidadesAP, setComunidadesAP] = useState([]); 
   const [nuevaComunidad, setNuevaComunidad] = useState('');
+
+  // NUEVO: ESTADO PARA EL EDITOR DE MAPAS
+  const [modoEdicionMapa, setModoEdicionMapa] = useState('ZONA'); // 'ZONA' | 'CAJA'
 
   const rol = usuarioActual?.rol || '';
   const esMarketing = ['GERENTE_MKT', 'DIRECTOR', 'ADMINISTRADOR'].includes(rol);
@@ -68,10 +70,21 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
       });
   }, [cobertura, busqueda, filtroRegion, filtroMarca, filtroTipo]);
 
+  // EL MOTOR DE CLICS EN EL MAPA EDITOR
+  const handleMapClick = (latlng) => {
+      if (modoEdicionMapa === 'ZONA') {
+          setCoordenadas({ lat: latlng.lat.toFixed(6), lng: latlng.lng.toFixed(6) });
+      } else {
+          setNuevaCaja({ ...nuevaCaja, lat: latlng.lat.toFixed(6), lng: latlng.lng.toFixed(6) });
+      }
+  };
+
   const agregarCajaALista = () => {
     if (!nuevaCaja.nombre || !nuevaCaja.calles) return alert("Faltan datos de la caja");
+    if (!nuevaCaja.lat || !nuevaCaja.lng) return alert("Haz clic en el mapa para ubicar la caja.");
     setCajasTemporales([...cajasTemporales, { ...nuevaCaja, id: `TEMP-${Date.now()}` }]);
     setNuevaCaja({ nombre: '', calles: '', puertos: 8, lat: '', lng: '' }); 
+    setModoEdicionMapa('ZONA'); // Regresa el mapa a modo zona
   };
   const eliminarCajaDeLista = (id) => setCajasTemporales(cajasTemporales.filter(c => c.id !== id));
 
@@ -107,8 +120,9 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const handleGuardarZona = (e) => {
     e.preventDefault();
     if (!datosZona.nombreAp || !datosZona.municipio) return alert("Faltan datos generales");
+    if (!coordenadas.lat || !coordenadas.lng) return alert("Haz clic en el mapa para ubicar la antena/OLT central.");
     if (tipoTecnologia === 'ANTENA' && comunidadesAP.length === 0) return alert("Agrega comunidades.");
-    if (tipoTecnologia === 'FIBRA' && cajasTemporales.length === 0) return alert("Configura cajas NAP.");
+    if (tipoTecnologia === 'FIBRA' && cajasTemporales.length === 0) return alert("Configura y ubica al menos una caja NAP.");
 
     const zonaFinal = {
         id: `ZONA-${Date.now()}`, ...datosZona, tipo: tipoTecnologia,
@@ -220,24 +234,23 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
               </div>
           ) : (
               <div className="h-full w-full bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-2 animate-fade-in">
-                  {/* AQUÍ INYECTAMOS EL MAPA GLOBAL */}
                   <MapaGlobal zonas={zonasFiltradas} />
               </div>
           )}
       </div>
 
-      {/* --- MODAL NUEVA ZONA (TÉCNICA) --- */}
+      {/* --- MODAL NUEVA ZONA CON EDITOR MAPA --- */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
-            <div className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl animate-scale-in max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-[2rem] w-full max-w-2xl p-8 shadow-2xl animate-scale-in max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-extrabold text-gray-900">Agregar Zona</h2>
                     <button onClick={() => setModalOpen(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><MdClose /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
                     <div className="flex bg-gray-100 p-1 rounded-2xl mb-6">
-                        <button onClick={() => setTipoTecnologia('FIBRA')} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${tipoTecnologia === 'FIBRA' ? 'bg-white shadow text-purple-600' : 'text-gray-500'}`}>Fibra Óptica</button>
-                        <button onClick={() => setTipoTecnologia('ANTENA')} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${tipoTecnologia === 'ANTENA' ? 'bg-white shadow text-orange-600' : 'text-gray-500'}`}>Antena</button>
+                        <button onClick={() => { setTipoTecnologia('FIBRA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${tipoTecnologia === 'FIBRA' ? 'bg-white shadow text-purple-600' : 'text-gray-500'}`}>Fibra Óptica</button>
+                        <button onClick={() => { setTipoTecnologia('ANTENA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${tipoTecnologia === 'ANTENA' ? 'bg-white shadow text-orange-600' : 'text-gray-500'}`}>Antena</button>
                     </div>
                     <form id="zonaForm" onSubmit={handleGuardarZona} className="space-y-5">
                         <div className="grid grid-cols-2 gap-4">
@@ -249,30 +262,60 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                             <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">Municipio</label><input required type="text" placeholder="Ej: San Diego" value={datosZona.municipio} onChange={(e) => setDatosZona({...datosZona, municipio: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-medium text-gray-800" /></div>
                             <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">Estado</label><input required type="text" placeholder="Ej: Guanajuato" value={datosZona.estado} onChange={(e) => setDatosZona({...datosZona, estado: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-medium text-gray-800" /></div>
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-dashed border-gray-200">
-                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Latitud AP/OLT</label><input type="number" placeholder="19.xxx" value={coordenadas.lat} onChange={(e) => setCoordenadas({...coordenadas, lat: e.target.value})} className="w-full px-4 py-2 bg-gray-50 rounded-xl outline-none text-xs" /></div>
-                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Longitud AP/OLT</label><input type="number" placeholder="-99.xxx" value={coordenadas.lng} onChange={(e) => setCoordenadas({...coordenadas, lng: e.target.value})} className="w-full px-4 py-2 bg-gray-50 rounded-xl outline-none text-xs" /></div>
+
+                        {/* EL NUEVO EDITOR DE MAPA INCRUSTADO */}
+                        <div className="bg-gray-50 p-4 rounded-3xl border border-gray-200 mt-6">
+                            <h4 className="text-sm font-extrabold text-gray-800 mb-3 flex items-center gap-2"><MdMap className="text-blue-500"/> Ubicación Geográfica (Clic para ubicar)</h4>
+                            
+                            {/* SWITCH DE EDICIÓN PARA FIBRA ÓPTICA */}
+                            {tipoTecnologia === 'FIBRA' && (
+                                <div className="flex bg-gray-200/50 p-1 rounded-xl mb-3">
+                                    <button type="button" onClick={() => setModoEdicionMapa('ZONA')} className={`flex-1 py-2 text-[10px] uppercase tracking-widest font-black rounded-lg transition-all ${modoEdicionMapa === 'ZONA' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-400'}`}>1. OLT Principal</button>
+                                    <button type="button" onClick={() => setModoEdicionMapa('CAJA')} className={`flex-1 py-2 text-[10px] uppercase tracking-widest font-black rounded-lg transition-all ${modoEdicionMapa === 'CAJA' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>2. Cajas NAP</button>
+                                </div>
+                            )}
+
+                            <MapaEditor 
+                                posicionCentro={modoEdicionMapa === 'ZONA' ? coordenadas : nuevaCaja} 
+                                setPosicion={handleMapClick} 
+                                tipoPunto={modoEdicionMapa === 'ZONA' ? tipoTecnologia : 'CAJA'}
+                                marcadoresExtra={cajasTemporales}
+                            />
+                            
+                            <div className="grid grid-cols-2 gap-4 mt-3">
+                                <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Latitud ({modoEdicionMapa === 'ZONA' ? 'OLT' : 'Caja'})</label><input readOnly value={modoEdicionMapa === 'ZONA' ? coordenadas.lat : nuevaCaja.lat} className="w-full px-4 py-2 bg-white rounded-xl text-xs border border-gray-100 text-gray-400 font-bold" /></div>
+                                <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Longitud ({modoEdicionMapa === 'ZONA' ? 'OLT' : 'Caja'})</label><input readOnly value={modoEdicionMapa === 'ZONA' ? coordenadas.lng : nuevaCaja.lng} className="w-full px-4 py-2 bg-white rounded-xl text-xs border border-gray-100 text-gray-400 font-bold" /></div>
+                            </div>
                         </div>
 
+                        {/* COMUNIDADES ANTENA */}
                         {tipoTecnologia === 'ANTENA' && (
                             <div className="bg-orange-50 p-5 rounded-3xl border border-orange-100"><h4 className="text-sm font-extrabold text-orange-800 mb-2 flex items-center gap-2"><MdPlace/> Comunidades Cubiertas</h4><div className="flex gap-2 mb-3"><input type="text" placeholder="Ej: La Soledad" value={nuevaComunidad} onChange={(e) => setNuevaComunidad(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), agregarComunidad())} className="flex-1 px-4 py-2 bg-white rounded-xl text-sm outline-none border border-orange-200" /><button type="button" onClick={agregarComunidad} className="px-4 py-2 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600">Agregar</button></div><div className="flex flex-wrap gap-2">{comunidadesAP.map((com, idx) => (<span key={idx} className="px-3 py-1 bg-white border border-orange-200 text-orange-700 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm">{com} <button type="button" onClick={() => eliminarComunidad(com)} className="text-orange-300 hover:text-red-500"><MdClose/></button></span>))}</div></div>
                         )}
+
+                        {/* FORMULARIO DE CAJAS (Ya no pide coordenadas manuales) */}
                         {tipoTecnologia === 'FIBRA' && (
-                            <div className="bg-purple-50 p-5 rounded-3xl border border-purple-100"><h4 className="text-sm font-extrabold text-purple-800 mb-4 flex items-center gap-2"><MdRouter/> Configurar Cajas (NAP)</h4><div className="space-y-3 mb-4"><input type="text" placeholder="Nombre (Ej: Caja 1)" value={nuevaCaja.nombre} onChange={(e) => setNuevaCaja({...nuevaCaja, nombre: e.target.value})} className="w-full px-4 py-2 bg-white rounded-xl text-sm border border-purple-100 outline-none" /><input type="text" placeholder="Calles que abarca" value={nuevaCaja.calles} onChange={(e) => setNuevaCaja({...nuevaCaja, calles: e.target.value})} className="w-full px-4 py-2 bg-white rounded-xl text-sm border border-purple-100 outline-none" />
-                            <div className="grid grid-cols-2 gap-2"><input type="number" placeholder="Lat (Opcional)" value={nuevaCaja.lat} onChange={(e) => setNuevaCaja({...nuevaCaja, lat: e.target.value})} className="px-4 py-2 bg-white rounded-xl text-xs border border-purple-100 outline-none" /><input type="number" placeholder="Lng (Opcional)" value={nuevaCaja.lng} onChange={(e) => setNuevaCaja({...nuevaCaja, lng: e.target.value})} className="px-4 py-2 bg-white rounded-xl text-xs border border-purple-100 outline-none" /></div>
-                            <div className="flex gap-2 items-center"><input type="number" placeholder="Puertos" value={nuevaCaja.puertos} onChange={(e) => setNuevaCaja({...nuevaCaja, puertos: e.target.value})} className="w-20 px-4 py-2 bg-white rounded-xl text-sm border border-purple-100 outline-none text-center font-bold" /><button type="button" onClick={agregarCajaALista} className="flex-1 py-2 bg-purple-600 text-white rounded-xl font-bold text-sm hover:bg-purple-700">Agregar Caja</button></div></div>{cajasTemporales.length > 0 && <div className="space-y-2">{cajasTemporales.map((c, i) => (<div key={i} className="flex justify-between items-center bg-white p-3 rounded-xl border border-purple-100 shadow-sm"><div><p className="text-xs font-bold text-gray-800">{c.nombre}</p><p className="text-[10px] text-gray-500">{c.puertos} puertos</p></div><button type="button" onClick={() => eliminarCajaDeLista(c.id)} className="text-red-400 hover:text-red-600"><MdDelete/></button></div>))}</div>}</div>
+                            <div className="bg-green-50 p-5 rounded-3xl border border-green-100">
+                                <h4 className="text-sm font-extrabold text-green-800 mb-2 flex items-center gap-2"><MdRouter/> Agregar Caja NAP</h4>
+                                <p className="text-[10px] text-green-600 mb-3">*Asegúrate de haber seleccionado "2. Cajas NAP" arriba y dar clic en el mapa para ubicarla.</p>
+                                <div className="space-y-3 mb-4">
+                                    <input type="text" placeholder="Nombre (Ej: Caja 1)" value={nuevaCaja.nombre} onChange={(e) => setNuevaCaja({...nuevaCaja, nombre: e.target.value})} className="w-full px-4 py-2 bg-white rounded-xl text-sm border border-green-100 outline-none" />
+                                    <input type="text" placeholder="Calles que abarca" value={nuevaCaja.calles} onChange={(e) => setNuevaCaja({...nuevaCaja, calles: e.target.value})} className="w-full px-4 py-2 bg-white rounded-xl text-sm border border-green-100 outline-none" />
+                                    <div className="flex gap-2 items-center"><input type="number" placeholder="Puertos" value={nuevaCaja.puertos} onChange={(e) => setNuevaCaja({...nuevaCaja, puertos: e.target.value})} className="w-20 px-4 py-2 bg-white rounded-xl text-sm border border-green-100 outline-none text-center font-bold" /><button type="button" onClick={agregarCajaALista} className="flex-1 py-2 bg-green-600 text-white rounded-xl font-bold text-sm hover:bg-green-700">Guardar Caja</button></div>
+                                </div>
+                                {cajasTemporales.length > 0 && <div className="space-y-2">{cajasTemporales.map((c, i) => (<div key={i} className="flex justify-between items-center bg-white p-3 rounded-xl border border-green-200 shadow-sm"><div><p className="text-xs font-bold text-gray-800">{c.nombre} <span className="text-[9px] text-green-500 bg-green-50 px-1 rounded ml-1">📍 {c.lat}</span></p><p className="text-[10px] text-gray-500">{c.puertos} puertos</p></div><button type="button" onClick={() => eliminarCajaDeLista(c.id)} className="text-red-400 hover:text-red-600"><MdDelete/></button></div>))}</div>}
+                            </div>
                         )}
                     </form>
                 </div>
                 <div className="pt-6 border-t border-gray-100 mt-2">
-                    <button type="submit" form="zonaForm" className="w-full py-4 bg-gray-900 text-white font-bold rounded-2xl shadow-lg hover:bg-black transition-all">Siguiente: Dibujar en Mapa</button>
+                    <button type="submit" form="zonaForm" className="w-full py-4 bg-gray-900 text-white font-bold rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"><MdSave className="text-xl"/> Guardar Zona Completa</button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* --- MODAL CONFIGURACIÓN MARKETING --- */}
+      {/* --- MODAL CONFIGURACIÓN MARKETING (Se queda igual de hermoso) --- */}
       {zonaAConfigurar && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
             <div className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl animate-scale-in max-h-[90vh] flex flex-col">
