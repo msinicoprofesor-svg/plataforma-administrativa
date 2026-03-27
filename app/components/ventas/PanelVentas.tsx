@@ -1,13 +1,17 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/PanelVentas.tsx (CUPONES INTELIGENTES)             */
+/* ARCHIVO: app/components/ventas/PanelVentas.tsx (CUPONES INTELIGENTES)      */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { 
   MdAddShoppingCart, MdPerson, MdLocationOn, MdRouter, MdAttachMoney, 
   MdSignalCellularAlt, MdCheckCircle, MdSearch, MdMap, MdCameraAlt, MdWifiTethering, 
-  MdDns, MdSettingsInputAntenna, MdDescription, MdWarning, MdVerified, MdSwapHoriz, MdFiberNew, MdDelete, MdLocalOffer, MdClose
+  MdDns, MdSettingsInputAntenna, MdDescription, MdWarning, MdVerified, MdSwapHoriz, 
+  MdFiberNew, MdDelete, MdLocalOffer, MdClose, MdBarChart, MdAssignment
 } from "react-icons/md";
+
+// IMPORTAR EL NUEVO MÓDULO ANALÍTICO
+import AnaliticaVentas from './AnaliticaVentas';
 
 // --- CATÁLOGOS ESTÁTICOS ---
 const REGIONES = [
@@ -32,10 +36,18 @@ const CONFIG_MARCAS = {
 };
 
 export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVenta, vendedorActual, validarCupon }) {
+  
+  // VERIFICAR PERMISOS GERENCIALES PARA MOSTRAR LA PESTAÑA DE ANALÍTICA
+  const rolNormalizado = (vendedorActual?.rol || '').toUpperCase();
+  const ROLES_GERENCIALES = ['GERENTE_MKT', 'GERENTE MARKETING', 'GERENTE_GENERAL', 'GERENTE GENERAL', 'DIRECTOR', 'ADMINISTRADOR', 'SOPORTE_GENERAL'];
+  const esGerencia = ROLES_GERENCIALES.includes(rolNormalizado);
+
+  // ESTADO DE LAS PESTAÑAS
+  const [tabActiva, setTabActiva] = useState('MIS_VENTAS');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   
-  // ESTADO DEL FORMULARIO
   const [form, setForm] = useState({
     nombre: '', telefono1: '', telefono2: '',
     estado: 'Guanajuato', municipio: '', comunidad: '', direccion: '', 
@@ -49,15 +61,11 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
     requiereVerificacion: false,
     tipoVenta: 'NUEVA', 
     fotosEvidencia: { router: null, antena: null },
-    
-    // CUPONES
-    codigoCupon: '',     
-    cuponAplicado: null  
+    codigoCupon: '', cuponAplicado: null  
   });
 
   const [mensajeCupon, setMensajeCupon] = useState({ texto: '', tipo: '' });
 
-  // --- LÓGICA DE FILTRADO ZONAS ---
   const zonasDisponibles = useMemo(() => {
     if (form.tipoServicio !== 'INTERNET') return [];
     return cobertura.filter(zona => {
@@ -81,15 +89,11 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
       return zonaSeleccionadaData?.planes || [];
   }, [zonaSeleccionadaData]);
 
-  // --- LÓGICA INTELIGENTE AP ---
   const apSugerido = useMemo(() => {
       if (form.tecnologia !== 'ANTENA' || !form.comunidad || form.comunidad.length < 3) return null;
       return cobertura.find(z => 
-          z.tipo === 'ANTENA' && 
-          z.sede === form.region &&
-          z.estatus === 'ACTIVA' &&
-          z.comunidades && 
-          z.comunidades.some(c => c.toLowerCase().includes(form.comunidad.toLowerCase()))
+          z.tipo === 'ANTENA' && z.sede === form.region && z.estatus === 'ACTIVA' &&
+          z.comunidades && z.comunidades.some(c => c.toLowerCase().includes(form.comunidad.toLowerCase()))
       );
   }, [cobertura, form.comunidad, form.tecnologia, form.region]);
 
@@ -101,7 +105,6 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
       }
   }, [apSugerido, form.comunidad, form.tecnologia]);
 
-  // --- LÓGICA DE PRECIOS + CUPONES ---
   const calcularDescuento = (precioBase, cupon) => {
       if (!cupon) return precioBase;
       let descuento = 0;
@@ -111,69 +114,39 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
   };
 
   useEffect(() => {
-      // 1. Costo Instalación
       if (zonaSeleccionadaData && zonaSeleccionadaData.costos) {
-          let precioBase = form.tipoVenta === 'NUEVA' 
-              ? zonaSeleccionadaData.costos.instalacion 
-              : zonaSeleccionadaData.costos.cambio;
-          
-          if (form.cuponAplicado && form.cuponAplicado.aplicarA === 'INSTALACION') {
-              precioBase = calcularDescuento(precioBase, form.cuponAplicado);
-          }
+          let precioBase = form.tipoVenta === 'NUEVA' ? zonaSeleccionadaData.costos.instalacion : zonaSeleccionadaData.costos.cambio;
+          if (form.cuponAplicado && form.cuponAplicado.aplicarA === 'INSTALACION') precioBase = calcularDescuento(precioBase, form.cuponAplicado);
           setForm(prev => ({ ...prev, costoInstalacion: precioBase }));
       }
-
-      // 2. Mensualidad
       if (form.velocidad && planesDisponibles.length > 0) {
           const plan = planesDisponibles.find(p => p.velocidad === form.velocidad);
           if (plan) {
               let precioMes = plan.precio;
-              if (form.cuponAplicado && form.cuponAplicado.aplicarA === 'MENSUALIDAD') {
-                  precioMes = calcularDescuento(precioMes, form.cuponAplicado);
-              }
+              if (form.cuponAplicado && form.cuponAplicado.aplicarA === 'MENSUALIDAD') precioMes = calcularDescuento(precioMes, form.cuponAplicado);
               setForm(prev => ({ ...prev, mensualidad: precioMes }));
           }
       }
   }, [zonaSeleccionadaData, form.tipoVenta, form.velocidad, form.cuponAplicado, planesDisponibles]);
 
-
-  // --- CUPONES SUGERIDOS (NUEVA LÓGICA) ---
   const cuponesSugeridos = useMemo(() => {
       if (!cupones) return [];
-      
       const hoy = new Date().toISOString().split('T')[0];
-      
       return cupones.filter(c => {
-          // Filtros básicos
-          if (!c.activo) return false;
-          if (c.vigencia < hoy) return false;
-          if (c.limite !== null && c.usados >= c.limite) return false;
-
-          // Filtros de contexto (Sede y Marca)
+          if (!c.activo || c.vigencia < hoy || (c.limite !== null && c.usados >= c.limite)) return false;
           if (c.restricciones.sede !== 'TODAS' && c.restricciones.sede !== form.region) return false;
           if (c.restricciones.marca !== 'TODAS' && c.restricciones.marca !== form.marca) return false;
-          
-          // Filtro de ZONA ESPECÍFICA
           if (c.restricciones.zonaId && c.restricciones.zonaId !== 'TODAS') {
-              // Si aún no ha seleccionado zona, no mostrar cupón específico
-              if (!form.zonaId) return false; 
-              // Si la zona seleccionada no coincide con la del cupón
-              if (c.restricciones.zonaId !== form.zonaId) return false;
+              if (!form.zonaId || c.restricciones.zonaId !== form.zonaId) return false;
           }
-
           return true;
       });
   }, [cupones, form.region, form.marca, form.zonaId]);
 
-
-  // --- MANEJADORES ---
   const handleAplicarCupon = (codigoManual = null) => {
       const codigo = codigoManual || form.codigoCupon;
       if (!codigo) return;
-      
-      const contexto = { sede: form.region, marca: form.marca, zonaId: form.zonaId };
-      const resultado = validarCupon(codigo, contexto);
-
+      const resultado = validarCupon(codigo, { sede: form.region, marca: form.marca, zonaId: form.zonaId });
       if (resultado.valido) {
           setForm(prev => ({ ...prev, codigoCupon: codigo, cuponAplicado: resultado.datos }));
           setMensajeCupon({ texto: `¡${resultado.mensaje}!`, tipo: 'exito' });
@@ -190,7 +163,6 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
     if (name === 'marca') {
       const config = CONFIG_MARCAS[value];
       const esInternet = config.tipo === 'INTERNET';
@@ -223,16 +195,12 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
       if (file) {
           if (file.size > 500 * 1024) return alert("La imagen es muy pesada. Máximo 500KB.");
           const reader = new FileReader();
-          reader.onloadend = () => {
-              setForm(prev => ({ ...prev, fotosEvidencia: { ...prev.fotosEvidencia, [tipoFoto]: reader.result } }));
-          };
+          reader.onloadend = () => { setForm(prev => ({ ...prev, fotosEvidencia: { ...prev.fotosEvidencia, [tipoFoto]: reader.result } })); };
           reader.readAsDataURL(file);
       }
   };
 
-  const removeEvidencia = (tipoFoto) => {
-      setForm(prev => ({ ...prev, fotosEvidencia: { ...prev.fotosEvidencia, [tipoFoto]: null } }));
-  };
+  const removeEvidencia = (tipoFoto) => setForm(prev => ({ ...prev, fotosEvidencia: { ...prev.fotosEvidencia, [tipoFoto]: null } }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -260,62 +228,93 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
     setMensajeCupon({ texto: '', tipo: '' });
   };
 
-  const misVentas = ventas.filter(v => v.vendedor.id === vendedorActual.id);
+  const misVentas = ventas.filter(v => v.vendedor?.id === vendedorActual?.id);
 
   return (
     <div className="h-full flex flex-col">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-         <div className="flex-1 bg-white p-6 rounded-[2rem] shadow-sm border border-red-50 relative overflow-hidden">
-            <div className="relative z-10">
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Ventas del Mes</p>
-                <h3 className="text-4xl font-extrabold text-gray-800 mt-1">{misVentas.length}</h3>
+        
+        {/* SISTEMA DE PESTAÑAS (SÓLO VISIBLE PARA GERENCIA) */}
+        {esGerencia && (
+            <div className="flex bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 mb-6 w-full max-w-sm mx-auto z-10 shrink-0">
+                <button 
+                    onClick={() => setTabActiva('MIS_VENTAS')} 
+                    className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tabActiva === 'MIS_VENTAS' ? 'bg-red-50 text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <MdAssignment className="text-lg"/> Mis Ventas
+                </button>
+                <button 
+                    onClick={() => setTabActiva('ANALITICA')} 
+                    className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tabActiva === 'ANALITICA' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <MdBarChart className="text-lg"/> Analítica Global
+                </button>
             </div>
-            <MdAttachMoney className="absolute -right-4 -bottom-4 text-8xl text-red-50" />
-         </div>
-         <button onClick={() => setIsModalOpen(true)} className="bg-[#DA291C] text-white p-6 rounded-[2rem] shadow-xl shadow-red-500/30 hover:shadow-red-500/50 hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-2 min-w-[150px]">
-            <MdAddShoppingCart className="text-4xl" />
-            <span className="font-bold text-sm">Nueva Venta</span>
-         </button>
-      </div>
+        )}
 
-      {/* LISTA */}
-      <div className="bg-white rounded-[2.5rem] shadow-sm flex-1 overflow-hidden flex flex-col">
-         <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-            <h3 className="font-bold text-gray-800">Historial de Ventas</h3>
-            <div className="bg-gray-100 rounded-full px-4 py-2 flex items-center gap-2 text-gray-500">
-                <MdSearch /><input type="text" placeholder="Buscar cliente..." className="bg-transparent outline-none text-sm font-bold w-32" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-            </div>
-         </div>
-         <div className="overflow-y-auto p-4 custom-scrollbar space-y-3">
-            {misVentas.length === 0 ? (
-                <div className="text-center py-20 text-gray-400"><MdAddShoppingCart className="text-6xl mx-auto mb-4 opacity-20" /><p>Aún no has registrado ventas.</p></div>
-            ) : (
-                misVentas
-                .filter(v => v.cliente.nombre.toLowerCase().includes(busqueda.toLowerCase()))
-                .map(venta => (
-                    <div key={venta.id} className="bg-gray-50 p-4 rounded-3xl flex items-center gap-4 hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-gray-100">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl text-white shadow-md ${venta.estatus === 'PENDIENTE' ? 'bg-yellow-400 shadow-yellow-200' : venta.estatus === 'FINALIZADA' ? 'bg-green-500 shadow-green-200' : 'bg-blue-500 shadow-blue-200'}`}>
-                            {venta.servicio.tipoServicio === 'CCTV' ? <MdCameraAlt /> : venta.servicio.tipoServicio === 'HOTSPOT' ? <MdWifiTethering /> : <MdRouter />}
+        <div className="flex-1 min-h-0 relative">
+            {/* VISTA 1: CAPTURA DE VENTAS DEL USUARIO (VISTA ORIGINAL) */}
+            {tabActiva === 'MIS_VENTAS' && (
+                <div className="flex flex-col h-full animate-fade-in absolute inset-0">
+                    <div className="flex flex-col md:flex-row gap-4 mb-6 shrink-0">
+                        <div className="flex-1 bg-white p-6 rounded-[2rem] shadow-sm border border-red-50 relative overflow-hidden">
+                            <div className="relative z-10">
+                                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Mis Ventas del Mes</p>
+                                <h3 className="text-4xl font-extrabold text-gray-800 mt-1">{misVentas.length}</h3>
+                            </div>
+                            <MdAttachMoney className="absolute -right-4 -bottom-4 text-8xl text-red-50" />
                         </div>
-                        <div className="flex-1">
-                            <h4 className="font-bold text-gray-800">{venta.cliente.nombre}</h4>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded uppercase">{venta.servicio.tecnologia}</span>
-                                {venta.servicio.tipoVenta === 'CAMBIO' && <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded uppercase">Cambio</span>}
+                        <button onClick={() => setIsModalOpen(true)} className="bg-[#DA291C] text-white p-6 rounded-[2rem] shadow-xl shadow-red-500/30 hover:shadow-red-500/50 hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-2 min-w-[150px]">
+                            <MdAddShoppingCart className="text-4xl" />
+                            <span className="font-bold text-sm">Nueva Venta</span>
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-[2.5rem] shadow-sm flex-1 overflow-hidden flex flex-col border border-gray-100">
+                        <div className="p-6 border-b border-gray-50 flex justify-between items-center shrink-0">
+                            <h3 className="font-bold text-gray-800">Mi Historial Reciente</h3>
+                            <div className="bg-gray-100 rounded-full px-4 py-2 flex items-center gap-2 text-gray-500">
+                                <MdSearch /><input type="text" placeholder="Buscar cliente..." className="bg-transparent outline-none text-sm font-bold w-32" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
                             </div>
                         </div>
-                        <div className="text-right">
-                            <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${venta.estatus === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-700' : venta.estatus === 'FINALIZADA' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{venta.estatus.replace('_', ' ')}</span>
-                            <p className="text-xs font-bold text-gray-400 mt-1">{venta.fechaRegistro}</p>
+                        <div className="overflow-y-auto p-4 custom-scrollbar space-y-3 flex-1">
+                            {misVentas.length === 0 ? (
+                                <div className="text-center py-20 text-gray-400"><MdAddShoppingCart className="text-6xl mx-auto mb-4 opacity-20" /><p>Aún no has registrado ventas.</p></div>
+                            ) : (
+                                misVentas
+                                .filter(v => v.cliente?.nombre?.toLowerCase().includes(busqueda.toLowerCase()))
+                                .map(venta => (
+                                    <div key={venta.id} className="bg-gray-50 p-4 rounded-3xl flex items-center gap-4 hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-gray-100">
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl text-white shadow-md shrink-0 ${venta.estatus === 'PENDIENTE' ? 'bg-yellow-400 shadow-yellow-200' : venta.estatus === 'FINALIZADA' ? 'bg-green-500 shadow-green-200' : 'bg-blue-500 shadow-blue-200'}`}>
+                                            {venta.servicio?.tipoServicio === 'CCTV' ? <MdCameraAlt /> : venta.servicio?.tipoServicio === 'HOTSPOT' ? <MdWifiTethering /> : <MdRouter />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-bold text-gray-800 truncate">{venta.cliente?.nombre}</h4>
+                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded uppercase">{venta.servicio?.tecnologia}</span>
+                                                {venta.servicio?.tipoVenta === 'CAMBIO' && <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded uppercase">Cambio</span>}
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${venta.estatus === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-700' : venta.estatus === 'FINALIZADA' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{venta.estatus.replace('_', ' ')}</span>
+                                            <p className="text-xs font-bold text-gray-400 mt-1">{new Date(venta.fechaRegistro).toLocaleDateString('es-MX')}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
-                ))
+                </div>
             )}
-         </div>
-      </div>
 
-      {/* MODAL NUEVA VENTA */}
+            {/* VISTA 2: ANALÍTICA GLOBAL (SÓLO GERENTES) */}
+            {tabActiva === 'ANALITICA' && esGerencia && (
+                <div className="absolute inset-0">
+                    <AnaliticaVentas ventas={ventas} />
+                </div>
+            )}
+        </div>
+
+      {/* MODAL NUEVA VENTA (PERMANECE IGUAL) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
             <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-scale-in max-h-[90vh] flex flex-col overflow-hidden">
@@ -408,11 +407,9 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
                             <div><label className="text-[10px] font-bold text-gray-400 uppercase ml-3">Tipo de Hotspot</label><div className="relative"><MdSettingsInputAntenna className="absolute left-3 top-3.5 text-gray-400 text-lg" /><select name="paquete" value={form.paquete} onChange={handleChange} className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl outline-none text-sm font-bold text-gray-800 cursor-pointer"><option value="">-- Seleccionar Sistema --</option>{CONFIG_MARCAS['WifiCel'].opciones.map(o => <option key={o} value={o}>{o}</option>)}</select></div></div>
                         )}
 
-                        {/* --- SECCIÓN CUPONES (MEJORADA: SUGERENCIAS Y ZONAS) --- */}
                         <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100">
                             <label className="text-[10px] font-bold text-orange-400 uppercase mb-2 block flex items-center gap-1"><MdLocalOffer/> Promoción / Cupón</label>
                             
-                            {/* SUGERENCIAS DE CUPONES */}
                             {cuponesSugeridos.length > 0 && !form.cuponAplicado && (
                                 <div className="flex flex-wrap gap-2 mb-3">
                                     {cuponesSugeridos.map(c => (
