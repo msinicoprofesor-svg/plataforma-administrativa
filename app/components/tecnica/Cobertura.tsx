@@ -8,7 +8,7 @@ import {
   MdMap, MdAdd, MdSearch, MdWifi, MdCable, MdClose, MdRouter, 
   MdLocationOn, MdDelete, MdPlace, MdBusiness, MdDomain, 
   MdAttachMoney, MdSpeed, MdCheckCircle, MdWarning, MdSwapHoriz,
-  MdViewModule
+  MdViewModule, MdSave // <--- ¡AQUÍ ESTÁ EL FIX! (Faltaba importar MdSave)
 } from "react-icons/md";
 
 // IMPORTACIÓN DINÁMICA DE LOS DOS MAPAS
@@ -35,7 +35,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
 
   const [modalOpen, setModalOpen] = useState(false);
   const [zonaAConfigurar, setZonaAConfigurar] = useState(null);
-  const [zonaDetalles, setZonaDetalles] = useState(null); // <-- ESTADO PARA EL ÚLTIMO PASO
+  const [zonaDetalles, setZonaDetalles] = useState(null); 
   
   const [costos, setCostos] = useState({ instalacion: '', cambio: '' });
   const [planes, setPlanes] = useState([]); 
@@ -223,7 +223,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
 
                                   <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
                                       {esFibra ? <p className="text-[10px] font-bold text-gray-400">{zona.cajas?.length || 0} Cajas NAP • {totalLibres} Puertos Libres</p> : <p className="text-[10px] font-bold text-gray-400">{zona.comunidades?.length || 0} Comunidades Cubiertas</p>}
-                                      {/* CONEXIÓN AL MODAL DE DETALLES */}
                                       <button onClick={() => setZonaDetalles(zona)} className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors shadow-sm cursor-pointer relative z-10">Ver Detalles</button>
                                   </div>
                               </div>
