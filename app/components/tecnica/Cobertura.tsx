@@ -8,7 +8,7 @@ import {
   MdMap, MdAdd, MdSearch, MdWifi, MdCable, MdClose, MdRouter, 
   MdLocationOn, MdDelete, MdPlace, MdBusiness, MdDomain, 
   MdAttachMoney, MdSpeed, MdCheckCircle, MdWarning, MdSwapHoriz,
-  MdViewModule, MdSave, MdEdit
+  MdViewModule, MdSave, MdEdit, MdFilterList
 } from "react-icons/md";
 
 const MapaGlobal = dynamic(() => import('./MapaGlobal'), { ssr: false, loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center animate-pulse"><MdMap className="text-4xl text-gray-300"/></div> });
@@ -17,8 +17,10 @@ const MapaEditor = dynamic(() => import('./MapaEditor'), { ssr: false, loading: 
 const SEDES = ['Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
 const MARCAS = ['DMG NET', 'Intercheap', 'Fibrox MX', 'WifiCel'];
 
-export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZona, usuarioActual }) {
+export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZona, eliminarZona, usuarioActual }) {
   const [vistaActiva, setVistaActiva] = useState('TARJETAS'); 
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false); // NUEVO ESTADO PARA EL ACORDEÓN DE FILTROS
+
   const [busqueda, setBusqueda] = useState('');
   const [filtroRegion, setFiltroRegion] = useState('TODAS');
   const [filtroMarca, setFiltroMarca] = useState('TODAS');
@@ -105,7 +107,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
     e.preventDefault();
     if (!datosZona.nombreAp || !datosZona.municipio || !coordenadas.lat) return alert("Faltan datos generales o ubicación central.");
     
-    // FIX: Ahora sí preparamos bien los puertos para la BD
     const cajasFormateadas = cajasTemporales.map(c => ({
         ...c,
         puertosTotales: Number(c.puertos),
@@ -132,26 +133,33 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
 
   return (
     <div className="h-full flex flex-col animate-fade-in">
-      <div className="bg-white p-6 rounded-t-[2rem] rounded-b-xl shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-2 shrink-0">
+      <div className="bg-white p-6 rounded-[2rem] shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4 shrink-0 border border-gray-100 relative z-10">
         <div><h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><MdMap className="text-blue-500" /> Cobertura y GIS</h2><p className="text-sm text-gray-400 font-medium">Gestión de Infraestructura</p></div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
             <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 w-full sm:w-auto shrink-0">
                 <button onClick={() => setVistaActiva('TARJETAS')} className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${vistaActiva === 'TARJETAS' ? 'bg-white text-blue-600 shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}><MdViewModule className="text-lg" /> Tarjetas</button>
                 <button onClick={() => setVistaActiva('MAPA')} className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${vistaActiva === 'MAPA' ? 'bg-white text-blue-600 shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}><MdMap className="text-lg" /> Mapa Global</button>
             </div>
+            {/* BOTÓN PARA DESPLEGAR FILTROS */}
+            <button onClick={() => setFiltrosAbiertos(!filtrosAbiertos)} className={`px-4 py-3 rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 ${filtrosAbiertos ? 'bg-gray-800 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}><MdFilterList className="text-lg" /></button>
             <button onClick={abrirModalNuevaZona} className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"><MdAdd className="text-xl" /> Nueva Zona</button>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-t-xl rounded-b-[2rem] shadow-sm border border-gray-100 mb-6 flex flex-col gap-3 shrink-0">
-          <div className={`flex items-center gap-4 overflow-x-auto pb-1 ${scrollbarInvisible}`}>
-              <div className="bg-gray-100 rounded-2xl px-4 py-2 flex items-center gap-2 text-gray-500 min-w-[200px] shrink-0"><MdSearch className="text-lg" /><input type="text" placeholder="Buscar zona o AP..." className="bg-transparent outline-none text-sm font-bold w-full" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
-              <div className="w-px h-6 bg-gray-200 shrink-0"></div>
-              <div className="flex items-center gap-2 shrink-0"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Tipo:</span>{['TODOS', 'FIBRA', 'ANTENA'].map(t => (<button key={t} onClick={() => setFiltroTipo(t)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroTipo === t ? 'bg-gray-800 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{t === 'FIBRA' ? 'Fibra Óptica' : t}</button>))}</div>
-              <div className="w-px h-6 bg-gray-200 shrink-0"></div>
-              <div className="flex items-center gap-2 shrink-0"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Región:</span><button onClick={() => setFiltroRegion('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === 'TODAS' ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>{regionesDisponibles.map(r => (<button key={r} onClick={() => setFiltroRegion(r)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === r ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{r}</button>))}</div>
-              <div className="w-px h-6 bg-gray-200 shrink-0"></div>
-              <div className="flex items-center gap-2 shrink-0 pr-4"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Marca:</span><button onClick={() => setFiltroMarca('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === 'TODAS' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>{marcasDisponibles.map(m => (<button key={m} onClick={() => setFiltroMarca(m)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === m ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{m}</button>))}</div>
+      {/* SÚPER BARRA DE FILTROS DESPLEGABLE (ACORDEÓN CSS) */}
+      <div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-in-out ${filtrosAbiertos ? 'grid-rows-[1fr] opacity-100 mb-4' : 'grid-rows-[0fr] opacity-0 mb-0'}`}>
+          <div className="overflow-hidden">
+              <div className="bg-white p-4 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col gap-3 shrink-0">
+                  <div className={`flex items-center gap-4 overflow-x-auto pb-1 ${scrollbarInvisible}`}>
+                      <div className="bg-gray-100 rounded-2xl px-4 py-2 flex items-center gap-2 text-gray-500 min-w-[200px] shrink-0"><MdSearch className="text-lg" /><input type="text" placeholder="Buscar zona o AP..." className="bg-transparent outline-none text-sm font-bold w-full" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
+                      <div className="w-px h-6 bg-gray-200 shrink-0"></div>
+                      <div className="flex items-center gap-2 shrink-0"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Tipo:</span>{['TODOS', 'FIBRA', 'ANTENA'].map(t => (<button key={t} onClick={() => setFiltroTipo(t)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroTipo === t ? 'bg-gray-800 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{t === 'FIBRA' ? 'Fibra Óptica' : t}</button>))}</div>
+                      <div className="w-px h-6 bg-gray-200 shrink-0"></div>
+                      <div className="flex items-center gap-2 shrink-0"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Región:</span><button onClick={() => setFiltroRegion('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === 'TODAS' ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>{regionesDisponibles.map(r => (<button key={r} onClick={() => setFiltroRegion(r)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === r ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{r}</button>))}</div>
+                      <div className="w-px h-6 bg-gray-200 shrink-0"></div>
+                      <div className="flex items-center gap-2 shrink-0 pr-4"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Marca:</span><button onClick={() => setFiltroMarca('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === 'TODAS' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>{marcasDisponibles.map(m => (<button key={m} onClick={() => setFiltroMarca(m)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === m ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{m}</button>))}</div>
+                  </div>
+              </div>
           </div>
       </div>
 
@@ -164,17 +172,19 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                           const esFibra = zona.tipo === 'FIBRA';
                           return (
                               <div key={zona.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 hover:shadow-md transition-all relative group">
+                                  {/* BOTÓN DE PAPELERA (Aparece en Hover) */}
+                                  <button onClick={() => { if(window.confirm('¿Seguro que deseas eliminar esta zona y toda su infraestructura?')) eliminarZona(zona.id); }} className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white border border-red-100 text-red-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20 shadow-sm"><MdDelete/></button>
+
                                   <div className="flex justify-between items-start mb-4">
                                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl ${esFibra ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>{esFibra ? <MdCable /> : <MdWifi />}</div>
-                                      <div className="text-right">
+                                      <div className="text-right pr-8">
                                           <span className="block text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-1">{zona.sede}</span>
                                           {zona.estatus === 'PENDIENTE_PRECIOS' ? <span className="px-2 py-1 bg-orange-100 text-orange-600 rounded-md text-[10px] font-bold flex items-center justify-end gap-1"><MdWarning/> PENDIENTE</span> : <span className="px-2 py-1 bg-green-100 text-green-600 rounded-md text-[10px] font-bold flex items-center justify-end gap-1"><MdCheckCircle/> ACTIVA</span>}
                                       </div>
                                   </div>
-                                  <h3 className="text-lg font-extrabold text-gray-800 leading-tight mb-1">{zona.nombreAp || zona.comunidad}</h3>
+                                  <h3 className="text-lg font-extrabold text-gray-800 leading-tight mb-1 pr-8 truncate">{zona.nombreAp || zona.comunidad}</h3>
                                   <p className="text-xs text-gray-500 font-medium mb-4 flex items-center gap-1"><MdPlace className="text-gray-400" /> {zona.municipio}, {zona.estado}</p>
                                   
-                                  {/* BOTONES DE EDICIÓN Y DETALLES */}
                                   <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center gap-2">
                                       <button onClick={() => abrirModalEditarZona(zona)} className="flex-1 py-2 text-[10px] font-black text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"><MdEdit/> Editar GEO</button>
                                       <button onClick={() => setZonaDetalles(zona)} className="flex-1 py-2 text-[10px] font-black text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">Ver Detalles</button>
@@ -305,7 +315,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
         </div>
       )}
 
-      {/* --- MODAL DETALLES DE ZONA (FICHA TÉCNICA REPARADA Y GIGANTE) --- */}
+      {/* --- MODAL DETALLES DE ZONA (FICHA TÉCNICA) --- */}
       {zonaDetalles && (
         <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-md">
             <div className="bg-white rounded-[2rem] w-full max-w-5xl shadow-2xl animate-scale-in flex flex-col overflow-hidden h-[85vh]">
@@ -325,11 +335,9 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                                         <div key={idx} className="bg-purple-50 rounded-xl p-3 border border-purple-100 flex justify-between items-center">
                                             <div>
                                                 <p className="text-xs font-black text-purple-800">{caja.nombre}</p>
-                                                {/* FIX: Calles restauradas en el lado izquierdo */}
                                                 <p className="text-[9px] font-bold text-purple-600">{caja.calles || 'Sin calles'}</p>
                                             </div>
                                             <div className="text-center bg-white px-2 py-1 rounded-lg shadow-sm">
-                                                {/* FIX: Puertos libres calculados con seguro */}
                                                 <p className="text-[10px] font-black text-gray-800">{caja.puertosLibres ?? caja.puertos}</p>
                                                 <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Libres</p>
                                             </div>
@@ -341,7 +349,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                             <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Comunidades</p><div className="flex flex-wrap gap-2">{zonaDetalles.comunidades?.map((com, idx) => (<span key={idx} className="bg-orange-50 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-black">{com}</span>))}</div></div>
                         )}
                     </div>
-                    {/* FIX: El mapa toma todo el espacio y altura que sobra (flex-1) */}
                     <div className="w-full lg:w-2/3 h-full relative bg-gray-100 p-2">
                         {zonaDetalles.lat && zonaDetalles.lng ? <MapaGlobal zonas={[zonaDetalles]} /> : <div className="flex items-center justify-center h-full w-full opacity-50"><MdMap className="text-6xl text-gray-400 mb-2"/></div>}
                     </div>
