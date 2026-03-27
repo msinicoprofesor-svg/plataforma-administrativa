@@ -1,11 +1,12 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/page.tsx (ACTUALIZADO: MEMORIA LOCAL Y SCROLL MÓVIL)          */
+/* ARCHIVO: app/page.tsx (ACTUALIZADO: LOGIN JAVAK CORE Y DISEÑO ADMIN)       */
 /* -------------------------------------------------------------------------- */
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MdDashboard, MdEmail, MdLock } from "react-icons/md";
-import { FaStoreAlt } from "react-icons/fa";
+// FIX: Importamos iconos más administrativos y corporativos
+import { MdDashboard, MdEmail, MdLock, MdAdminPanelSettings, MdBusiness } from "react-icons/md";
+// OLD: FaStoreAlt (eliminado)
 
 import { useColaboradores } from './hooks/useColaboradores';
 import { useVentas } from './hooks/useVentas'; 
@@ -167,19 +168,22 @@ export default function Home() {
   if (!u) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8] p-4 relative overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
-        <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-red-300 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
+        {/* Fondo decorativo con blobs */}
+        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
+        <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-sky-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
         
-        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md mx-auto border border-white/50 z-10">
-            <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-tr from-[#DA291C] to-orange-400 rounded-3xl mb-6 shadow-lg shadow-red-500/30">
-                    <FaStoreAlt className="text-4xl text-white" />
+        <div className="bg-white/80 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md mx-auto border border-white/50 z-10 transition-all">
+            <div className="text-center mb-10">
+                {/* FIX: Ícono administrativo con gradiente azul profesional */}
+                <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-tr from-blue-600 to-sky-400 rounded-3xl mb-6 shadow-lg shadow-blue-500/30">
+                    <MdAdminPanelSettings className="text-5xl text-white" />
                 </div>
-                <h1 className="text-3xl font-extrabold text-gray-800">LikeStore</h1>
-                <p className="text-sm font-medium text-gray-500 mt-2">Acceso Corporativo</p>
+                {/* FIX: Nombre de la plataforma actualizado */}
+                <h1 className="text-4xl font-extrabold text-gray-900 tracking-tighter">JAVAK <span className='text-blue-600'>Core</span></h1>
+                <p className="text-sm font-semibold text-gray-500 mt-3 uppercase tracking-widest">Plataforma Administrativa Central</p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-6">
                 {errorLogin && (
                     <div className="bg-red-50 text-red-500 text-xs font-bold p-3 rounded-xl border border-red-100 text-center animate-pulse">
                         {errorLogin}
@@ -187,25 +191,30 @@ export default function Home() {
                 )}
 
                 <div className="group relative">
-                    <label className="text-[10px] font-bold text-gray-400 ml-4 uppercase mb-1 block">Correo</label>
+                    <label className="text-[10px] font-bold text-gray-400 ml-4 uppercase mb-1 block tracking-wider">Correo Electrónico</label>
                     <div className="relative">
-                        <MdEmail className="absolute left-4 top-3.5 text-gray-400 text-lg" />
-                        <input name="email" type="text" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full pl-12 pr-6 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-bold text-gray-700 focus:ring-2 focus:ring-red-100 transition-all" required />
+                        <MdEmail className="absolute left-4 top-4 text-gray-400 text-xl transition-colors group-focus-within:text-blue-500" />
+                        <input name="email" type="text" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full pl-12 pr-6 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold text-gray-800 focus:ring-2 focus:ring-blue-100 focus:bg-white focus:border-blue-200 transition-all placeholder:text-gray-300" placeholder='usuario@empresa.com' required />
                     </div>
                 </div>
 
                 <div className="group relative">
-                    <label className="text-[10px] font-bold text-gray-400 ml-4 uppercase mb-1 block">Contraseña</label>
+                    <label className="text-[10px] font-bold text-gray-400 ml-4 uppercase mb-1 block tracking-wider">Contraseña</label>
                     <div className="relative">
-                        <MdLock className="absolute left-4 top-3.5 text-gray-400 text-lg" />
-                        <input name="password" type="password" value={passInput} onChange={(e) => setPassInput(e.target.value)} className="w-full pl-12 pr-6 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-bold text-gray-700 focus:ring-2 focus:ring-red-100 transition-all" required />
+                        <MdLock className="absolute left-4 top-4 text-gray-400 text-xl transition-colors group-focus-within:text-blue-500" />
+                        <input name="password" type="password" value={passInput} onChange={(e) => setPassInput(e.target.value)} className="w-full pl-12 pr-6 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold text-gray-800 focus:ring-2 focus:ring-blue-100 focus:bg-white focus:border-blue-200 transition-all placeholder:text-gray-300" placeholder='••••••••' required />
                     </div>
                 </div>
 
-                <button type="submit" className="w-full py-4 bg-[#DA291C] text-white font-bold rounded-2xl shadow-xl hover:scale-[1.02] transition-all mt-4">
-                    Iniciar Sesión
+                {/* FIX: Botón con color azul administrativo */}
+                <button type="submit" className="w-full py-4.5 bg-blue-600 text-white font-bold rounded-2xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all mt-6 text-base tracking-tight flex items-center justify-center gap-2">
+                    <MdVerifiedUser className='text-xl' /> Ingresar Seguro
                 </button>
             </form>
+            
+            <div className="text-center mt-10 pt-6 border-t border-gray-100">
+                <p className="text-xs text-gray-400 font-medium">&copy; 2024 JAVAK Group. Todos los derechos reservados.</p>
+            </div>
         </div>
       </div>
     );
@@ -267,7 +276,6 @@ eliminarReglaComision={ventasData?.eliminarReglaComision}
                 </div>
             )}
             
-            {/* FIX: SE AGREGÓ eliminarZona={ventasData.eliminarZona} */}
             {activeModule === 'marketing_cobertura' && verCobertura && <div className="animate-slide-up h-full pb-10"><Cobertura cobertura={ventasData.cobertura} onAgregarZona={ventasData.agregarZona} onActualizarZona={ventasData.actualizarZona} eliminarZona={ventasData.eliminarZona} usuarioActual={u} /></div>}
             
             {activeModule === 'marketing_mesa' && verMesa && <div className="animate-slide-up h-full pb-10"><MesaControl ventas={ventasData.ventas} cobertura={ventasData.cobertura} onActualizarEstado={ventasData.actualizarEstadoVenta} usuarioActual={u} /></div>}
