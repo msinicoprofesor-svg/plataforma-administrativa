@@ -24,10 +24,11 @@ const PRECIOS_KITS = {
     'Cotización Especial': 0 
 };
 
+// CORRECCIÓN: "tecnologias" sin acento para coincidir con la lógica del formulario
 const CONFIG_MARCAS = {
-  'DMG NET': { tipo: 'INTERNET', tecnologías: ['FIBRA', 'ANTENA'] },
-  'Intercheap': { tipo: 'INTERNET', tecnologías: ['FIBRA', 'ANTENA'] },
-  'Fibrox MX': { tipo: 'INTERNET', tecnologías: ['FIBRA'] },
+  'DMG NET': { tipo: 'INTERNET', tecnologias: ['FIBRA', 'ANTENA'] },
+  'Intercheap': { tipo: 'INTERNET', tecnologias: ['FIBRA', 'ANTENA'] },
+  'Fibrox MX': { tipo: 'INTERNET', tecnologias: ['FIBRA'] },
   'RK': { tipo: 'CCTV', opciones: Object.keys(PRECIOS_KITS) },
   'WifiCel': { tipo: 'HOTSPOT', opciones: ['Sistema por Fichas', 'Máquina de Monedas'] }
 };
@@ -51,7 +52,6 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura = [], cupon
 
   const [mensajeCupon, setMensajeCupon] = useState({ texto: '', tipo: '' });
 
-  // TODOS LOS HOOKS SE EJECUTAN SIEMPRE (Regla de React)
   const zonasDisponibles = useMemo(() => {
     if (form.tipoServicio !== 'INTERNET' || !cobertura) return [];
     return cobertura.filter(zona => {
@@ -201,7 +201,6 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura = [], cupon
 
     onRegistrarVenta(datosFinales, vendedorActual);
     
-    // Limpiar formulario al guardar
     setForm({
         nombre: '', telefono1: '', telefono2: '',
         estado: 'Guanajuato', municipio: '', comunidad: '', direccion: '', 
@@ -218,7 +217,6 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura = [], cupon
     onClose();
   };
 
-  // RETORNO TEMPRANO MOVIDO AL FINAL (PARA NO ROMPER LAS REGLAS DE REACT)
   if (!isOpen) return null;
 
   return (
