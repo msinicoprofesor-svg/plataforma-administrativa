@@ -96,12 +96,11 @@ export function useVentas() {
       await supabase.from('ventas_metas').upsert([payload]);
   };
 
-  // --- EL GUARDADO DE COMISIÓN SEGURO Y PROTEGIDO ---
+  // --- SOLUCIÓN DEL BUG: ID NUMÉRICO (BIGINT COMPATIBLE) ---
   const guardarReglaComision = async (regla) => {
-      const idRegla = `COMIS-${Date.now()}`;
+      const idRegla = Date.now(); // Número puro, compatible con la columna bigint de tu base de datos
       const nuevaRegla = { id: idRegla, ...regla };
       
-      // ESPERAMOS A VER QUÉ DICE SUPABASE ANTES DE PINTARLO
       const { error } = await supabase.from('ventas_comisiones').insert([{
           id: idRegla, 
           beneficiario_tipo: regla.beneficiarioTipo, 
@@ -114,11 +113,10 @@ export function useVentas() {
 
       if (error) {
           console.error("Supabase rechazó la regla:", error);
-          alert(`Error al guardar en base de datos: ${error.message}. Verifica que RLS esté desactivado en la tabla 'ventas_comisiones'.`);
+          alert(`Error al guardar en base de datos: ${error.message}`);
           return;
       }
 
-      // SI SE GUARDÓ BIEN, LO PONEMOS EN LA PANTALLA
       setComisiones(prev => [nuevaRegla, ...prev]);
   };
 
@@ -158,7 +156,6 @@ export function useVentas() {
   const agregarZona = async (zona) => {
     const nuevaZona = { ...zona, id: `ZONA-${Date.now()}` };
     setCobertura(prev => [...prev, nuevaZona]);
-    // Asumimos que `mapZonaToDB` no está declarado en este extracto truncado pero funciona
     await supabase.from('ventas_zonas').insert([mapZonaToDB(nuevaZona)]);
   };
 
