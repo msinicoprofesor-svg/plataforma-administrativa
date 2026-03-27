@@ -13,17 +13,19 @@ export function useVentas() {
   const [comisiones, setComisiones] = useState([]); 
   const [cargando, setCargando] = useState(true);
 
-  // --- TRADUCTORES CON NUEVO CAMPO: coberturaGeo ---
+  // --- TRADUCTORES CON FIX DE COMUNIDADES ---
   const mapZonaToDB = (z) => ({
       id: z.id, nombre_ap: z.nombreAp, comunidad: z.comunidad, 
+      comunidades: z.comunidades, // FIX: Ahora guarda el arreglo completo
       municipio: z.municipio, estado: z.estado, sede: z.sede, 
       marca: z.marca, tipo: z.tipo, lat: z.lat, lng: z.lng, 
       estatus: z.estatus, costos: z.costos, planes: z.planes, cajas: z.cajas,
-      cobertura_geo: z.coberturaGeo // Magia GIS
+      cobertura_geo: z.coberturaGeo 
   });
 
   const mapZonaFromDB = (db) => ({
       id: db.id, nombreAp: db.nombre_ap, comunidad: db.comunidad, 
+      comunidades: db.comunidades || [], // FIX: Recupera el arreglo completo
       municipio: db.municipio, estado: db.estado, sede: db.sede, 
       marca: db.marca, tipo: db.tipo, lat: db.lat, lng: db.lng, 
       estatus: db.estatus, costos: db.costos, planes: db.planes, cajas: db.cajas,
@@ -136,17 +138,15 @@ export function useVentas() {
       return { valido: true, datos: cupon, mensaje: 'Cupón aplicado correctamente.' };
   };
 
-  // --- SOLUCIÓN ERROR DE GUARDADO ZONA ---
   const agregarZona = async (zona) => {
-    const idNum = Date.now(); // Número puro para evitar fallos de BigInt
+    const idNum = Date.now(); 
     const nuevaZona = { ...zona, id: idNum };
     
-    // TRAMPA DE ERRORES AL GUARDAR
     const { error } = await supabase.from('ventas_zonas').insert([mapZonaToDB(nuevaZona)]);
     
     if (error) {
         console.error("Error al guardar zona:", error);
-        alert(`Error guardando en la Nube: ${error.message}. Verifica que 'cobertura_geo' sea tipo JSONB en Supabase.`);
+        alert(`Error guardando en la Nube: ${error.message}. Verifica que 'cobertura_geo' y 'comunidades' estén correctos en Supabase.`);
         return;
     }
     setCobertura(prev => [...prev, nuevaZona]);
@@ -159,6 +159,17 @@ export function useVentas() {
         return;
     }
     setCobertura(prev => prev.map(z => z.id === zonaActualizada.id ? zonaActualizada : z));
+  };
+
+  // --- NUEVA FUNCIÓN: ELIMINAR ZONA ---
+  const eliminarZona = async (idZona) => {
+      // 1. Lo quitamos de la pantalla rápido (Optimismo)
+      setCobertura(prev => prev.filter(z => z.id !== idZona));
+      // 2. Le avisamos a Supabase
+      const { error } = await supabase.from('ventas_zonas').delete().eq('id', idZona);
+      if (error) {
+          alert(`Error al intentar eliminar la zona: ${error.message}`);
+      }
   };
 
   const registrarVenta = async (datosFormulario, vendedor) => {
@@ -201,7 +212,8 @@ export function useVentas() {
 
   return { 
       cobertura, ventas, cupones, metas, comisiones, cargando,
-      agregarZona, actualizarZona, registrarVenta, actualizarEstadoVenta, 
+      agregarZona, actualizarZona, eliminarZona, // <-- Exportamos la nueva función
+      registrarVenta, actualizarEstadoVenta, 
       agregarCupon, eliminarCupon, validarCupon, actualizarMeta,
       guardarReglaComision, eliminarReglaComision
   };
