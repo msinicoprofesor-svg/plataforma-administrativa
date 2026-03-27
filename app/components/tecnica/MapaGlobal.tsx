@@ -3,12 +3,11 @@
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polygon, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MdWifi, MdCable } from 'react-icons/md';
 
-// ICONOS MINIMALISTAS
+// ICONOS MINIMALISTAS (SVG integrados)
 const crearIcono = (color, iconoSVG, size = 32) => L.divIcon({
     className: 'custom-div-icon',
     html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"><span style="color: white; font-size: ${size * 0.5}px;">${iconoSVG}</span></div>`,
@@ -37,10 +36,10 @@ const calcularPoligonoSector = (lat, lng, radioMetros, anguloInicio, amplitud) =
     return puntos;
 };
 
-// COMPONENTE PARA MOVER EL MAPA
+// COMPONENTE PARA MOVER EL MAPA AL HACER CLIC EN UNA TARJETA
 function ChangeView({ center, zoom }) {
   const map = useMap();
-  map.setView(center, zoom);
+  map.setView(center, zoom, { animate: true, duration: 1.5 });
   return null;
 }
 
@@ -55,7 +54,7 @@ export default function MapaGlobal({ zonas = [] }) {
             
             {/* MINI TARJETAS HORIZONTALES FLOTANTES */}
             <div className="absolute top-4 left-4 right-4 z-[400] flex gap-3 overflow-x-auto pb-4 custom-scrollbar pointer-events-auto">
-                {zonas.slice(0, 10).map(z => ( // Mostramos max 10 para no saturar la memoria
+                {zonas.map(z => ( 
                     <div key={z.id} onClick={() => setZonaFocuseada(z)} className={`shrink-0 w-64 p-3 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border cursor-pointer transition-all hover:scale-105 ${zonaFocuseada?.id === z.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}>
                         <div className="flex justify-between items-center mb-1">
                             <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${z.tipo === 'FIBRA' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{z.tipo}</span>

@@ -74,7 +74,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const abrirModalEditarZona = (zona) => {
       setEditandoZonaId(zona.id);
       setTipoTecnologia(zona.tipo);
-      setDatosZona({ nombreAp: zona.nombreAp, sede: zona.sede, marca: zona.marca, municipio: zona.municipio, estado: zona.estado });
+      setDatosZona({ nombreAp: zona.nombreAp || zona.comunidad, sede: zona.sede, marca: zona.marca, municipio: zona.municipio, estado: zona.estado });
       setCoordenadas({ lat: zona.lat, lng: zona.lng });
       setCajasTemporales(zona.cajas || []);
       setComunidadesAP(zona.comunidades || []);
