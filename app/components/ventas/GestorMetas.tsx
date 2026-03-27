@@ -18,17 +18,21 @@ export default function GestorMetas({
     comisiones = [], guardarReglaComision = async () => {}, eliminarReglaComision = async () => {} 
 }) {
     
-    // SISTEMA DE PESTAÑAS INTERNAS
-    const [vistaInterna, setVistaInterna] = useState('METAS'); // 'METAS' | 'COMISIONES'
-
-    // ESTADOS PARA METAS
+    const [vistaInterna, setVistaInterna] = useState('METAS'); 
     const mesActual = new Date().toISOString().substring(0, 7);
     const [mesSeleccionado, setMesSeleccionado] = useState(mesActual);
     const [metasEditando, setMetasEditando] = useState({});
     const [guardando, setGuardando] = useState(false);
 
-    // ESTADOS PARA FORMULARIO DE COMISIONES
-    const [formComision, setFormComision] = useState({ categoria: 'TIPO_VENTA', criterio: 'NUEVA', tipoPago: 'MONTO_FIJO', valor: '' });
+    // NUEVO ESTADO DEL FORMULARIO MULTI-CONDICIONAL
+    const [formComision, setFormComision] = useState({ 
+        beneficiarioTipo: 'CANAL', 
+        beneficiarioValor: 'DIGITAL', 
+        condicionMarca: 'TODAS',
+        condicionTipoVenta: 'TODAS',
+        tipoPago: 'MONTO_FIJO', 
+        valor: '' 
+    });
 
     // --- LÓGICA DE METAS ---
     const obtenerCanalVendedor = (vendedorId) => {
@@ -81,19 +85,11 @@ export default function GestorMetas({
     };
 
     // --- LÓGICA DE COMISIONES ---
-    const getOpcionesCriterio = (cat) => {
-        if (cat === 'TIPO_VENTA') return ['NUEVA', 'CAMBIO'];
-        if (cat === 'CANAL') return CANALES_VENTA;
-        if (cat === 'REGION') return REGIONES_INTERNET;
-        if (cat === 'MARCA') return MARCAS_TODAS;
-        return [];
-    };
-
     const handleAddComision = async (e) => {
         e.preventDefault();
         setGuardando(true);
         await guardarReglaComision(formComision);
-        setFormComision(prev => ({ ...prev, valor: '' }));
+        setFormComision(prev => ({ ...prev, valor: '' })); // Limpiar solo el valor para cargar más rápido la siguiente
         setGuardando(false);
     };
 
@@ -104,7 +100,7 @@ export default function GestorMetas({
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0 z-10 mb-6">
                 <div>
                     <h3 className="text-xl font-black text-gray-800 flex items-center gap-2"><MdFlag className="text-red-500"/> Gestión de Metas y Comisiones</h3>
-                    <p className="text-xs font-bold text-gray-400 mt-1">Configura los objetivos y las reglas de pago para tus vendedores.</p>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Configura objetivos y reglas multi-condicionales para tus vendedores.</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
@@ -181,63 +177,80 @@ export default function GestorMetas({
                     </div>
                 ) : (
                     /* ---------------------------------------------------- */
-                    /* ESQUEMA DE COMISIONES                                */
+                    /* ESQUEMA DE COMISIONES (MULTICONDICIONAL)             */
                     /* ---------------------------------------------------- */
-                    <div className="space-y-6 animate-slide-up max-w-5xl mx-auto">
+                    <div className="space-y-6 animate-slide-up max-w-6xl mx-auto">
                         <div className="bg-green-50 rounded-[2rem] p-6 border border-green-200 shadow-sm">
-                            <h4 className="text-sm font-black text-green-800 uppercase tracking-widest mb-4 flex items-center gap-2"><MdAdd/> Agregar Nueva Regla de Comisión</h4>
-                            <form onSubmit={handleAddComision} className="flex flex-wrap items-end gap-4">
-                                <div className="flex-1 min-w-[150px]">
-                                    <label className="text-[10px] font-bold text-green-600 uppercase ml-2 mb-1 block">Categoría</label>
-                                    <select value={formComision.categoria} onChange={e => setFormComision({ ...formComision, categoria: e.target.value, criterio: getOpcionesCriterio(e.target.value)[0] })} className="w-full bg-white px-4 py-2.5 rounded-xl border border-green-200 text-sm font-bold text-gray-700 outline-none">
-                                        <option value="TIPO_VENTA">Tipo de Instalación</option>
-                                        <option value="CANAL">Canal de Venta</option>
-                                        <option value="REGION">Sede / Región</option>
-                                        <option value="MARCA">Marca / Servicio</option>
+                            <h4 className="text-sm font-black text-green-800 uppercase tracking-widest mb-4 flex items-center gap-2"><MdAdd/> Agregar Regla de Comisión Avanzada</h4>
+                            
+                            <form onSubmit={handleAddComision} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                
+                                <div className="bg-white p-4 rounded-2xl border border-green-100 shadow-sm">
+                                    <h5 className="text-[10px] font-black text-green-600 uppercase mb-3">1. ¿A quién le pagas?</h5>
+                                    <select value={formComision.beneficiarioTipo} onChange={e => setFormComision({...formComision, beneficiarioTipo: e.target.value, beneficiarioValor: e.target.value === 'CANAL' ? CANALES_VENTA[0] : REGIONES_INTERNET[0]})} className="w-full bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 outline-none mb-2">
+                                        <option value="CANAL">Por Canal de Venta</option>
+                                        <option value="REGION">Por Región Operativa</option>
+                                    </select>
+                                    <select value={formComision.beneficiarioValor} onChange={e => setFormComision({...formComision, beneficiarioValor: e.target.value})} className="w-full bg-green-50/50 px-3 py-2 rounded-lg border border-green-200 text-xs font-bold text-green-800 outline-none">
+                                        {(formComision.beneficiarioTipo === 'CANAL' ? CANALES_VENTA : REGIONES_INTERNET).map(opt => <option key={opt} value={opt}>{opt.replace('_', ' ')}</option>)}
                                     </select>
                                 </div>
-                                <div className="flex-1 min-w-[150px]">
-                                    <label className="text-[10px] font-bold text-green-600 uppercase ml-2 mb-1 block">Aplica para</label>
-                                    <select value={formComision.criterio} onChange={e => setFormComision({ ...formComision, criterio: e.target.value })} className="w-full bg-white px-4 py-2.5 rounded-xl border border-green-200 text-sm font-bold text-gray-700 outline-none">
-                                        {getOpcionesCriterio(formComision.categoria).map(opt => <option key={opt} value={opt}>{opt.replace('_', ' ')}</option>)}
+
+                                <div className="bg-white p-4 rounded-2xl border border-green-100 shadow-sm">
+                                    <h5 className="text-[10px] font-black text-green-600 uppercase mb-3">2. Condiciones de Venta</h5>
+                                    <select value={formComision.condicionMarca} onChange={e => setFormComision({...formComision, condicionMarca: e.target.value})} className="w-full bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 outline-none mb-2">
+                                        <option value="TODAS">Cualquier Marca</option>
+                                        {MARCAS_TODAS.map(opt => <option key={opt} value={opt}>Solo {opt}</option>)}
+                                    </select>
+                                    <select value={formComision.condicionTipoVenta} onChange={e => setFormComision({...formComision, condicionTipoVenta: e.target.value})} className="w-full bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 outline-none">
+                                        <option value="TODAS">Instalación y Cambio</option>
+                                        <option value="NUEVA">Solo Instalación Nueva</option>
+                                        <option value="CAMBIO">Solo Cambio de Proveedor</option>
                                     </select>
                                 </div>
-                                <div className="flex-1 min-w-[150px]">
-                                    <label className="text-[10px] font-bold text-green-600 uppercase ml-2 mb-1 block">Tipo de Pago</label>
-                                    <select value={formComision.tipoPago} onChange={e => setFormComision({ ...formComision, tipoPago: e.target.value })} className="w-full bg-white px-4 py-2.5 rounded-xl border border-green-200 text-sm font-bold text-gray-700 outline-none">
-                                        <option value="MONTO_FIJO">Monto Fijo ($)</option>
-                                        <option value="PORCENTAJE">Porcentaje (%)</option>
-                                    </select>
+
+                                <div className="bg-white p-4 rounded-2xl border border-green-100 shadow-sm flex flex-col">
+                                    <h5 className="text-[10px] font-black text-green-600 uppercase mb-3">3. ¿Cuánto le pagas?</h5>
+                                    <div className="flex gap-2 mb-2">
+                                        <select value={formComision.tipoPago} onChange={e => setFormComision({...formComision, tipoPago: e.target.value})} className="w-full bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 outline-none">
+                                            <option value="MONTO_FIJO">Monto Fijo ($)</option>
+                                            <option value="PORCENTAJE">Porcentaje (%)</option>
+                                            <option value="MENSUALIDAD">Mensualidad(es)</option>
+                                        </select>
+                                        <input type="number" required min="0" step="0.01" value={formComision.valor} onChange={e => setFormComision({...formComision, valor: e.target.value})} placeholder="Valor" className="w-20 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 text-xs font-black text-gray-800 outline-none"/>
+                                    </div>
+                                    <button type="submit" disabled={guardando} className="mt-auto w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center">
+                                        {guardando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : 'Guardar Regla'}
+                                    </button>
                                 </div>
-                                <div className="flex-1 min-w-[120px]">
-                                    <label className="text-[10px] font-bold text-green-600 uppercase ml-2 mb-1 block">Valor</label>
-                                    <input type="number" required min="0" step="0.01" value={formComision.valor} onChange={e => setFormComision({ ...formComision, valor: e.target.value })} placeholder={formComision.tipoPago === 'MONTO_FIJO' ? 'Ej: 500' : 'Ej: 10'} className="w-full bg-white px-4 py-2.5 rounded-xl border border-green-200 text-sm font-black text-gray-800 outline-none"/>
-                                </div>
-                                <button type="submit" disabled={guardando} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-black text-sm shadow-md transition-all h-[42px] flex items-center justify-center min-w-[120px]">
-                                    {guardando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : 'Guardar Regla'}
-                                </button>
                             </form>
                         </div>
 
-                        {/* LISTA DE REGLAS ACTIVAS */}
+                        {/* LISTA DE REGLAS ACTIVAS (FORMATO HUMANO) */}
                         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
-                            <h4 className="text-sm font-black text-gray-800 uppercase tracking-widest mb-4 flex items-center gap-2"><MdLabelOutline className="text-blue-500"/> Reglas Activas</h4>
+                            <h4 className="text-sm font-black text-gray-800 uppercase tracking-widest mb-4 flex items-center gap-2"><MdLabelOutline className="text-blue-500"/> Reglas Activas en el Sistema</h4>
                             {comisiones.length === 0 ? (
-                                <p className="text-sm text-gray-400 font-bold text-center py-10">No hay reglas de comisión configuradas.</p>
+                                <p className="text-sm text-gray-400 font-bold text-center py-10">No hay reglas configuradas.</p>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {comisiones.map(c => (
-                                        <div key={c.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center justify-between group hover:border-green-300 transition-all">
-                                            <div>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">{c.categoria.replace('_', ' ')}</p>
-                                                <h5 className="font-black text-gray-800 text-sm">{c.criterio.replace('_', ' ')}</h5>
-                                                <p className="text-xs font-bold text-green-600 mt-1 bg-green-100/50 inline-block px-2 py-0.5 rounded">
-                                                    {c.tipoPago === 'MONTO_FIJO' ? `$${c.valor} MXN` : `${c.valor}% (Del Ingreso Inicial)`}
-                                                </p>
+                                        <div key={c.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 relative group hover:border-green-300 hover:shadow-md transition-all">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="bg-gray-200 text-gray-600 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">{c.beneficiarioTipo}: {c.beneficiarioValor.replace('_', ' ')}</span>
+                                                <button onClick={() => { if(window.confirm('¿Eliminar regla?')) eliminarReglaComision(c.id); }} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><MdDelete className="text-lg"/></button>
                                             </div>
-                                            <button onClick={() => { if(window.confirm('¿Eliminar esta regla?')) eliminarReglaComision(c.id); }} className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-200 shadow-sm opacity-0 group-hover:opacity-100 transition-all">
-                                                <MdDelete/>
-                                            </button>
+                                            
+                                            <p className="text-xs font-bold text-gray-600 mt-2">
+                                                Si vende <span className="font-black text-gray-800">{c.condicionMarca === 'TODAS' ? 'Cualquier Marca' : c.condicionMarca}</span> 
+                                                <br/>(Tipo: <span className="font-black text-gray-800">{c.condicionTipoVenta === 'TODAS' ? 'Todas' : c.condicionTipoVenta}</span>)
+                                            </p>
+                                            
+                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Recibe de comisión:</p>
+                                                <span className="text-sm font-black text-green-600 bg-green-100/50 px-2 py-1 rounded">
+                                                    {c.tipoPago === 'MONTO_FIJO' ? `$${c.valor} MXN` : c.tipoPago === 'PORCENTAJE' ? `${c.valor}% (Del Monto Inicial)` : `${c.valor} Mensualidad(es)`}
+                                                </span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

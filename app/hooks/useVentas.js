@@ -10,7 +10,7 @@ export function useVentas() {
   const [ventas, setVentas] = useState([]);
   const [cupones, setCupones] = useState([]);
   const [metas, setMetas] = useState([]); 
-  const [comisiones, setComisiones] = useState([]); // <-- NUEVO ESTADO PARA COMISIONES
+  const [comisiones, setComisiones] = useState([]); 
   const [cargando, setCargando] = useState(true);
 
   // --- MAPERS: Traductores Frontend <-> Base de Datos ---
@@ -69,12 +69,17 @@ export function useVentas() {
             const { data: dMetas } = await supabase.from('ventas_metas').select('*');
             if (dMetas) setMetas(dMetas);
 
-            // NUEVO: CARGAR REGLAS DE COMISIÓN
+            // NUEVO: CARGAR REGLAS DE COMISIÓN MULTI-CONDICIONALES
             const { data: dComis } = await supabase.from('ventas_comisiones').select('*');
             if (dComis) {
                 setComisiones(dComis.map(c => ({
-                    id: c.id, categoria: c.categoria, criterio: c.criterio, 
-                    tipoPago: c.tipo_pago, valor: c.valor
+                    id: c.id, 
+                    beneficiarioTipo: c.beneficiario_tipo, 
+                    beneficiarioValor: c.beneficiario_valor, 
+                    condicionMarca: c.condicion_marca,
+                    condicionTipoVenta: c.condicion_tipo_venta,
+                    tipoPago: c.tipo_pago, 
+                    valor: c.valor
                 })));
             }
 
@@ -87,7 +92,7 @@ export function useVentas() {
     cargarDatos();
   }, []);
 
-  // --- 2. GESTIÓN DE METAS Y COMISIONES (NUEVO) ---
+  // --- 2. GESTIÓN DE METAS Y COMISIONES ---
   const actualizarMeta = async (mes, canal, valorMeta) => {
       const idMeta = `${mes}-${canal}`;
       const payload = { id: idMeta, mes, canal, meta: parseInt(valorMeta) || 0 };
@@ -102,18 +107,20 @@ export function useVentas() {
   };
 
   const guardarReglaComision = async (regla) => {
-      const idRegla = `REGLA-${regla.categoria}-${regla.criterio}`.replace(/\s+/g, '_').toUpperCase();
+      // ID ÚNICO POR TIEMPO PARA NUNCA SOBREESCRIBIR REGLAS DEL MISMO CANAL
+      const idRegla = `COMIS-${Date.now()}`;
       const nuevaRegla = { id: idRegla, ...regla };
       
-      setComisiones(prev => {
-          const existe = prev.find(c => c.id === idRegla);
-          if (existe) return prev.map(c => c.id === idRegla ? nuevaRegla : c);
-          return [...prev, nuevaRegla];
-      });
+      setComisiones(prev => [nuevaRegla, ...prev]);
 
-      await supabase.from('ventas_comisiones').upsert([{
-          id: idRegla, categoria: regla.categoria, criterio: regla.criterio,
-          tipo_pago: regla.tipoPago, valor: Number(regla.valor) || 0
+      await supabase.from('ventas_comisiones').insert([{
+          id: idRegla, 
+          beneficiario_tipo: regla.beneficiarioTipo, 
+          beneficiario_valor: regla.beneficiarioValor,
+          condicion_marca: regla.condicionMarca,
+          condicion_tipo_venta: regla.condicionTipoVenta,
+          tipo_pago: regla.tipoPago, 
+          valor: Number(regla.valor) || 0
       }]);
   };
 
