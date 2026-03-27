@@ -5,8 +5,9 @@
 
 import { useState, useEffect } from 'react';
 // FIX: Importamos iconos más administrativos y corporativos
-import { MdDashboard, MdEmail, MdLock, MdAdminPanelSettings, MdBusiness } from "react-icons/md";
+import { MdDashboard, MdEmail, MdLock, MdAdminPanelSettings, MdBusiness, MdVerifiedUser } from "react-icons/md";
 // OLD: FaStoreAlt (eliminado)
+
 
 import { useColaboradores } from './hooks/useColaboradores';
 import { useVentas } from './hooks/useVentas'; 
