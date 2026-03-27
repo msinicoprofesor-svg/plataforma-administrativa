@@ -12,7 +12,7 @@ import {
 } from "react-icons/md";
 
 const MapaGlobal = dynamic(() => import('./MapaGlobal'), { ssr: false, loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center animate-pulse"><MdMap className="text-4xl text-gray-300"/></div> });
-const MapaEditor = dynamic(() => import('./MapaEditor'), { ssr: false, loading: () => <div className="h-64 w-full bg-gray-100 rounded-2xl flex items-center justify-center animate-pulse"><MdMap className="text-3xl text-gray-300"/></div> });
+const MapaEditor = dynamic(() => import('./MapaEditor'), { ssr: false, loading: () => <div className="h-full w-full min-h-[300px] bg-gray-100 rounded-[2rem] flex items-center justify-center animate-pulse"><MdMap className="text-3xl text-gray-300"/></div> });
 
 const SEDES = ['Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
 const MARCAS = ['DMG NET', 'Intercheap', 'Fibrox MX', 'WifiCel'];
@@ -27,7 +27,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const [modalOpen, setModalOpen] = useState(false);
   const [zonaAConfigurar, setZonaAConfigurar] = useState(null);
   const [zonaDetalles, setZonaDetalles] = useState(null); 
-  const [editandoZonaId, setEditandoZonaId] = useState(null); // NUEVO ESTADO PARA EDICIÓN
+  const [editandoZonaId, setEditandoZonaId] = useState(null); 
   
   const [costos, setCostos] = useState({ instalacion: '', cambio: '' });
   const [planes, setPlanes] = useState([]); 
@@ -41,7 +41,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const [comunidadesAP, setComunidadesAP] = useState([]); 
   const [nuevaComunidad, setNuevaComunidad] = useState('');
 
-  // ESTADO GIS MATEMÁTICO (Radio y Ángulo para antenas, o arreglo de puntos para fibra)
   const [coberturaGeo, setCoberturaGeo] = useState({ radio: 3000, anguloInicio: 0, amplitud: 360, poligono: [] });
   const [modoEdicionMapa, setModoEdicionMapa] = useState('ZONA');
 
@@ -111,7 +110,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
         cajas: tipoTecnologia === 'FIBRA' ? cajasTemporales : [],
         comunidades: tipoTecnologia === 'ANTENA' ? comunidadesAP : [],
         comunidad: tipoTecnologia === 'ANTENA' ? (comunidadesAP[0] || datosZona.nombreAp) : datosZona.nombreAp,
-        coberturaGeo: coberturaGeo // Guardamos el cono o polígono
+        coberturaGeo: coberturaGeo
     };
 
     if (editandoZonaId) {
@@ -168,7 +167,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                                   <h3 className="text-lg font-extrabold text-gray-800 leading-tight mb-1">{zona.nombreAp || zona.comunidad}</h3>
                                   <p className="text-xs text-gray-500 font-medium mb-4 flex items-center gap-1"><MdPlace className="text-gray-400" /> {zona.municipio}, {zona.estado}</p>
                                   
-                                  {/* BOTONES DE EDICIÓN Y DETALLES */}
                                   <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center gap-2">
                                       <button onClick={() => abrirModalEditarZona(zona)} className="flex-1 py-2 text-[10px] font-black text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"><MdEdit/> Editar GEO</button>
                                       <button onClick={() => setZonaDetalles(zona)} className="flex-1 py-2 text-[10px] font-black text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">Ver Detalles</button>
@@ -186,16 +184,15 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
       {/* --- MODAL NUEVA/EDITAR ZONA (EL SÚPER EDITOR GIS) --- */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
-            <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl animate-scale-in flex flex-col overflow-hidden max-h-[95vh]">
+            <div className="bg-white rounded-[2.5rem] w-full max-w-5xl shadow-2xl animate-scale-in flex flex-col overflow-hidden max-h-[95vh] min-h-[80vh]">
                 <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
                     <h2 className="text-2xl font-extrabold text-gray-900">{editandoZonaId ? 'Editar Zona GIS' : 'Crear Nueva Zona GIS'}</h2>
                     <button onClick={() => setModalOpen(false)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 shadow-sm transition-all"><MdClose className="text-xl"/></button>
                 </div>
 
-                <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto">
-                    
+                <div className="flex flex-col lg:flex-row flex-1 min-h-0">
                     {/* COLUMNA IZQUIERDA: CONTROLES */}
-                    <div className="w-full lg:w-1/2 p-6 border-r border-gray-100 bg-white space-y-6">
+                    <div className="w-full lg:w-1/3 p-6 border-r border-gray-100 bg-white space-y-6 overflow-y-auto custom-scrollbar">
                         <div className="flex bg-gray-100 p-1 rounded-2xl">
                             <button disabled={!!editandoZonaId} onClick={() => { setTipoTecnologia('FIBRA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${tipoTecnologia === 'FIBRA' ? 'bg-white shadow text-purple-600' : 'text-gray-500 disabled:opacity-50'}`}>Fibra Óptica</button>
                             <button disabled={!!editandoZonaId} onClick={() => { setTipoTecnologia('ANTENA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${tipoTecnologia === 'ANTENA' ? 'bg-white shadow text-orange-600' : 'text-gray-500 disabled:opacity-50'}`}>Antena WISP</button>
@@ -211,7 +208,6 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                         {tipoTecnologia === 'ANTENA' && (
                             <div className="bg-orange-50 p-4 rounded-3xl border border-orange-100">
                                 <h4 className="text-xs font-extrabold text-orange-800 mb-4 flex items-center gap-2"><MdWifi/> Controles Sectoriales (Cono)</h4>
-                                
                                 <div className="space-y-4">
                                     <div>
                                         <label className="flex justify-between text-[10px] font-bold text-orange-700 uppercase mb-1"><span>Alcance (Radio)</span> <span>{coberturaGeo.radio} m</span></label>
@@ -241,34 +237,36 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                                 </div>
                             </div>
                         )}
-
                     </div>
 
                     {/* COLUMNA DERECHA: EL MAPA EN VIVO */}
-                    <div className="w-full lg:w-1/2 bg-gray-100 relative min-h-[400px]">
+                    {/* FIX: Se cambió lg:w-1/2 por lg:w-2/3 y se agregó p-4 para que ocupe todo el espacio sobrante */}
+                    <div className="w-full lg:w-2/3 bg-gray-100 relative min-h-[400px] flex flex-col p-4 lg:p-6">
                         
-                        {/* Selector de Herramienta sobre el mapa */}
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] flex bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-gray-200">
+                        <div className="absolute top-8 lg:top-10 left-1/2 -translate-x-1/2 z-[400] flex bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-gray-200">
                             <button type="button" onClick={() => setModoEdicionMapa('ZONA')} className={`px-4 py-1.5 text-[10px] uppercase tracking-widest font-black rounded-full transition-all ${modoEdicionMapa === 'ZONA' ? 'bg-blue-500 text-white shadow' : 'text-gray-500'}`}>Mover Central</button>
                             {tipoTecnologia === 'FIBRA' && <button type="button" onClick={() => setModoEdicionMapa('CAJA')} className={`px-4 py-1.5 text-[10px] uppercase tracking-widest font-black rounded-full transition-all ${modoEdicionMapa === 'CAJA' ? 'bg-green-500 text-white shadow' : 'text-gray-500'}`}>Poner Cajas NAP</button>}
                         </div>
 
-                        <MapaEditor 
-                            posicionCentro={modoEdicionMapa === 'ZONA' ? coordenadas : nuevaCaja} 
-                            setPosicion={handleMapClick} 
-                            tipoPunto={modoEdicionMapa}
-                            marcadoresExtra={cajasTemporales}
-                            coberturaGeo={coberturaGeo}
-                            setCoberturaGeo={setCoberturaGeo}
-                        />
+                        {/* Contenedor flexible para el mapa */}
+                        <div className="flex-1 w-full h-full relative mt-12 lg:mt-0">
+                            <MapaEditor 
+                                posicionCentro={modoEdicionMapa === 'ZONA' ? coordenadas : nuevaCaja} 
+                                setPosicion={handleMapClick} 
+                                // FIX: Pasamos el tipo correcto para que pinte la Antena o el OLT al inicio
+                                tipoPunto={modoEdicionMapa === 'ZONA' ? tipoTecnologia : modoEdicionMapa}
+                                marcadoresExtra={cajasTemporales}
+                                coberturaGeo={coberturaGeo}
+                                setCoberturaGeo={setCoberturaGeo}
+                            />
+                        </div>
 
-                        {/* PEQUEÑO PANEL PARA GUARDAR CAJAS EN LA ESQUINA DEL MAPA */}
                         {modoEdicionMapa === 'CAJA' && (
-                            <div className="absolute bottom-10 left-4 right-4 z-[400] bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-green-200">
-                                <div className="flex gap-2 mb-2">
+                            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-sm z-[400] bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-green-200">
+                                <div className="flex gap-2">
                                     <input type="text" placeholder="Ej: Caja Madero" value={nuevaCaja.nombre} onChange={e => setNuevaCaja({...nuevaCaja, nombre: e.target.value})} className="w-1/2 px-3 py-1.5 bg-gray-50 rounded-lg text-xs outline-none border border-gray-200"/>
                                     <input type="number" placeholder="Puertos" value={nuevaCaja.puertos} onChange={e => setNuevaCaja({...nuevaCaja, puertos: e.target.value})} className="w-1/4 px-3 py-1.5 bg-gray-50 rounded-lg text-xs outline-none border border-gray-200 text-center font-bold"/>
-                                    <button type="button" onClick={agregarCajaALista} className="w-1/4 bg-green-500 text-white text-[10px] font-black rounded-lg">Fijar Pin</button>
+                                    <button type="button" onClick={agregarCajaALista} className="w-1/4 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600 transition-all">Fijar Pin</button>
                                 </div>
                             </div>
                         )}
@@ -300,7 +298,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                             <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Comunidades</p><div className="flex flex-wrap gap-2">{zonaDetalles.comunidades?.map((com, idx) => (<span key={idx} className="bg-orange-50 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-black">{com}</span>))}</div></div>
                         )}
                     </div>
-                    <div className="w-full lg:w-2/3 min-h-[300px] lg:min-h-0 relative bg-gray-100">
+                    <div className="w-full lg:w-2/3 min-h-[300px] lg:min-h-0 relative bg-gray-100 p-2">
                         {zonaDetalles.lat && zonaDetalles.lng ? <MapaGlobal zonas={[zonaDetalles]} /> : <div className="flex items-center justify-center h-full w-full opacity-50"><MdMap className="text-6xl text-gray-400 mb-2"/></div>}
                     </div>
                 </div>
