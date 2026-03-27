@@ -60,10 +60,10 @@ export default function PanelVentas({
             </div>
         )}
 
-        <div className="flex-1 min-h-0 relative">
+        <div className="flex-1 min-h-0 flex flex-col relative">
             {/* VISTA 1: CAPTURA DE VENTAS DEL USUARIO (VISTA ORIGINAL) */}
             {tabActiva === 'MIS_VENTAS' && (
-                <div className="flex flex-col h-full animate-fade-in absolute inset-0">
+                <div className="flex flex-col h-full animate-fade-in w-full">
                     <div className="flex flex-col md:flex-row gap-4 mb-6 shrink-0">
                         <div className="flex-1 bg-white p-6 rounded-[2rem] shadow-sm border border-red-50 relative overflow-hidden">
                             <div className="relative z-10">
@@ -117,14 +117,14 @@ export default function PanelVentas({
 
             {/* VISTA 2: ANALÍTICA GLOBAL (SÓLO GERENTES) */}
             {tabActiva === 'ANALITICA' && esGerencia && (
-                <div className="absolute inset-0">
+                <div className="flex flex-col h-full animate-fade-in w-full">
                     <AnaliticaVentas ventas={ventas} />
                 </div>
             )}
 
             {/* VISTA 3: GESTOR DE METAS (SÓLO GERENTES) */}
             {tabActiva === 'METAS' && esGerencia && (
-                <div className="absolute inset-0">
+                <div className="flex flex-col h-full animate-fade-in w-full">
                     <GestorMetas 
                         ventas={ventas} 
                         metas={metas} 

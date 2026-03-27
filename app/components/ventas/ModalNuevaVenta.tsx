@@ -32,7 +32,7 @@ const CONFIG_MARCAS = {
   'WifiCel': { tipo: 'HOTSPOT', opciones: ['Sistema por Fichas', 'Máquina de Monedas'] }
 };
 
-export default function ModalNuevaVenta({ isOpen, onClose, cobertura, cupones, onRegistrarVenta, vendedorActual, validarCupon }) {
+export default function ModalNuevaVenta({ isOpen, onClose, cobertura = [], cupones = [], onRegistrarVenta, vendedorActual, validarCupon }) {
   const [form, setForm] = useState({
     nombre: '', telefono1: '', telefono2: '',
     estado: 'Guanajuato', municipio: '', comunidad: '', direccion: '', 
@@ -54,7 +54,7 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura, cupones, o
   if (!isOpen) return null;
 
   const zonasDisponibles = useMemo(() => {
-    if (form.tipoServicio !== 'INTERNET') return [];
+    if (form.tipoServicio !== 'INTERNET' || !cobertura) return [];
     return cobertura.filter(zona => {
         const coincideRegion = zona.sede === form.region;
         const coincideTecnologia = zona.tipo === form.tecnologia;
@@ -63,7 +63,7 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura, cupones, o
   }, [cobertura, form.region, form.tecnologia, form.tipoServicio]);
 
   const zonaSeleccionadaData = useMemo(() => {
-      if (!form.zonaId) return null;
+      if (!form.zonaId || !cobertura) return null;
       return cobertura.find(z => z.id === form.zonaId);
   }, [form.zonaId, cobertura]);
 
@@ -77,7 +77,7 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura, cupones, o
   }, [zonaSeleccionadaData]);
 
   const apSugerido = useMemo(() => {
-      if (form.tecnologia !== 'ANTENA' || !form.comunidad || form.comunidad.length < 3) return null;
+      if (form.tecnologia !== 'ANTENA' || !form.comunidad || form.comunidad.length < 3 || !cobertura) return null;
       return cobertura.find(z => 
           z.tipo === 'ANTENA' && z.sede === form.region && z.estatus === 'ACTIVA' &&
           z.comunidades && z.comunidades.some(c => c.toLowerCase().includes(form.comunidad.toLowerCase()))
@@ -117,7 +117,7 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura, cupones, o
   }, [zonaSeleccionadaData, form.tipoVenta, form.velocidad, form.cuponAplicado, planesDisponibles]);
 
   const cuponesSugeridos = useMemo(() => {
-      if (!cupones) return [];
+      if (!cupones || cupones.length === 0) return [];
       const hoy = new Date().toISOString().split('T')[0];
       return cupones.filter(c => {
           if (!c.activo || c.vigencia < hoy || (c.limite !== null && c.usados >= c.limite)) return false;
@@ -207,7 +207,7 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura, cupones, o
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
         <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-scale-in max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+            <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
                 <div><h2 className="text-xl font-extrabold text-gray-800">Registrar Venta</h2><p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Formulario de Contratación</p></div>
                 <button onClick={onClose} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 shadow-sm transition-all"><MdClose className="text-xl"/></button>
             </div>
