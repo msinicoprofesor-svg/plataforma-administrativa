@@ -248,7 +248,22 @@ export default function Home() {
             {activeModule === 'tecnico_movil' && verAtencionCliente && <div className="animate-fade-in h-full w-full"><DashboardTecnico tecnicoId={u?.id || "1"} onOpenMenu={() => setSidebarOpen(true)} /></div>}
 
             {/* --- COMERCIAL Y MARKETING --- */}
-            {activeModule === 'marketing_ventas' && verVentas && <div className="animate-slide-up h-full pb-10"><PanelVentas ventas={ventasData.ventas} cobertura={ventasData.cobertura} cupones={ventasData.cupones} validarCupon={ventasData.validarCupon} onRegistrarVenta={ventasData.registrarVenta} vendedorActual={u} /></div>}
+            {activeModule === 'marketing_ventas' && verVentas && (
+                <div className="animate-slide-up h-full pb-10">
+                    <PanelVentas 
+                        ventas={ventasData.ventas} 
+                        cobertura={ventasData.cobertura} 
+                        cupones={ventasData.cupones} 
+                        validarCupon={ventasData.validarCupon} 
+                        onRegistrarVenta={ventasData.registrarVenta} 
+                        vendedorActual={u} 
+                        metas={ventasData.metas} 
+                        actualizarMeta={ventasData.actualizarMeta} 
+                        colaboradores={colaboradoresReales} 
+                    />
+                </div>
+            )}
+            
             {activeModule === 'marketing_cobertura' && verCobertura && <div className="animate-slide-up h-full pb-10"><Cobertura cobertura={ventasData.cobertura} onAgregarZona={ventasData.agregarZona} onActualizarZona={ventasData.actualizarZona} usuarioActual={u} /></div>}
             {activeModule === 'marketing_mesa' && verMesa && <div className="animate-slide-up h-full pb-10"><MesaControl ventas={ventasData.ventas} cobertura={ventasData.cobertura} onActualizarEstado={ventasData.actualizarEstadoVenta} usuarioActual={u} /></div>}
 

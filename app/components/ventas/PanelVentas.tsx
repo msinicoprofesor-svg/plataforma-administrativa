@@ -6,16 +6,21 @@ import { useState } from 'react';
 import { 
   MdAddShoppingCart, MdRouter, MdAttachMoney, 
   MdSearch, MdCameraAlt, MdWifiTethering, 
-  MdBarChart, MdAssignment
+  MdBarChart, MdAssignment, MdFlag
 } from "react-icons/md";
 
 // IMPORTACIÓN DE MÓDULOS SEPARADOS (ARQUITECTURA LIMPIA)
 import AnaliticaVentas from './AnaliticaVentas';
 import ModalNuevaVenta from './ModalNuevaVenta';
+import GestorMetas from './GestorMetas';
 
-export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVenta, vendedorActual, validarCupon }) {
+export default function PanelVentas({ 
+    ventas, cobertura, cupones, metas, 
+    onRegistrarVenta, vendedorActual, validarCupon, 
+    actualizarMeta, colaboradores 
+}) {
   
-  // VERIFICAR PERMISOS GERENCIALES PARA MOSTRAR LA PESTAÑA DE ANALÍTICA
+  // VERIFICAR PERMISOS GERENCIALES PARA MOSTRAR LAS PESTAÑAS EXTRAS
   const rolNormalizado = (vendedorActual?.rol || '').toUpperCase();
   const ROLES_GERENCIALES = ['GERENTE_MKT', 'GERENTE MARKETING', 'GERENTE_GENERAL', 'GERENTE GENERAL', 'DIRECTOR', 'ADMINISTRADOR', 'SOPORTE_GENERAL'];
   const esGerencia = ROLES_GERENCIALES.includes(rolNormalizado);
@@ -33,7 +38,7 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
         
         {/* SISTEMA DE PESTAÑAS (SÓLO VISIBLE PARA GERENCIA) */}
         {esGerencia && (
-            <div className="flex bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 mb-6 w-full max-w-sm mx-auto z-10 shrink-0">
+            <div className="flex bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 mb-6 w-full max-w-lg mx-auto z-10 shrink-0">
                 <button 
                     onClick={() => setTabActiva('MIS_VENTAS')} 
                     className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tabActiva === 'MIS_VENTAS' ? 'bg-red-50 text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
@@ -45,6 +50,12 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
                     className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tabActiva === 'ANALITICA' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                 >
                     <MdBarChart className="text-lg"/> Analítica Global
+                </button>
+                <button 
+                    onClick={() => setTabActiva('METAS')} 
+                    className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tabActiva === 'METAS' ? 'bg-green-50 text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <MdFlag className="text-lg"/> Metas (CRM)
                 </button>
             </div>
         )}
@@ -108,6 +119,18 @@ export default function PanelVentas({ ventas, cobertura, cupones, onRegistrarVen
             {tabActiva === 'ANALITICA' && esGerencia && (
                 <div className="absolute inset-0">
                     <AnaliticaVentas ventas={ventas} />
+                </div>
+            )}
+
+            {/* VISTA 3: GESTOR DE METAS (SÓLO GERENTES) */}
+            {tabActiva === 'METAS' && esGerencia && (
+                <div className="absolute inset-0">
+                    <GestorMetas 
+                        ventas={ventas} 
+                        metas={metas} 
+                        actualizarMeta={actualizarMeta} 
+                        colaboradores={colaboradores} 
+                    />
                 </div>
             )}
         </div>
