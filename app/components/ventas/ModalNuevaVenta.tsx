@@ -25,9 +25,9 @@ const PRECIOS_KITS = {
 };
 
 const CONFIG_MARCAS = {
-  'DMG NET': { tipo: 'INTERNET', tecnologias: ['FIBRA', 'ANTENA'] },
-  'Intercheap': { tipo: 'INTERNET', tecnologias: ['FIBRA', 'ANTENA'] },
-  'Fibrox MX': { tipo: 'INTERNET', tecnologias: ['FIBRA'] },
+  'DMG NET': { tipo: 'INTERNET', tecnologías: ['FIBRA', 'ANTENA'] },
+  'Intercheap': { tipo: 'INTERNET', tecnologías: ['FIBRA', 'ANTENA'] },
+  'Fibrox MX': { tipo: 'INTERNET', tecnologías: ['FIBRA'] },
   'RK': { tipo: 'CCTV', opciones: Object.keys(PRECIOS_KITS) },
   'WifiCel': { tipo: 'HOTSPOT', opciones: ['Sistema por Fichas', 'Máquina de Monedas'] }
 };
@@ -51,8 +51,7 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura = [], cupon
 
   const [mensajeCupon, setMensajeCupon] = useState({ texto: '', tipo: '' });
 
-  if (!isOpen) return null;
-
+  // TODOS LOS HOOKS SE EJECUTAN SIEMPRE (Regla de React)
   const zonasDisponibles = useMemo(() => {
     if (form.tipoServicio !== 'INTERNET' || !cobertura) return [];
     return cobertura.filter(zona => {
@@ -201,8 +200,26 @@ export default function ModalNuevaVenta({ isOpen, onClose, cobertura = [], cupon
     if (form.cuponAplicado) datosFinales.referencias += ` [CUPÓN: ${form.cuponAplicado.codigo}]`;
 
     onRegistrarVenta(datosFinales, vendedorActual);
+    
+    // Limpiar formulario al guardar
+    setForm({
+        nombre: '', telefono1: '', telefono2: '',
+        estado: 'Guanajuato', municipio: '', comunidad: '', direccion: '', 
+        gps: '', referencias: '', region: 'Centro', marca: 'DMG NET', 
+        tipoServicio: 'INTERNET', tecnologia: 'FIBRA', velocidad: '',
+        paquete: '', precioEquipo: 0, costoInstalacion: '', mensualidad: '',
+        fechaConexion: '', horaConexion: '', zonaId: '', cajaId: '',
+        requiereVerificacion: false, tipoVenta: 'NUEVA', 
+        fotosEvidencia: { router: null, antena: null },
+        codigoCupon: '', cuponAplicado: null  
+    });
+    setMensajeCupon({ texto: '', tipo: '' });
+    
     onClose();
   };
+
+  // RETORNO TEMPRANO MOVIDO AL FINAL (PARA NO ROMPER LAS REGLAS DE REACT)
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
