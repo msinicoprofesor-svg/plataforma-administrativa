@@ -7,7 +7,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-l
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// ICONOS MINIMALISTAS (SVG integrados)
+// ICONOS MINIMALISTAS
 const crearIcono = (color, iconoSVG, size = 32) => L.divIcon({
     className: 'custom-div-icon',
     html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"><span style="color: white; font-size: ${size * 0.5}px;">${iconoSVG}</span></div>`,
@@ -17,7 +17,7 @@ const AntenaIcon = crearIcono('#ea580c', '📡', 34);
 const OltIcon = crearIcono('#8b5cf6', '🏢', 34); 
 const CajaIcon = crearIcono('#22c55e', '🔌', 24);
 
-// MOTOR MATEMÁTICO DE DIBUJO (Misma lógica que el editor)
+// MOTOR MATEMÁTICO DE DIBUJO
 const calcularPoligonoSector = (lat, lng, radioMetros, anguloInicio, amplitud) => {
     if (!lat || !lng || !radioMetros || !amplitud) return [];
     const puntos = [[lat, lng]]; 
@@ -36,7 +36,6 @@ const calcularPoligonoSector = (lat, lng, radioMetros, anguloInicio, amplitud) =
     return puntos;
 };
 
-// COMPONENTE PARA MOVER EL MAPA AL HACER CLIC EN UNA TARJETA
 function ChangeView({ center, zoom }) {
   const map = useMap();
   map.setView(center, zoom, { animate: true, duration: 1.5 });
@@ -52,21 +51,24 @@ export default function MapaGlobal({ zonas = [] }) {
     return (
         <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative z-0 border border-gray-200 shadow-inner bg-gray-50 flex flex-col">
             
-            {/* MINI TARJETAS HORIZONTALES FLOTANTES */}
-            <div className="absolute top-4 left-4 right-4 z-[400] flex gap-3 overflow-x-auto pb-4 custom-scrollbar pointer-events-auto">
-                {zonas.map(z => ( 
-                    <div key={z.id} onClick={() => setZonaFocuseada(z)} className={`shrink-0 w-64 p-3 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border cursor-pointer transition-all hover:scale-105 ${zonaFocuseada?.id === z.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${z.tipo === 'FIBRA' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{z.tipo}</span>
-                            <span className="text-[10px] font-bold text-gray-400">{z.sede}</span>
+            {/* MINI TARJETAS (Ocultas si solo se manda 1 zona como en "Detalles") */}
+            {zonas.length > 1 && (
+                <div className="absolute top-4 left-4 right-4 z-[400] flex gap-3 overflow-x-auto pb-4 custom-scrollbar pointer-events-auto">
+                    {zonas.map(z => ( 
+                        <div key={z.id} onClick={() => setZonaFocuseada(z)} className={`shrink-0 w-64 p-3 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border cursor-pointer transition-all hover:scale-105 ${zonaFocuseada?.id === z.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${z.tipo === 'FIBRA' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{z.tipo}</span>
+                                <span className="text-[10px] font-bold text-gray-400">{z.sede}</span>
+                            </div>
+                            <h4 className="text-sm font-black text-gray-800 truncate">{z.nombreAp || z.comunidad}</h4>
                         </div>
-                        <h4 className="text-sm font-black text-gray-800 truncate">{z.nombreAp || z.comunidad}</h4>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             <MapContainer center={centroDefecto} zoom={11} style={{ height: '100%', width: '100%', zIndex: 0 }} zoomControl={false}>
-                <ChangeView center={centroDinamico} zoom={zonaFocuseada ? 14 : 11} />
+                {/* Si hay 1 sola zona, hace zoom directo a ella (Zoom 14), si no, al estado global */}
+                <ChangeView center={zonas.length === 1 ? [parseFloat(zonas[0].lat), parseFloat(zonas[0].lng)] : centroDinamico} zoom={zonas.length === 1 ? 15 : (zonaFocuseada ? 14 : 11)} />
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
 
                 {zonas.map(zona => {
@@ -74,12 +76,10 @@ export default function MapaGlobal({ zonas = [] }) {
                     const lng = parseFloat(zona.lng);
                     if (isNaN(lat) || isNaN(lng)) return null;
 
-                    // Extracción de datos Geo Espaciales
                     const geo = zona.coberturaGeo || {};
 
                     return (
                         <div key={zona.id}>
-                            {/* PINES CENTRALES */}
                             <Marker position={[lat, lng]} icon={zona.tipo === 'ANTENA' ? AntenaIcon : OltIcon}>
                                 <Popup className="rounded-xl border-none shadow-xl">
                                     <div className="text-center p-1 min-w-[120px]">
@@ -90,7 +90,6 @@ export default function MapaGlobal({ zonas = [] }) {
                                 </Popup>
                             </Marker>
 
-                            {/* DIBUJO ANTENA: CONO SECTORIAL O CÍRCULO */}
                             {zona.tipo === 'ANTENA' && geo.radio && (
                                 <Polygon 
                                     positions={calcularPoligonoSector(lat, lng, geo.radio, geo.anguloInicio || 0, geo.amplitud || 360)} 
@@ -98,12 +97,10 @@ export default function MapaGlobal({ zonas = [] }) {
                                 />
                             )}
 
-                            {/* DIBUJO FIBRA: POLÍGONO IRREGULAR */}
                             {zona.tipo === 'FIBRA' && geo.poligono?.length > 0 && (
                                 <Polygon positions={geo.poligono} pathOptions={{ color: '#8b5cf6', fillColor: '#8b5cf6', fillOpacity: 0.15, weight: 2, dashArray: '5, 5' }} />
                             )}
 
-                            {/* PINES DE CAJAS NAP */}
                             {zona.tipo === 'FIBRA' && zona.cajas?.map(caja => {
                                 const cLat = parseFloat(caja.lat);
                                 const cLng = parseFloat(caja.lng);
@@ -112,10 +109,17 @@ export default function MapaGlobal({ zonas = [] }) {
                                 return (
                                     <Marker key={caja.id} position={[cLat, cLng]} icon={CajaIcon}>
                                         <Popup>
-                                            <div className="text-center p-1 min-w-[100px]">
+                                            <div className="text-center p-1 min-w-[120px]">
                                                 <p className="text-[9px] font-black text-green-500 uppercase tracking-widest">Caja NAP</p>
                                                 <h4 className="font-black text-gray-800 text-xs mt-0.5">{caja.nombre}</h4>
-                                                <div className="mt-2 bg-green-50 border border-green-100 rounded-lg p-1.5"><p className="text-[10px] font-black text-green-700">{caja.puertosLibres} de {caja.puertosTotales} Libres</p></div>
+                                                
+                                                {/* FIX: CALLES Y PUERTOS RESTAURADOS */}
+                                                <p className="text-[10px] font-bold text-gray-500 mt-1">{caja.calles || 'Calles sin especificar'}</p>
+                                                <div className="mt-2 bg-green-50 border border-green-100 rounded-lg p-1.5">
+                                                    <p className="text-[10px] font-black text-green-700">
+                                                        {caja.puertosLibres ?? caja.puertos} de {caja.puertosTotales ?? caja.puertos} Libres
+                                                    </p>
+                                                </div>
                                             </div>
                                         </Popup>
                                     </Marker>
