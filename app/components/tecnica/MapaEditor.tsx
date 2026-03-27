@@ -2,6 +2,7 @@
 /* ARCHIVO: app/components/tecnica/MapaEditor.tsx (EDITOR GIS AVANZADO)       */
 /* -------------------------------------------------------------------------- */
 'use client';
+import { useMemo } from 'react'; // <--- ¡AQUÍ ESTÁ EL FIX! (Faltaba esta importación)
 import { MapContainer, TileLayer, Marker, useMapEvents, Polygon } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -19,7 +20,7 @@ const crearIcono = (color, iconoSVG, size = 32) => L.divIcon({
 });
 
 // Iconos usando emojis/texto por compatibilidad directa sin importar librerías extra
-const AntenaIcon = crearIcono('#f97316', '📡', 34); // Naranja
+const AntenaIcon = crearIcono('#ea580c', '📡', 34); // Naranja
 const OltIcon = crearIcono('#8b5cf6', '🏢', 34); // Morado
 const CajaIcon = crearIcono('#22c55e', '🔌', 24); // Verde (Más chiquito)
 
