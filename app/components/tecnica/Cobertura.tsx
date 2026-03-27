@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/* ARCHIVO: app/components/tecnica/Cobertura.tsx (CON FICHA TÉCNICA GIS)      */
+/* ARCHIVO: app/components/tecnica/Cobertura.tsx (CON GIS AVANZADO Y EDICIÓN) */
 /* -------------------------------------------------------------------------- */
 'use client';
 import { useState, useMemo } from 'react';
@@ -8,26 +8,17 @@ import {
   MdMap, MdAdd, MdSearch, MdWifi, MdCable, MdClose, MdRouter, 
   MdLocationOn, MdDelete, MdPlace, MdBusiness, MdDomain, 
   MdAttachMoney, MdSpeed, MdCheckCircle, MdWarning, MdSwapHoriz,
-  MdViewModule, MdSave // <--- ¡AQUÍ ESTÁ EL FIX! (Faltaba importar MdSave)
+  MdViewModule, MdSave, MdEdit
 } from "react-icons/md";
 
-// IMPORTACIÓN DINÁMICA DE LOS DOS MAPAS
-const MapaGlobal = dynamic(() => import('./MapaGlobal'), { 
-    ssr: false, 
-    loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center animate-pulse"><MdMap className="text-4xl text-gray-300"/></div>
-});
-
-const MapaEditor = dynamic(() => import('./MapaEditor'), { 
-    ssr: false, 
-    loading: () => <div className="h-64 w-full bg-gray-100 rounded-2xl flex items-center justify-center animate-pulse"><MdMap className="text-3xl text-gray-300"/></div>
-});
+const MapaGlobal = dynamic(() => import('./MapaGlobal'), { ssr: false, loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center animate-pulse"><MdMap className="text-4xl text-gray-300"/></div> });
+const MapaEditor = dynamic(() => import('./MapaEditor'), { ssr: false, loading: () => <div className="h-64 w-full bg-gray-100 rounded-2xl flex items-center justify-center animate-pulse"><MdMap className="text-3xl text-gray-300"/></div> });
 
 const SEDES = ['Centro', 'Comonfort', 'Tlalpujahua', 'Gandhó', 'San Diego de la Unión', 'Amealco', 'Xichú', 'Jalpan de Serra', 'Santa María del Río'];
 const MARCAS = ['DMG NET', 'Intercheap', 'Fibrox MX', 'WifiCel'];
 
 export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZona, usuarioActual }) {
   const [vistaActiva, setVistaActiva] = useState('TARJETAS'); 
-  
   const [busqueda, setBusqueda] = useState('');
   const [filtroRegion, setFiltroRegion] = useState('TODAS');
   const [filtroMarca, setFiltroMarca] = useState('TODAS');
@@ -36,6 +27,7 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const [modalOpen, setModalOpen] = useState(false);
   const [zonaAConfigurar, setZonaAConfigurar] = useState(null);
   const [zonaDetalles, setZonaDetalles] = useState(null); 
+  const [editandoZonaId, setEditandoZonaId] = useState(null); // NUEVO ESTADO PARA EDICIÓN
   
   const [costos, setCostos] = useState({ instalacion: '', cambio: '' });
   const [planes, setPlanes] = useState([]); 
@@ -49,6 +41,8 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const [comunidadesAP, setComunidadesAP] = useState([]); 
   const [nuevaComunidad, setNuevaComunidad] = useState('');
 
+  // ESTADO GIS MATEMÁTICO (Radio y Ángulo para antenas, o arreglo de puntos para fibra)
+  const [coberturaGeo, setCoberturaGeo] = useState({ radio: 3000, anguloInicio: 0, amplitud: 360, poligono: [] });
   const [modoEdicionMapa, setModoEdicionMapa] = useState('ZONA');
 
   const rol = usuarioActual?.rol || '';
@@ -69,17 +63,32 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
       });
   }, [cobertura, busqueda, filtroRegion, filtroMarca, filtroTipo]);
 
+  const abrirModalNuevaZona = () => {
+      setEditandoZonaId(null);
+      setDatosZona({ nombreAp: '', sede: 'Centro', marca: 'DMG NET', municipio: '', estado: 'Guanajuato' });
+      setCoordenadas({ lat: '', lng: '' }); setCajasTemporales([]); setComunidadesAP([]);
+      setCoberturaGeo({ radio: 3000, anguloInicio: 0, amplitud: 360, poligono: [] });
+      setModalOpen(true);
+  };
+
+  const abrirModalEditarZona = (zona) => {
+      setEditandoZonaId(zona.id);
+      setTipoTecnologia(zona.tipo);
+      setDatosZona({ nombreAp: zona.nombreAp, sede: zona.sede, marca: zona.marca, municipio: zona.municipio, estado: zona.estado });
+      setCoordenadas({ lat: zona.lat, lng: zona.lng });
+      setCajasTemporales(zona.cajas || []);
+      setComunidadesAP(zona.comunidades || []);
+      setCoberturaGeo(zona.coberturaGeo || { radio: 3000, anguloInicio: 0, amplitud: 360, poligono: [] });
+      setModalOpen(true);
+  };
+
   const handleMapClick = (latlng) => {
-      if (modoEdicionMapa === 'ZONA') {
-          setCoordenadas({ lat: latlng.lat.toFixed(6), lng: latlng.lng.toFixed(6) });
-      } else {
-          setNuevaCaja({ ...nuevaCaja, lat: latlng.lat.toFixed(6), lng: latlng.lng.toFixed(6) });
-      }
+      if (modoEdicionMapa === 'ZONA') setCoordenadas({ lat: latlng.lat.toFixed(6), lng: latlng.lng.toFixed(6) });
+      else setNuevaCaja({ ...nuevaCaja, lat: latlng.lat.toFixed(6), lng: latlng.lng.toFixed(6) });
   };
 
   const agregarCajaALista = () => {
-    if (!nuevaCaja.nombre || !nuevaCaja.calles) return alert("Faltan datos de la caja");
-    if (!nuevaCaja.lat || !nuevaCaja.lng) return alert("Haz clic en el mapa para ubicar la caja.");
+    if (!nuevaCaja.nombre || !nuevaCaja.lat) return alert("Faltan datos o ubicación en el mapa");
     setCajasTemporales([...cajasTemporales, { ...nuevaCaja, id: `TEMP-${Date.now()}` }]);
     setNuevaCaja({ nombre: '', calles: '', puertos: 8, lat: '', lng: '' }); 
     setModoEdicionMapa('ZONA');
@@ -87,56 +96,30 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   const eliminarCajaDeLista = (id) => setCajasTemporales(cajasTemporales.filter(c => c.id !== id));
 
   const agregarComunidad = () => {
-      if (!nuevaComunidad.trim()) return;
-      if (comunidadesAP.includes(nuevaComunidad.trim())) return alert("Ya agregaste esa comunidad");
+      if (!nuevaComunidad.trim() || comunidadesAP.includes(nuevaComunidad.trim())) return;
       setComunidadesAP([...comunidadesAP, nuevaComunidad.trim()]);
       setNuevaComunidad('');
   };
   const eliminarComunidad = (com) => setComunidadesAP(comunidadesAP.filter(c => c !== com));
 
-  const agregarPlan = () => {
-      if (!nuevoPlan.velocidad || !nuevoPlan.precio) return alert("Completa velocidad y precio del plan");
-      let vel = nuevoPlan.velocidad.toUpperCase();
-      if (!vel.includes('MB')) vel += ' MB';
-      setPlanes([...planes, { ...nuevoPlan, velocidad: vel, id: Date.now() }]);
-      setNuevoPlan({ velocidad: '', precio: '' });
-  };
-  const eliminarPlan = (id) => setPlanes(planes.filter(p => p.id !== id));
-
-  const guardarConfiguracionMarketing = (e) => {
-      e.preventDefault();
-      if (!costos.instalacion || !costos.cambio) return alert("Define los costos de instalación y cambio.");
-      if (planes.length === 0) return alert("Debes agregar al menos un plan de internet.");
-
-      const zonaActualizada = { ...zonaAConfigurar, costos: { instalacion: Number(costos.instalacion), cambio: Number(costos.cambio) }, planes: planes, estatus: 'ACTIVA' };
-      onActualizarZona(zonaActualizada);
-      setZonaAConfigurar(null);
-      setCostos({ instalacion: '', cambio: '' });
-      setPlanes([]);
-  };
-
   const handleGuardarZona = (e) => {
     e.preventDefault();
-    if (!datosZona.nombreAp || !datosZona.municipio) return alert("Faltan datos generales");
-    if (!coordenadas.lat || !coordenadas.lng) return alert("Haz clic en el mapa para ubicar la antena/OLT central.");
-    if (tipoTecnologia === 'ANTENA' && comunidadesAP.length === 0) return alert("Agrega comunidades.");
-    if (tipoTecnologia === 'FIBRA' && cajasTemporales.length === 0) return alert("Configura y ubica al menos una caja NAP.");
-
-    const zonaFinal = {
-        id: `ZONA-${Date.now()}`, ...datosZona, tipo: tipoTecnologia,
-        lat: coordenadas.lat, lng: coordenadas.lng,
-        cajas: tipoTecnologia === 'FIBRA' ? cajasTemporales.map(c => ({
-            id: `BOX-${Math.random().toString(36).substr(2,9)}`, nombre: c.nombre, calles: c.calles, puertosTotales: Number(c.puertos), puertosLibres: Number(c.puertos), lat: c.lat, lng: c.lng 
-        })) : [],
+    if (!datosZona.nombreAp || !datosZona.municipio || !coordenadas.lat) return alert("Faltan datos generales o ubicación central.");
+    
+    const payload = {
+        ...datosZona, tipo: tipoTecnologia, lat: coordenadas.lat, lng: coordenadas.lng,
+        cajas: tipoTecnologia === 'FIBRA' ? cajasTemporales : [],
         comunidades: tipoTecnologia === 'ANTENA' ? comunidadesAP : [],
         comunidad: tipoTecnologia === 'ANTENA' ? (comunidadesAP[0] || datosZona.nombreAp) : datosZona.nombreAp,
-        estatus: 'PENDIENTE_PRECIOS', costos: { instalacion: 0, cambio: 0 }, planes: []
+        coberturaGeo: coberturaGeo // Guardamos el cono o polígono
     };
 
-    onAgregarZona(zonaFinal);
+    if (editandoZonaId) {
+        onActualizarZona({ ...cobertura.find(z => z.id === editandoZonaId), ...payload });
+    } else {
+        onAgregarZona({ ...payload, estatus: 'PENDIENTE_PRECIOS', costos: { instalacion: 0, cambio: 0 }, planes: [] });
+    }
     setModalOpen(false);
-    setDatosZona({ nombreAp: '', sede: 'Centro', marca: 'DMG NET', municipio: '', estado: 'Guanajuato' });
-    setCajasTemporales([]); setComunidadesAP([]); setCoordenadas({ lat: '', lng: '' });
   };
 
   const scrollbarInvisible = "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
@@ -144,44 +127,25 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
   return (
     <div className="h-full flex flex-col animate-fade-in">
       <div className="bg-white p-6 rounded-t-[2rem] rounded-b-xl shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-2 shrink-0">
-        <div>
-            <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><MdMap className="text-blue-500" /> Cobertura y GIS</h2>
-            <p className="text-sm text-gray-400 font-medium">Gestión de Infraestructura y Tarifas</p>
-        </div>
-        
+        <div><h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><MdMap className="text-blue-500" /> Cobertura y GIS</h2><p className="text-sm text-gray-400 font-medium">Gestión de Infraestructura</p></div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
             <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200/50 w-full sm:w-auto shrink-0">
                 <button onClick={() => setVistaActiva('TARJETAS')} className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${vistaActiva === 'TARJETAS' ? 'bg-white text-blue-600 shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}><MdViewModule className="text-lg" /> Tarjetas</button>
                 <button onClick={() => setVistaActiva('MAPA')} className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${vistaActiva === 'MAPA' ? 'bg-white text-blue-600 shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}><MdMap className="text-lg" /> Mapa Global</button>
             </div>
-            <button onClick={() => setModalOpen(true)} className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"><MdAdd className="text-xl" /> Nueva Zona</button>
+            <button onClick={abrirModalNuevaZona} className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"><MdAdd className="text-xl" /> Nueva Zona</button>
         </div>
       </div>
 
       <div className="bg-white p-4 rounded-t-xl rounded-b-[2rem] shadow-sm border border-gray-100 mb-6 flex flex-col gap-3 shrink-0">
           <div className={`flex items-center gap-4 overflow-x-auto pb-1 ${scrollbarInvisible}`}>
-              <div className="bg-gray-100 rounded-2xl px-4 py-2 flex items-center gap-2 text-gray-500 min-w-[200px] shrink-0">
-                  <MdSearch className="text-lg" /><input type="text" placeholder="Buscar zona o AP..." className="bg-transparent outline-none text-sm font-bold w-full" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-              </div>
+              <div className="bg-gray-100 rounded-2xl px-4 py-2 flex items-center gap-2 text-gray-500 min-w-[200px] shrink-0"><MdSearch className="text-lg" /><input type="text" placeholder="Buscar zona o AP..." className="bg-transparent outline-none text-sm font-bold w-full" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
               <div className="w-px h-6 bg-gray-200 shrink-0"></div>
-              <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Tipo:</span>
-                  {['TODOS', 'FIBRA', 'ANTENA'].map(t => (
-                      <button key={t} onClick={() => setFiltroTipo(t)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroTipo === t ? 'bg-gray-800 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{t === 'FIBRA' ? 'Fibra Óptica' : t}</button>
-                  ))}
-              </div>
+              <div className="flex items-center gap-2 shrink-0"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Tipo:</span>{['TODOS', 'FIBRA', 'ANTENA'].map(t => (<button key={t} onClick={() => setFiltroTipo(t)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroTipo === t ? 'bg-gray-800 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{t === 'FIBRA' ? 'Fibra Óptica' : t}</button>))}</div>
               <div className="w-px h-6 bg-gray-200 shrink-0"></div>
-              <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Región:</span>
-                  <button onClick={() => setFiltroRegion('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === 'TODAS' ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>
-                  {regionesDisponibles.map(r => (<button key={r} onClick={() => setFiltroRegion(r)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === r ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{r}</button>))}
-              </div>
+              <div className="flex items-center gap-2 shrink-0"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Región:</span><button onClick={() => setFiltroRegion('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === 'TODAS' ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>{regionesDisponibles.map(r => (<button key={r} onClick={() => setFiltroRegion(r)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroRegion === r ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{r}</button>))}</div>
               <div className="w-px h-6 bg-gray-200 shrink-0"></div>
-              <div className="flex items-center gap-2 shrink-0 pr-4">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Marca:</span>
-                  <button onClick={() => setFiltroMarca('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === 'TODAS' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>
-                  {marcasDisponibles.map(m => (<button key={m} onClick={() => setFiltroMarca(m)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === m ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{m}</button>))}
-              </div>
+              <div className="flex items-center gap-2 shrink-0 pr-4"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Marca:</span><button onClick={() => setFiltroMarca('TODAS')} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === 'TODAS' ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>Todas</button>{marcasDisponibles.map(m => (<button key={m} onClick={() => setFiltroMarca(m)} className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filtroMarca === m ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-transparent text-gray-400 hover:bg-gray-50 border border-transparent'}`}>{m}</button>))}</div>
           </div>
       </div>
 
@@ -192,38 +156,22 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                       {zonasFiltradas.length === 0 && (<div className="col-span-full text-center py-20 text-gray-300 font-bold uppercase tracking-widest">No hay zonas que coincidan con los filtros</div>)}
                       {zonasFiltradas.map((zona) => {
                           const esFibra = zona.tipo === 'FIBRA';
-                          const pendiente = zona.estatus === 'PENDIENTE_PRECIOS';
-                          let totalLibres = 0;
-                          if (esFibra && zona.cajas) totalLibres = zona.cajas.reduce((acc, c) => acc + c.puertosLibres, 0);
-                          
                           return (
-                              <div key={zona.id} className={`bg-white p-6 rounded-[2.5rem] shadow-sm border transition-all relative overflow-hidden group ${pendiente ? 'border-orange-200 bg-orange-50/30' : 'border-gray-50 hover:shadow-md'}`}>
+                              <div key={zona.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 hover:shadow-md transition-all relative group">
                                   <div className="flex justify-between items-start mb-4">
                                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl ${esFibra ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>{esFibra ? <MdCable /> : <MdWifi />}</div>
                                       <div className="text-right">
                                           <span className="block text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-1">{zona.sede}</span>
-                                          {pendiente ? <span className="px-2 py-1 bg-orange-100 text-orange-600 rounded-md text-[10px] font-bold flex items-center justify-end gap-1"><MdWarning/> PENDIENTE</span> : <span className="px-2 py-1 bg-green-100 text-green-600 rounded-md text-[10px] font-bold flex items-center justify-end gap-1"><MdCheckCircle/> ACTIVA</span>}
+                                          {zona.estatus === 'PENDIENTE_PRECIOS' ? <span className="px-2 py-1 bg-orange-100 text-orange-600 rounded-md text-[10px] font-bold flex items-center justify-end gap-1"><MdWarning/> PENDIENTE</span> : <span className="px-2 py-1 bg-green-100 text-green-600 rounded-md text-[10px] font-bold flex items-center justify-end gap-1"><MdCheckCircle/> ACTIVA</span>}
                                       </div>
                                   </div>
                                   <h3 className="text-lg font-extrabold text-gray-800 leading-tight mb-1">{zona.nombreAp || zona.comunidad}</h3>
-                                  <p className="text-xs text-gray-500 font-medium mb-3 flex items-center gap-1"><MdPlace className="text-gray-400" /> {zona.municipio}, {zona.estado}</p>
-
-                                  {!pendiente && zona.costos && (
-                                      <div className="flex flex-wrap gap-2 mb-4">
-                                          <span className="text-[10px] bg-green-50 border border-green-100 px-2 py-1 rounded-lg font-bold text-green-700 flex items-center gap-1"><MdAttachMoney/> Inst: ${zona.costos.instalacion}</span>
-                                          <span className="text-[10px] bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg font-bold text-blue-700 flex items-center gap-1"><MdSwapHoriz/> Camb: ${zona.costos.cambio}</span>
-                                      </div>
-                                  )}
-
-                                  {pendiente && esMarketing && (
-                                      <button onClick={() => { setZonaAConfigurar(zona); setPlanes([]); setCostos({instalacion: '', cambio: ''}); }} className="w-full py-3 bg-orange-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-orange-500/30 hover:bg-orange-600 transition-all flex items-center justify-center gap-2 mt-2 animate-pulse">
-                                          <MdAttachMoney className="text-lg"/> Configurar Oferta
-                                      </button>
-                                  )}
-
-                                  <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
-                                      {esFibra ? <p className="text-[10px] font-bold text-gray-400">{zona.cajas?.length || 0} Cajas NAP • {totalLibres} Puertos Libres</p> : <p className="text-[10px] font-bold text-gray-400">{zona.comunidades?.length || 0} Comunidades Cubiertas</p>}
-                                      <button onClick={() => setZonaDetalles(zona)} className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors shadow-sm cursor-pointer relative z-10">Ver Detalles</button>
+                                  <p className="text-xs text-gray-500 font-medium mb-4 flex items-center gap-1"><MdPlace className="text-gray-400" /> {zona.municipio}, {zona.estado}</p>
+                                  
+                                  {/* BOTONES DE EDICIÓN Y DETALLES */}
+                                  <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center gap-2">
+                                      <button onClick={() => abrirModalEditarZona(zona)} className="flex-1 py-2 text-[10px] font-black text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"><MdEdit/> Editar GEO</button>
+                                      <button onClick={() => setZonaDetalles(zona)} className="flex-1 py-2 text-[10px] font-black text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">Ver Detalles</button>
                                   </div>
                               </div>
                           );
@@ -231,229 +179,134 @@ export default function Cobertura({ cobertura = [], onAgregarZona, onActualizarZ
                   </div>
               </div>
           ) : (
-              <div className="h-full w-full bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-2 animate-fade-in">
-                  <MapaGlobal zonas={zonasFiltradas} />
-              </div>
+              <div className="h-full w-full bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-2 animate-fade-in"><MapaGlobal zonas={zonasFiltradas} /></div>
           )}
       </div>
 
-      {/* --- MODAL NUEVA ZONA CON EDITOR MAPA --- */}
+      {/* --- MODAL NUEVA/EDITAR ZONA (EL SÚPER EDITOR GIS) --- */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
-            <div className="bg-white rounded-[2rem] w-full max-w-2xl p-8 shadow-2xl animate-scale-in max-h-[90vh] flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-extrabold text-gray-900">Agregar Zona</h2>
-                    <button onClick={() => setModalOpen(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><MdClose /></button>
+            <div className="bg-white rounded-[2rem] w-full max-w-4xl shadow-2xl animate-scale-in flex flex-col overflow-hidden max-h-[95vh]">
+                <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
+                    <h2 className="text-2xl font-extrabold text-gray-900">{editandoZonaId ? 'Editar Zona GIS' : 'Crear Nueva Zona GIS'}</h2>
+                    <button onClick={() => setModalOpen(false)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 shadow-sm transition-all"><MdClose className="text-xl"/></button>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
-                    <div className="flex bg-gray-100 p-1 rounded-2xl mb-6">
-                        <button onClick={() => { setTipoTecnologia('FIBRA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${tipoTecnologia === 'FIBRA' ? 'bg-white shadow text-purple-600' : 'text-gray-500'}`}>Fibra Óptica</button>
-                        <button onClick={() => { setTipoTecnologia('ANTENA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${tipoTecnologia === 'ANTENA' ? 'bg-white shadow text-orange-600' : 'text-gray-500'}`}>Antena</button>
-                    </div>
-                    <form id="zonaForm" onSubmit={handleGuardarZona} className="space-y-5">
+
+                <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto">
+                    
+                    {/* COLUMNA IZQUIERDA: CONTROLES */}
+                    <div className="w-full lg:w-1/2 p-6 border-r border-gray-100 bg-white space-y-6">
+                        <div className="flex bg-gray-100 p-1 rounded-2xl">
+                            <button disabled={!!editandoZonaId} onClick={() => { setTipoTecnologia('FIBRA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${tipoTecnologia === 'FIBRA' ? 'bg-white shadow text-purple-600' : 'text-gray-500 disabled:opacity-50'}`}>Fibra Óptica</button>
+                            <button disabled={!!editandoZonaId} onClick={() => { setTipoTecnologia('ANTENA'); setModoEdicionMapa('ZONA'); }} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${tipoTecnologia === 'ANTENA' ? 'bg-white shadow text-orange-600' : 'text-gray-500 disabled:opacity-50'}`}>Antena WISP</button>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">Sede Operativa</label><div className="relative"><MdDomain className="absolute left-3 top-3.5 text-gray-400"/><select value={datosZona.sede} onChange={(e) => setDatosZona({...datosZona, sede: e.target.value})} className="w-full pl-9 pr-4 py-3 bg-gray-50 rounded-2xl border-none outline-none font-bold text-sm text-gray-700 appearance-none">{SEDES.map(s => <option key={s} value={s}>{s}</option>)}</select></div></div>
-                            <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">Marca</label><div className="relative"><MdBusiness className="absolute left-3 top-3.5 text-gray-400"/><select value={datosZona.marca} onChange={(e) => setDatosZona({...datosZona, marca: e.target.value})} className="w-full pl-9 pr-4 py-3 bg-gray-50 rounded-2xl border-none outline-none font-bold text-sm text-gray-700 appearance-none">{MARCAS.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div>
+                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Sede Operativa</label><select value={datosZona.sede} onChange={(e) => setDatosZona({...datosZona, sede: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-none outline-none font-bold text-xs text-gray-700 appearance-none">{SEDES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Marca</label><select value={datosZona.marca} onChange={(e) => setDatosZona({...datosZona, marca: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-none outline-none font-bold text-xs text-gray-700 appearance-none">{MARCAS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
                         </div>
-                        <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">{tipoTecnologia === 'FIBRA' ? 'Nombre Zona OLT' : 'Nombre del AP (Torre)'}</label><input required type="text" placeholder="Ej: Zona Centro" value={datosZona.nombreAp} onChange={(e) => setDatosZona({...datosZona, nombreAp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-100 font-bold text-gray-800" /></div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">Municipio</label><input required type="text" placeholder="Ej: San Diego" value={datosZona.municipio} onChange={(e) => setDatosZona({...datosZona, municipio: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-medium text-gray-800" /></div>
-                            <div><label className="block text-xs font-bold text-gray-400 uppercase mb-2">Estado</label><input required type="text" placeholder="Ej: Guanajuato" value={datosZona.estado} onChange={(e) => setDatosZona({...datosZona, estado: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl border-none outline-none font-medium text-gray-800" /></div>
-                        </div>
+                        <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre (ID Identificador)</label><input required type="text" placeholder="Ej: Torre Principal Noria" value={datosZona.nombreAp} onChange={(e) => setDatosZona({...datosZona, nombreAp: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-none outline-none font-bold text-xs text-gray-800" /></div>
 
-                        <div className="bg-gray-50 p-4 rounded-3xl border border-gray-200 mt-6">
-                            <h4 className="text-sm font-extrabold text-gray-800 mb-3 flex items-center gap-2"><MdMap className="text-blue-500"/> Ubicación Geográfica (Clic para ubicar)</h4>
-                            
-                            {tipoTecnologia === 'FIBRA' && (
-                                <div className="flex bg-gray-200/50 p-1 rounded-xl mb-3">
-                                    <button type="button" onClick={() => setModoEdicionMapa('ZONA')} className={`flex-1 py-2 text-[10px] uppercase tracking-widest font-black rounded-lg transition-all ${modoEdicionMapa === 'ZONA' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-400'}`}>1. OLT Principal</button>
-                                    <button type="button" onClick={() => setModoEdicionMapa('CAJA')} className={`flex-1 py-2 text-[10px] uppercase tracking-widest font-black rounded-lg transition-all ${modoEdicionMapa === 'CAJA' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>2. Cajas NAP</button>
-                                </div>
-                            )}
-
-                            <MapaEditor 
-                                posicionCentro={modoEdicionMapa === 'ZONA' ? coordenadas : nuevaCaja} 
-                                setPosicion={handleMapClick} 
-                                tipoPunto={modoEdicionMapa === 'ZONA' ? tipoTecnologia : 'CAJA'}
-                                marcadoresExtra={cajasTemporales}
-                            />
-                            
-                            <div className="grid grid-cols-2 gap-4 mt-3">
-                                <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Latitud ({modoEdicionMapa === 'ZONA' ? 'OLT' : 'Caja'})</label><input readOnly value={modoEdicionMapa === 'ZONA' ? coordenadas.lat : nuevaCaja.lat} className="w-full px-4 py-2 bg-white rounded-xl text-xs border border-gray-100 text-gray-400 font-bold" /></div>
-                                <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Longitud ({modoEdicionMapa === 'ZONA' ? 'OLT' : 'Caja'})</label><input readOnly value={modoEdicionMapa === 'ZONA' ? coordenadas.lng : nuevaCaja.lng} className="w-full px-4 py-2 bg-white rounded-xl text-xs border border-gray-100 text-gray-400 font-bold" /></div>
-                            </div>
-                        </div>
-
+                        {/* CONTROLES AVANZADOS SEGÚN TECNOLOGÍA */}
                         {tipoTecnologia === 'ANTENA' && (
-                            <div className="bg-orange-50 p-5 rounded-3xl border border-orange-100"><h4 className="text-sm font-extrabold text-orange-800 mb-2 flex items-center gap-2"><MdPlace/> Comunidades Cubiertas</h4><div className="flex gap-2 mb-3"><input type="text" placeholder="Ej: La Soledad" value={nuevaComunidad} onChange={(e) => setNuevaComunidad(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), agregarComunidad())} className="flex-1 px-4 py-2 bg-white rounded-xl text-sm outline-none border border-orange-200" /><button type="button" onClick={agregarComunidad} className="px-4 py-2 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600">Agregar</button></div><div className="flex flex-wrap gap-2">{comunidadesAP.map((com, idx) => (<span key={idx} className="px-3 py-1 bg-white border border-orange-200 text-orange-700 rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm">{com} <button type="button" onClick={() => eliminarComunidad(com)} className="text-orange-300 hover:text-red-500"><MdClose/></button></span>))}</div></div>
+                            <div className="bg-orange-50 p-4 rounded-3xl border border-orange-100">
+                                <h4 className="text-xs font-extrabold text-orange-800 mb-4 flex items-center gap-2"><MdWifi/> Controles Sectoriales (Cono)</h4>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="flex justify-between text-[10px] font-bold text-orange-700 uppercase mb-1"><span>Alcance (Radio)</span> <span>{coberturaGeo.radio} m</span></label>
+                                        <input type="range" min="500" max="15000" step="500" value={coberturaGeo.radio} onChange={(e) => setCoberturaGeo({...coberturaGeo, radio: Number(e.target.value)})} className="w-full accent-orange-600"/>
+                                    </div>
+                                    <div>
+                                        <label className="flex justify-between text-[10px] font-bold text-orange-700 uppercase mb-1"><span>Apertura (Grados)</span> <span>{coberturaGeo.amplitud}°</span></label>
+                                        <input type="range" min="30" max="360" step="10" value={coberturaGeo.amplitud} onChange={(e) => setCoberturaGeo({...coberturaGeo, amplitud: Number(e.target.value)})} className="w-full accent-orange-600"/>
+                                    </div>
+                                    {coberturaGeo.amplitud < 360 && (
+                                        <div>
+                                            <label className="flex justify-between text-[10px] font-bold text-orange-700 uppercase mb-1"><span>Orientación (Dirección)</span> <span>{coberturaGeo.anguloInicio}°</span></label>
+                                            <input type="range" min="0" max="360" step="5" value={coberturaGeo.anguloInicio} onChange={(e) => setCoberturaGeo({...coberturaGeo, anguloInicio: Number(e.target.value)})} className="w-full accent-orange-600"/>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         )}
 
                         {tipoTecnologia === 'FIBRA' && (
-                            <div className="bg-green-50 p-5 rounded-3xl border border-green-100">
-                                <h4 className="text-sm font-extrabold text-green-800 mb-2 flex items-center gap-2"><MdRouter/> Agregar Caja NAP</h4>
-                                <p className="text-[10px] text-green-600 mb-3">*Asegúrate de haber seleccionado "2. Cajas NAP" arriba y dar clic en el mapa para ubicarla.</p>
-                                <div className="space-y-3 mb-4">
-                                    <input type="text" placeholder="Nombre (Ej: Caja 1)" value={nuevaCaja.nombre} onChange={(e) => setNuevaCaja({...nuevaCaja, nombre: e.target.value})} className="w-full px-4 py-2 bg-white rounded-xl text-sm border border-green-100 outline-none" />
-                                    <input type="text" placeholder="Calles que abarca" value={nuevaCaja.calles} onChange={(e) => setNuevaCaja({...nuevaCaja, calles: e.target.value})} className="w-full px-4 py-2 bg-white rounded-xl text-sm border border-green-100 outline-none" />
-                                    <div className="flex gap-2 items-center"><input type="number" placeholder="Puertos" value={nuevaCaja.puertos} onChange={(e) => setNuevaCaja({...nuevaCaja, puertos: e.target.value})} className="w-20 px-4 py-2 bg-white rounded-xl text-sm border border-green-100 outline-none text-center font-bold" /><button type="button" onClick={agregarCajaALista} className="flex-1 py-2 bg-green-600 text-white rounded-xl font-bold text-sm hover:bg-green-700">Guardar Caja</button></div>
+                            <div className="bg-purple-50 p-4 rounded-3xl border border-purple-100">
+                                <h4 className="text-xs font-extrabold text-purple-800 mb-3 flex items-center gap-2"><MdCable/> Dibujo de Polígono Irregular</h4>
+                                <p className="text-[10px] text-purple-600 font-medium mb-3">Haz clic en el botón inferior para empezar a trazar calles en el mapa.</p>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setModoEdicionMapa('POLIGONO_FIBRA')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${modoEdicionMapa === 'POLIGONO_FIBRA' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 border border-purple-200'}`}>Trazar Perímetro</button>
+                                    <button type="button" onClick={() => setCoberturaGeo({...coberturaGeo, poligono: []})} className="px-4 py-2 bg-white text-red-500 border border-red-100 rounded-xl text-[10px] font-black hover:bg-red-50">Borrar</button>
                                 </div>
-                                {cajasTemporales.length > 0 && <div className="space-y-2">{cajasTemporales.map((c, i) => (<div key={i} className="flex justify-between items-center bg-white p-3 rounded-xl border border-green-200 shadow-sm"><div><p className="text-xs font-bold text-gray-800">{c.nombre} <span className="text-[9px] text-green-500 bg-green-50 px-1 rounded ml-1">📍 {c.lat}</span></p><p className="text-[10px] text-gray-500">{c.puertos} puertos</p></div><button type="button" onClick={() => eliminarCajaDeLista(c.id)} className="text-red-400 hover:text-red-600"><MdDelete/></button></div>))}</div>}
                             </div>
                         )}
-                    </form>
-                </div>
-                <div className="pt-6 border-t border-gray-100 mt-2">
-                    <button type="submit" form="zonaForm" className="w-full py-4 bg-gray-900 text-white font-bold rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"><MdSave className="text-xl"/> Guardar Zona Completa</button>
-                </div>
-            </div>
-        </div>
-      )}
 
-      {/* --- MODAL CONFIGURACIÓN MARKETING --- */}
-      {zonaAConfigurar && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
-            <div className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl animate-scale-in max-h-[90vh] flex flex-col">
-                <div className="flex justify-between items-start mb-6">
-                    <div>
-                        <h2 className="text-xl font-extrabold text-gray-900">Oferta Comercial</h2>
-                        <p className="text-xs text-gray-500 font-bold">{zonaAConfigurar.nombreAp}</p>
                     </div>
-                    <button onClick={() => setZonaAConfigurar(null)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><MdClose /></button>
-                </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                    <div className="bg-gray-50 p-4 rounded-2xl mb-6 border border-gray-100">
-                        <h4 className="text-xs font-black text-gray-400 uppercase mb-3">Costos de Contratación</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-[10px] font-bold text-green-600 uppercase mb-1">Instalación Nueva ($)</label><input type="number" placeholder="Ej: 1500" value={costos.instalacion} onChange={(e) => setCostos({...costos, instalacion: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl outline-none font-bold text-gray-800 border border-gray-200 focus:border-green-400" /></div>
-                            <div><label className="block text-[10px] font-bold text-blue-600 uppercase mb-1">Cambio Prov. ($)</label><input type="number" placeholder="Ej: 500" value={costos.cambio} onChange={(e) => setCostos({...costos, cambio: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl outline-none font-bold text-gray-800 border border-gray-200 focus:border-blue-400" /></div>
+                    {/* COLUMNA DERECHA: EL MAPA EN VIVO */}
+                    <div className="w-full lg:w-1/2 bg-gray-100 relative min-h-[400px]">
+                        
+                        {/* Selector de Herramienta sobre el mapa */}
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] flex bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-gray-200">
+                            <button type="button" onClick={() => setModoEdicionMapa('ZONA')} className={`px-4 py-1.5 text-[10px] uppercase tracking-widest font-black rounded-full transition-all ${modoEdicionMapa === 'ZONA' ? 'bg-blue-500 text-white shadow' : 'text-gray-500'}`}>Mover Central</button>
+                            {tipoTecnologia === 'FIBRA' && <button type="button" onClick={() => setModoEdicionMapa('CAJA')} className={`px-4 py-1.5 text-[10px] uppercase tracking-widest font-black rounded-full transition-all ${modoEdicionMapa === 'CAJA' ? 'bg-green-500 text-white shadow' : 'text-gray-500'}`}>Poner Cajas NAP</button>}
                         </div>
-                    </div>
 
-                    <div className="mb-6">
-                        <h4 className="text-xs font-black text-gray-400 uppercase mb-3">Planes de Velocidad</h4>
-                        <div className="flex gap-2 mb-3"><input type="text" placeholder="Ej: 50" value={nuevoPlan.velocidad} onChange={(e) => setNuevoPlan({...nuevoPlan, velocidad: e.target.value})} className="w-24 px-4 py-2 bg-gray-50 rounded-xl text-sm outline-none border border-gray-200" /><span className="self-center font-bold text-gray-400 text-xs">MB</span><span className="self-center font-bold text-gray-400 text-sm ml-2">$</span><input type="number" placeholder="Precio" value={nuevoPlan.precio} onChange={(e) => setNuevoPlan({...nuevoPlan, precio: e.target.value})} className="flex-1 px-4 py-2 bg-gray-50 rounded-xl text-sm outline-none border border-gray-200" /><button type="button" onClick={agregarPlan} className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700">Agregar</button></div>
-                        <div className="space-y-2">
-                            {planes.map((p) => (
-                                <div key={p.id} className="flex justify-between items-center bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
-                                    <div><p className="font-extrabold text-gray-800 text-sm flex items-center gap-2"><MdSpeed className="text-blue-500"/> {p.velocidad}</p><p className="text-xs text-gray-500 font-bold">${p.precio} / mes</p></div><button onClick={() => eliminarPlan(p.id)} className="text-red-400 hover:text-red-600 p-2"><MdDelete/></button>
+                        <MapaEditor 
+                            posicionCentro={modoEdicionMapa === 'ZONA' ? coordenadas : nuevaCaja} 
+                            setPosicion={handleMapClick} 
+                            tipoPunto={modoEdicionMapa}
+                            marcadoresExtra={cajasTemporales}
+                            coberturaGeo={coberturaGeo}
+                            setCoberturaGeo={setCoberturaGeo}
+                        />
+
+                        {/* PEQUEÑO PANEL PARA GUARDAR CAJAS EN LA ESQUINA DEL MAPA */}
+                        {modoEdicionMapa === 'CAJA' && (
+                            <div className="absolute bottom-10 left-4 right-4 z-[400] bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-green-200">
+                                <div className="flex gap-2 mb-2">
+                                    <input type="text" placeholder="Ej: Caja Madero" value={nuevaCaja.nombre} onChange={e => setNuevaCaja({...nuevaCaja, nombre: e.target.value})} className="w-1/2 px-3 py-1.5 bg-gray-50 rounded-lg text-xs outline-none border border-gray-200"/>
+                                    <input type="number" placeholder="Puertos" value={nuevaCaja.puertos} onChange={e => setNuevaCaja({...nuevaCaja, puertos: e.target.value})} className="w-1/4 px-3 py-1.5 bg-gray-50 rounded-lg text-xs outline-none border border-gray-200 text-center font-bold"/>
+                                    <button type="button" onClick={agregarCajaALista} className="w-1/4 bg-green-500 text-white text-[10px] font-black rounded-lg">Fijar Pin</button>
                                 </div>
-                            ))}
-                            {planes.length === 0 && <p className="text-center text-xs text-gray-400 italic py-4">Agrega al menos un plan para activar la zona.</p>}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100">
-                    <button onClick={guardarConfiguracionMarketing} className="w-full py-4 bg-orange-500 text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-2">
-                        <MdCheckCircle className="text-xl" /> Activar Zona
-                    </button>
+                <div className="p-6 border-t border-gray-100 bg-gray-50 shrink-0">
+                    <button onClick={handleGuardarZona} className="w-full py-4 bg-gray-900 text-white font-extrabold rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"><MdSave className="text-xl"/> {editandoZonaId ? 'Guardar Cambios de Zona' : 'Guardar Nueva Zona'}</button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* --- MODAL DETALLES DE ZONA (ÚLTIMO PASO: FICHA TÉCNICA) --- */}
+      {/* --- MODAL DETALLES DE ZONA (FICHA TÉCNICA) --- */}
       {zonaDetalles && (
         <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-md">
             <div className="bg-white rounded-[2rem] w-full max-w-5xl shadow-2xl animate-scale-in flex flex-col overflow-hidden max-h-[90vh]">
                 <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
-                    <div>
-                        <h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><MdMap className="text-blue-500"/> Ficha Técnica de Cobertura</h2>
-                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{zonaDetalles.nombreAp || zonaDetalles.comunidad} • {zonaDetalles.municipio}</p>
-                    </div>
+                    <div><h2 className="text-xl font-extrabold text-gray-800 flex items-center gap-2"><MdMap className="text-blue-500"/> Ficha Técnica de Cobertura</h2></div>
                     <button onClick={() => setZonaDetalles(null)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 shadow-sm transition-all"><MdClose className="text-xl"/></button>
                 </div>
                 
                 <div className="flex flex-col lg:flex-row flex-1 min-h-0">
-                    {/* COLUMNA IZQUIERDA: DATOS */}
                     <div className="w-full lg:w-1/3 p-6 overflow-y-auto custom-scrollbar bg-white border-r border-gray-100 space-y-6">
-                        <div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Información General</p>
-                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                <p className="text-sm font-black text-gray-800">{zonaDetalles.marca}</p>
-                                <p className="text-xs font-bold text-gray-500 mt-1">Sede: {zonaDetalles.sede}</p>
-                                <p className="text-xs font-bold text-gray-500">Tipo: {zonaDetalles.tipo === 'FIBRA' ? 'Fibra Óptica (OLT)' : 'Antena (Torre)'}</p>
-                            </div>
-                        </div>
-
+                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100"><p className="text-sm font-black text-gray-800">{zonaDetalles.nombreAp || zonaDetalles.comunidad}</p><p className="text-xs font-bold text-gray-500">Tipo: {zonaDetalles.tipo}</p></div>
                         {zonaDetalles.tipo === 'FIBRA' ? (
-                            <div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Infraestructura (Cajas NAP)</p>
-                                <div className="space-y-2">
-                                    {zonaDetalles.cajas?.map((caja, idx) => (
-                                        <div key={idx} className="bg-purple-50 rounded-xl p-3 border border-purple-100 flex justify-between items-center">
-                                            <div>
-                                                <p className="text-xs font-black text-purple-800">{caja.nombre}</p>
-                                                <p className="text-[9px] font-bold text-purple-600">{caja.calles}</p>
-                                            </div>
-                                            <div className="text-center bg-white px-2 py-1 rounded-lg shadow-sm">
-                                                <p className="text-[10px] font-black text-gray-800">{caja.puertosLibres}</p>
-                                                <p className="text-[8px] font-bold text-gray-400">Libres</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Cajas NAP ({zonaDetalles.cajas?.length})</p><div className="space-y-2">{zonaDetalles.cajas?.map((caja, idx) => (<div key={idx} className="bg-purple-50 rounded-xl p-3 border border-purple-100 flex justify-between items-center"><div><p className="text-xs font-black text-purple-800">{caja.nombre}</p></div><div className="text-center bg-white px-2 py-1 rounded-lg"><p className="text-[10px] font-black text-gray-800">{caja.puertosLibres}</p></div></div>))}</div></div>
                         ) : (
-                            <div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Comunidades Cubiertas</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {zonaDetalles.comunidades?.map((com, idx) => (
-                                        <span key={idx} className="bg-orange-50 border border-orange-100 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-black">{com}</span>
-                                    ))}
-                                </div>
-                            </div>
+                            <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Comunidades</p><div className="flex flex-wrap gap-2">{zonaDetalles.comunidades?.map((com, idx) => (<span key={idx} className="bg-orange-50 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-black">{com}</span>))}</div></div>
                         )}
-
-                        <div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Oferta Comercial</p>
-                            {zonaDetalles.estatus === 'PENDIENTE_PRECIOS' ? (
-                                <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl text-center">
-                                    <MdWarning className="text-2xl text-orange-400 mx-auto mb-1"/>
-                                    <p className="text-xs font-bold text-orange-700">Tarifas pendientes de configurar por Marketing.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="bg-green-50 rounded-xl p-2 border border-green-100 text-center">
-                                            <p className="text-[9px] font-black text-green-600 uppercase">Instalación</p>
-                                            <p className="text-sm font-black text-green-700">${zonaDetalles.costos?.instalacion}</p>
-                                        </div>
-                                        <div className="bg-blue-50 rounded-xl p-2 border border-blue-100 text-center">
-                                            <p className="text-[9px] font-black text-blue-600 uppercase">Cambio</p>
-                                            <p className="text-sm font-black text-blue-700">${zonaDetalles.costos?.cambio}</p>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {zonaDetalles.planes?.map((p, idx) => (
-                                            <div key={idx} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
-                                                <span className="text-xs font-black text-gray-700 flex items-center gap-1"><MdSpeed className="text-gray-400"/> {p.velocidad}</span>
-                                                <span className="text-xs font-bold text-gray-500">${p.precio}/mes</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                     </div>
-                    
-                    {/* COLUMNA DERECHA: MINI MAPA ESPECÍFICO */}
                     <div className="w-full lg:w-2/3 min-h-[300px] lg:min-h-0 relative bg-gray-100">
-                        {zonaDetalles.lat && zonaDetalles.lng ? (
-                            <MapaGlobal zonas={[zonaDetalles]} />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full w-full opacity-50">
-                                <MdMap className="text-6xl text-gray-400 mb-2"/>
-                                <p className="text-sm font-bold text-gray-500">Sin coordenadas registradas en el mapa.</p>
-                            </div>
-                        )}
+                        {zonaDetalles.lat && zonaDetalles.lng ? <MapaGlobal zonas={[zonaDetalles]} /> : <div className="flex items-center justify-center h-full w-full opacity-50"><MdMap className="text-6xl text-gray-400 mb-2"/></div>}
                     </div>
                 </div>
             </div>
         </div>
       )}
-
     </div>
   );
 }
