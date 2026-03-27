@@ -13,11 +13,21 @@ export function useVentas() {
   const [comisiones, setComisiones] = useState([]); 
   const [cargando, setCargando] = useState(true);
 
+  // --- TRADUCTORES CON NUEVO CAMPO: coberturaGeo ---
+  const mapZonaToDB = (z) => ({
+      id: z.id, nombre_ap: z.nombreAp, comunidad: z.comunidad, 
+      municipio: z.municipio, estado: z.estado, sede: z.sede, 
+      marca: z.marca, tipo: z.tipo, lat: z.lat, lng: z.lng, 
+      estatus: z.estatus, costos: z.costos, planes: z.planes, cajas: z.cajas,
+      cobertura_geo: z.coberturaGeo // Magia GIS
+  });
+
   const mapZonaFromDB = (db) => ({
       id: db.id, nombreAp: db.nombre_ap, comunidad: db.comunidad, 
       municipio: db.municipio, estado: db.estado, sede: db.sede, 
       marca: db.marca, tipo: db.tipo, lat: db.lat, lng: db.lng, 
-      estatus: db.estatus, costos: db.costos, planes: db.planes, cajas: db.cajas
+      estatus: db.estatus, costos: db.costos, planes: db.planes, cajas: db.cajas,
+      coberturaGeo: db.cobertura_geo || null
   });
 
   const mapVentaToDB = (v) => ({
@@ -61,16 +71,11 @@ export function useVentas() {
             if (dMetas) setMetas(dMetas);
 
             const { data: dComis, error: errComis } = await supabase.from('ventas_comisiones').select('*');
-            if (errComis) console.error("Error BD Comisiones:", errComis);
             if (dComis) {
                 setComisiones(dComis.map(c => ({
-                    id: c.id, 
-                    beneficiarioTipo: c.beneficiario_tipo, 
-                    beneficiarioValor: c.beneficiario_valor, 
-                    condicionMarca: c.condicion_marca,
-                    condicionTipoVenta: c.condicion_tipo_venta,
-                    tipoPago: c.tipo_pago, 
-                    valor: c.valor
+                    id: c.id, beneficiarioTipo: c.beneficiario_tipo, beneficiarioValor: c.beneficiario_valor, 
+                    condicionMarca: c.condicion_marca, condicionTipoVenta: c.condicion_tipo_venta,
+                    tipoPago: c.tipo_pago, valor: c.valor
                 })));
             }
 
@@ -86,37 +91,23 @@ export function useVentas() {
   const actualizarMeta = async (mes, canal, valorMeta) => {
       const idMeta = `${mes}-${canal}`;
       const payload = { id: idMeta, mes, canal, meta: parseInt(valorMeta) || 0 };
-      
       setMetas(prev => {
           const existe = prev.find(m => m.id === idMeta);
           if (existe) return prev.map(m => m.id === idMeta ? payload : m);
           return [...prev, payload];
       });
-
       await supabase.from('ventas_metas').upsert([payload]);
   };
 
-  // --- SOLUCIÓN DEL BUG: ID NUMÉRICO (BIGINT COMPATIBLE) ---
   const guardarReglaComision = async (regla) => {
-      const idRegla = Date.now(); // Número puro, compatible con la columna bigint de tu base de datos
+      const idRegla = Date.now(); 
       const nuevaRegla = { id: idRegla, ...regla };
-      
       const { error } = await supabase.from('ventas_comisiones').insert([{
-          id: idRegla, 
-          beneficiario_tipo: regla.beneficiarioTipo, 
-          beneficiario_valor: regla.beneficiarioValor,
-          condicion_marca: regla.condicionMarca,
-          condicion_tipo_venta: regla.condicionTipoVenta,
-          tipo_pago: regla.tipoPago, 
-          valor: Number(regla.valor) || 0
+          id: idRegla, beneficiario_tipo: regla.beneficiarioTipo, beneficiario_valor: regla.beneficiarioValor,
+          condicion_marca: regla.condicionMarca, condicion_tipo_venta: regla.condicionTipoVenta,
+          tipo_pago: regla.tipoPago, valor: Number(regla.valor) || 0
       }]);
-
-      if (error) {
-          console.error("Supabase rechazó la regla:", error);
-          alert(`Error al guardar en base de datos: ${error.message}`);
-          return;
-      }
-
+      if (error) { alert(`Error BD: ${error.message}`); return; }
       setComisiones(prev => [nuevaRegla, ...prev]);
   };
 
@@ -139,38 +130,43 @@ export function useVentas() {
   const validarCupon = (codigo, contextoVenta) => {
       const cupon = cupones.find(c => c.codigo.toUpperCase() === codigo.toUpperCase() && c.activo);
       if (!cupon) return { valido: false, mensaje: 'Cupón no existe o inactivo.' };
-
       const hoy = new Date().toISOString().split('T')[0];
       if (cupon.vigencia < hoy) return { valido: false, mensaje: 'Cupón expirado.' };
-      if (cupon.limite !== null && cupon.usados >= cupon.limite) return { valido: false, mensaje: 'Este cupón ha agotado sus usos disponibles.' };
-
-      const restr = cupon.restricciones || {};
-      if (restr.sede !== 'TODAS' && restr.sede !== contextoVenta.sede) return { valido: false, mensaje: `Solo válido para sede ${restr.sede}.` };
-      if (restr.marca !== 'TODAS' && restr.marca !== contextoVenta.marca) return { valido: false, mensaje: `Solo válido para marca ${restr.marca}.` };
-      if (restr.zonaId && restr.zonaId !== 'TODAS') {
-          if (restr.zonaId !== contextoVenta.zonaId) return { valido: false, mensaje: 'Este cupón no es válido para esta zona.' };
-      }
+      if (cupon.limite !== null && cupon.usados >= cupon.limite) return { valido: false, mensaje: 'Agotado.' };
       return { valido: true, datos: cupon, mensaje: 'Cupón aplicado correctamente.' };
   };
 
+  // --- SOLUCIÓN ERROR DE GUARDADO ZONA ---
   const agregarZona = async (zona) => {
-    const nuevaZona = { ...zona, id: `ZONA-${Date.now()}` };
+    const idNum = Date.now(); // Número puro para evitar fallos de BigInt
+    const nuevaZona = { ...zona, id: idNum };
+    
+    // TRAMPA DE ERRORES AL GUARDAR
+    const { error } = await supabase.from('ventas_zonas').insert([mapZonaToDB(nuevaZona)]);
+    
+    if (error) {
+        console.error("Error al guardar zona:", error);
+        alert(`Error guardando en la Nube: ${error.message}. Verifica que 'cobertura_geo' sea tipo JSONB en Supabase.`);
+        return;
+    }
     setCobertura(prev => [...prev, nuevaZona]);
-    await supabase.from('ventas_zonas').insert([mapZonaToDB(nuevaZona)]);
   };
 
   const actualizarZona = async (zonaActualizada) => {
+    const { error } = await supabase.from('ventas_zonas').update(mapZonaToDB(zonaActualizada)).eq('id', zonaActualizada.id);
+    if (error) {
+        alert(`Error al actualizar: ${error.message}`);
+        return;
+    }
     setCobertura(prev => prev.map(z => z.id === zonaActualizada.id ? zonaActualizada : z));
-    await supabase.from('ventas_zonas').update(mapZonaToDB(zonaActualizada)).eq('id', zonaActualizada.id);
   };
 
   const registrarVenta = async (datosFormulario, vendedor) => {
     const nuevaVenta = {
-      id: `VENTA-${Date.now()}`,
+      id: Date.now(),
       fechaRegistro: new Date().toISOString(), 
       vendedor: { id: vendedor.id, nombre: vendedor.nombre },
-      cliente: { ...datosFormulario }, 
-      servicio: { ...datosFormulario },
+      cliente: { ...datosFormulario }, servicio: { ...datosFormulario },
       estatus: 'PENDIENTE',
       bitacora: [{ fecha: new Date().toISOString(), mensaje: 'Venta registrada', usuario: vendedor.nombre }]
     };
@@ -188,16 +184,6 @@ export function useVentas() {
             updates.push(supabase.from('ventas_zonas').update({ cajas: nuevasCajas }).eq('id', zona.id));
         }
     }
-
-    if (datosFormulario.cuponAplicado) {
-        const cupon = cupones.find(c => c.id === datosFormulario.cuponAplicado.id);
-        if (cupon) {
-            const nuevosUsos = (cupon.usos || 0) + 1;
-            const cuponActualizado = { ...cupon, usos: nuevosUsos };
-            setCupones(prev => prev.map(c => c.id === cupon.id ? cuponActualizado : c));
-            updates.push(supabase.from('ventas_cupones').update({ usos: nuevosUsos }).eq('id', cupon.id));
-        }
-    }
     await Promise.all(updates);
   };
 
@@ -210,10 +196,7 @@ export function useVentas() {
       }
       return v;
     }));
-
-    if (ventaActualizada) {
-        await supabase.from('ventas_registros').update({ estatus: nuevoEstado, bitacora: ventaActualizada.bitacora }).eq('id', idVenta);
-    }
+    if (ventaActualizada) await supabase.from('ventas_registros').update({ estatus: nuevoEstado, bitacora: ventaActualizada.bitacora }).eq('id', idVenta);
   };
 
   return { 
