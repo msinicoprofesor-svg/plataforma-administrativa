@@ -51,23 +51,28 @@ export default function MapaGlobal({ zonas = [] }) {
     return (
         <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative z-0 border border-gray-200 shadow-inner bg-gray-50 flex flex-col">
             
-            {/* MINI TARJETAS (Ocultas si solo se manda 1 zona como en "Detalles") */}
+            {/* CONTENEDOR DE TARJETAS CON EFECTO DE DESVANECIMIENTO */}
             {zonas.length > 1 && (
-                <div className="absolute top-4 left-4 right-4 z-[400] flex gap-3 overflow-x-auto pb-4 custom-scrollbar pointer-events-auto">
-                    {zonas.map(z => ( 
-                        <div key={z.id} onClick={() => setZonaFocuseada(z)} className={`shrink-0 w-64 p-3 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border cursor-pointer transition-all hover:scale-105 ${zonaFocuseada?.id === z.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}>
-                            <div className="flex justify-between items-center mb-1">
-                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${z.tipo === 'FIBRA' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{z.tipo}</span>
-                                <span className="text-[10px] font-bold text-gray-400">{z.sede}</span>
+                <div 
+                    className="absolute top-4 left-4 right-4 z-[400] pointer-events-auto overflow-hidden"
+                    // FIX: Efecto de máscara CSS para crear el desvanecimiento a la derecha
+                    style={{ maskImage: 'linear-gradient(to right, black 85%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)' }}
+                >
+                    <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                        {zonas.map(z => ( 
+                            <div key={z.id} onClick={() => setZonaFocuseada(z)} className={`shrink-0 w-64 p-3 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border cursor-pointer transition-all hover:scale-105 ${zonaFocuseada?.id === z.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}>
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${z.tipo === 'FIBRA' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{z.tipo}</span>
+                                    <span className="text-[10px] font-bold text-gray-400">{z.sede}</span>
+                                </div>
+                                <h4 className="text-sm font-black text-gray-800 truncate">{z.nombreAp || z.comunidad}</h4>
                             </div>
-                            <h4 className="text-sm font-black text-gray-800 truncate">{z.nombreAp || z.comunidad}</h4>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
 
             <MapContainer center={centroDefecto} zoom={11} style={{ height: '100%', width: '100%', zIndex: 0 }} zoomControl={false}>
-                {/* Si hay 1 sola zona, hace zoom directo a ella (Zoom 14), si no, al estado global */}
                 <ChangeView center={zonas.length === 1 ? [parseFloat(zonas[0].lat), parseFloat(zonas[0].lng)] : centroDinamico} zoom={zonas.length === 1 ? 15 : (zonaFocuseada ? 14 : 11)} />
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
 
@@ -113,7 +118,6 @@ export default function MapaGlobal({ zonas = [] }) {
                                                 <p className="text-[9px] font-black text-green-500 uppercase tracking-widest">Caja NAP</p>
                                                 <h4 className="font-black text-gray-800 text-xs mt-0.5">{caja.nombre}</h4>
                                                 
-                                                {/* FIX: CALLES Y PUERTOS RESTAURADOS */}
                                                 <p className="text-[10px] font-bold text-gray-500 mt-1">{caja.calles || 'Calles sin especificar'}</p>
                                                 <div className="mt-2 bg-green-50 border border-green-100 rounded-lg p-1.5">
                                                     <p className="text-[10px] font-black text-green-700">
