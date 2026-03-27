@@ -97,7 +97,7 @@ export default function Home() {
   const [isViewOnly, setIsViewOnly] = useState(false);
 
   const uBasico = auth.usuarioActivo;
-  const perfilReal = colaboradoresReales.find(c => c.email === uBasico?.email);
+  const perfilReal = (colaboradoresReales || []).find(c => c.email === uBasico?.email);
 
   const u = uBasico ? {
       ...uBasico,
@@ -251,15 +251,15 @@ export default function Home() {
             {activeModule === 'marketing_ventas' && verVentas && (
                 <div className="animate-slide-up h-full pb-10">
                     <PanelVentas 
-                        ventas={ventasData.ventas} 
-                        cobertura={ventasData.cobertura} 
-                        cupones={ventasData.cupones} 
-                        validarCupon={ventasData.validarCupon} 
-                        onRegistrarVenta={ventasData.registrarVenta} 
+                        ventas={ventasData?.ventas || []} 
+                        cobertura={ventasData?.cobertura || []} 
+                        cupones={ventasData?.cupones || []} 
+                        validarCupon={ventasData?.validarCupon} 
+                        onRegistrarVenta={ventasData?.registrarVenta} 
                         vendedorActual={u} 
-                        metas={ventasData.metas} 
-                        actualizarMeta={ventasData.actualizarMeta} 
-                        colaboradores={colaboradoresReales} 
+                        metas={ventasData?.metas || []} 
+                        actualizarMeta={ventasData?.actualizarMeta} 
+                        colaboradores={colaboradoresReales || []} 
                     />
                 </div>
             )}
