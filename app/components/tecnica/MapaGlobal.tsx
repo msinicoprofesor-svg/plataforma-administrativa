@@ -51,23 +51,31 @@ export default function MapaGlobal({ zonas = [] }) {
     return (
         <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative z-0 border border-gray-200 shadow-inner bg-gray-50 flex flex-col">
             
-            {/* CONTENEDOR DE TARJETAS CON EFECTO DE DESVANECIMIENTO */}
+            {/* CONTENEDOR DE TARJETAS REDISEÑADO */}
             {zonas.length > 1 && (
-                <div 
-                    className="absolute top-4 left-4 right-4 z-[400] pointer-events-auto overflow-hidden"
-                    // FIX: Efecto de máscara CSS para crear el desvanecimiento a la derecha
-                    style={{ maskImage: 'linear-gradient(to right, black 85%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)' }}
-                >
-                    <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                        {zonas.map(z => ( 
-                            <div key={z.id} onClick={() => setZonaFocuseada(z)} className={`shrink-0 w-64 p-3 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border cursor-pointer transition-all hover:scale-105 ${zonaFocuseada?.id === z.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${z.tipo === 'FIBRA' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{z.tipo}</span>
-                                    <span className="text-[10px] font-bold text-gray-400">{z.sede}</span>
+                <div className="absolute top-2 left-0 right-0 z-[400] pointer-events-none">
+                    <div 
+                        className="pointer-events-auto w-full overflow-hidden"
+                        // FIX: Máscara de desvanecimiento en ambos lados (0% a 5% y 95% a 100%)
+                        style={{ maskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)' }}
+                    >
+                        {/* FIX: py-4 para evitar cortes al escalar, px-6 para márgenes, y barra scroll de cristal */}
+                        <div className="flex gap-4 overflow-x-auto px-6 py-4 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400/30 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400/50 [&::-webkit-scrollbar-thumb]:rounded-full transition-all">
+                            {zonas.map(z => ( 
+                                <div 
+                                    key={z.id} 
+                                    onClick={() => setZonaFocuseada(z)} 
+                                    // FIX: Sombras más suaves, hover:-translate-y-1 para levantar elegante sin cortar
+                                    className={`shrink-0 w-64 p-3 rounded-2xl bg-white/95 backdrop-blur-md shadow-sm border cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${zonaFocuseada?.id === z.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}
+                                >
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${z.tipo === 'FIBRA' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>{z.tipo}</span>
+                                        <span className="text-[10px] font-bold text-gray-400">{z.sede}</span>
+                                    </div>
+                                    <h4 className="text-sm font-black text-gray-800 truncate">{z.nombreAp || z.comunidad}</h4>
                                 </div>
-                                <h4 className="text-sm font-black text-gray-800 truncate">{z.nombreAp || z.comunidad}</h4>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
